@@ -2,50 +2,139 @@ NUSLink — Development Plan & Work Allocation
 Joel Yap & Zhang Kaiwen
 Orbital 2026 — Apollo 11
 
-A comprehensive development plan supplementing the NUSLink Feature Specification. This document details task allocation, sprint timelines, and deliverables for each milestone.
+A development plan for the conservative scope of NUSLink. This document translates `FEATURES.md` into milestone-sized deliverables and follows the implementation guardrails in `AGENTS.md`: keep M1 small, ship a manual non-AI core first, and defer SSO plus AI-heavy features until the later milestone.
 
+## Overview
 
-Overview
-This document breaks down the NUSLink Feature Specification into concrete development tasks, allocates them equally between Joel and Kaiwen, and organises them into six two-week sprints across three Orbital milestones. Each task includes a description and time estimate to support sprint planning.
+This plan breaks the product into six two-week sprints across three milestones.
 
-Allocation Summary
-The table below summarises the task distribution across milestones. Individual tasks are split roughly evenly; shared tasks (integration testing, documentation, submissions) are completed jointly.
-MilestoneJoelKaiwenSharedMilestone 16 tasks6 tasks3 shared tasksMilestone 27 tasks6 tasks4 shared tasksMilestone 36 tasks6 tasks3 shared tasksTotal19 tasks18 tasks10 shared tasks
-🟠 = Joel's tasks · 🔵 = Kaiwen's tasks · ⚪ = Shared tasks
+- Milestone 1 proves the stack works end to end.
+- Milestone 2 ships the core social and matching experience.
+- Milestone 3 adds higher-risk features such as SSO, AI, moderation, and trust signals.
 
-Detailed Task Breakdown by Milestone
-Milestone 1 — Technical Proof of Concept
+## Allocation Summary
+
+- Joel owns most frontend-heavy surfaces, authentication UI, chat UI, notifications, and AI-facing product flows.
+- Kaiwen owns backend architecture, database design, matching logic, moderation, trust systems, and technical documentation.
+- Integration testing, milestone reports, and final submissions are shared.
+
+## Milestone 1 — Technical Proof of Concept
+
 Deadline: End of May 2026
-Deliver a working skeleton: users can sign up, onboard, create basic groups, and browse them. CI/CD pipeline is operational and backend is deployed. This milestone proves the technical stack works end-to-end.
-TaskOwnerDescriptionEst.🟠 Project scaffolding (Expo + TypeScript + NativeWind)JoelInitialise the React Native project with Expo, configure TypeScript, set up NativeWind, create folder structure, and configure path aliases.2 days🟠 Supabase project setupJoelCreate Supabase project, configure auth providers (email + OIDC placeholder for SSO), set up initial database schema with migrations, and configure Row-Level Security policies for users table.1 day🟠 Sign-up & login screens (email flow)JoelBuild sign-up and login UI screens. Integrate Supabase Auth for email/password flow. Handle error states, loading states, and redirect to onboarding on first login.3 days🟠 NUS SSO integration (OIDC)JoelImplement SSO authentication via Supabase OIDC provider. Auto-populate faculty, major, year from identity claims. Handle SSO verification flag for email-only users.3 days🟠 Onboarding screens 1–3 (Sign Up, Academic Info, Profile Setup)JoelBuild the first three onboarding screens. Integrate NUSMods API for module search with chip selection. Implement profile picture upload to Supabase Storage. Persist all data to the database on completion.4 days🟠 CI pipeline (GitHub Actions)JoelConfigure GitHub Actions for ESLint, TypeScript type-checking, Ruff (Python), and automated tests on every push. Set up branch protection on main requiring PR approval and passing CI.1 day🔵 FastAPI backend scaffolding & deploymentKaiwenSet up FastAPI project structure with proper module organisation. Configure Railway deployment with auto-deploy from main. Implement health endpoint and CORS configuration.2 days🔵 Database schema design & migrationsKaiwenDesign and implement full database schema for users, profiles, modules, groups, and memberships. Write Supabase migrations. Define RLS policies for all tables.2 days🔵 Onboarding screens 4–5 (Interests, Intent Selection)KaiwenBuild the Academic Interests selector with predefined categories and custom tags. Build Intent Selection screen with multi-select. Implement onboarding completion flow that persists all selections and navigates to the main app.3 days🔵 Basic profile page with completion barKaiwenBuild the profile screen displaying user info, modules, interests, and intents. Calculate and display profile completion percentage based on filled optional fields. Allow editing of all profile fields.3 days🔵 Basic group creation (public groups, manual form)KaiwenBuild group creation form with mandatory fields (name, type, module). Support public privacy setting only. Persist group to database and navigate to group detail screen.2 days🔵 Basic Discover tab (list & join groups)KaiwenBuild Discover tab showing available public groups as scrollable cards (name, type, module, member count). Implement join functionality. No matching algorithm yet.2 days⚪ Integration testing & bug fixesBothEnd-to-end testing of the full onboarding-to-group-join flow. Fix integration bugs between frontend and backend. Verify CI pipeline catches regressions.2 days⚪ Milestone 1 documentation & submissionBothWrite milestone report, record demo video, prepare poster updates. Ensure README is up to date with setup instructions.1 day
 
-Milestone 2 — Core Features Complete
+Goal: users can sign up, finish onboarding, create basic public groups, and browse or join them. The backend, database, and CI pipeline are working.
+
+### Joel
+
+- Project scaffolding: initialise Expo, TypeScript, NativeWind, folder structure, and path aliases. Est. 2 days.
+- Supabase project setup: configure email/password auth, initial project settings, and core environment setup. Est. 1 day.
+- Sign-up and login screens: build email/password auth flow with loading and error states. Est. 3 days.
+- Onboarding screens 1–3: sign up, academic information, and profile setup. Integrate NUSMods search and profile image upload. Est. 4 days.
+- CI pipeline: configure linting, type-checking, Python checks, and automated test runs. Est. 1 day.
+
+### Kaiwen
+
+- FastAPI backend scaffolding and deployment: set up project structure, health endpoint, CORS, and Railway deployment. Est. 2 days.
+- Database schema design and migrations: create initial schema for users, profiles, modules, groups, and memberships with RLS. Est. 2 days.
+- Onboarding screens 4–5: academic interests and intent selection, including persistence and onboarding completion flow. Est. 3 days.
+- Basic profile page with completion bar: show user info, modules, interests, and intents with editable fields. Est. 3 days.
+- Basic group creation: public groups only, manual form only. Est. 2 days.
+- Basic Discover tab: list and join public groups, no matching yet. Est. 2 days.
+
+### Shared
+
+- Integration testing and bug fixes: verify onboarding through group join end to end. Est. 2 days.
+- Milestone 1 documentation and submission: report, README updates, demo prep, poster updates. Est. 1 day.
+
+## Milestone 2 — Core Features Complete
+
 Deadline: End of June 2026
-Deliver the core experience: smart matching drives discovery, real-time chat enables collaboration, communities provide long-lived spaces, and the connection system gates direct messaging. User testing validates the flow with real NUS students.
-TaskOwnerDescriptionEst.🟠 Full group creation (all privacy types)JoelExtend group creation to support semi-private (restriction selector) and private (invite link, QR code, request-to-join) groups. Update Discover tab to respect visibility rules.3 days🟠 AI group creation autofill (Section 7.1)JoelBuild toggle between manual and AI mode on group creation. Send natural language input to AI API via FastAPI. Parse structured response and auto-populate form fields. Allow user review and editing before submission.3 days🟠 Real-time chat — text, images, filesJoelImplement real-time messaging via Supabase Realtime subscriptions. Support text messages, image attachments with inline rendering, and file sharing with downloadable links. Build chat UI with message bubbles, timestamps, and sender info.4 days🟠 Chat features — polls & pinned messagesJoelBuild poll creation UI (question + 2–4 options), real-time vote counting, and results display. Implement pinned messages with admin controls and a dedicated pinned messages viewer accessible from the chat header.3 days🟠 Timetable import (NUSMods URL)JoelParse NUSMods share URL to extract timetable data. Store structured timetable in database. Build weekly grid view for manual entry as fallback. Display timetable on profile page.2 days🟠 Unified chat inbox with unread trackingJoelBuild the Chats tab with a single sorted list of all group chats, community chats, and DMs. Track read/unread state per user per conversation. Display unread count badges and last message preview.2 days🟠 User testing coordination (5–10 students)JoelRecruit 5–10 NUS students for testing. Prepare testing script covering onboarding, group discovery, matching, and chat. Conduct sessions and compile feedback.2 days🔵 Smart matching algorithm (5 dimensions)KaiwenImplement the weighted multi-dimensional scoring algorithm in FastAPI: schedule overlap (0.30), skills complementarity (0.25), target grade (0.20), working style (0.15), communication preference (0.10). Handle missing data with proportional weight redistribution. Support both people-to-people and people-to-group matching modes.5 days🔵 Matching API endpoints & Discover integrationKaiwenBuild FastAPI endpoints for fetching ranked matches (people and groups). Integrate with Discover tab to display compatibility percentages on cards. Implement sort-by-compatibility and other sort/filter options.3 days🔵 Communities tab (browse, create, join, chat)KaiwenBuild Communities tab with browsable community cards. Support official (badged) and user-created types. Implement open and request-approval join policies. Integrate community chat using the same chat infrastructure.4 days🔵 Shared resources sectionKaiwenBuild a shared resources panel for groups and communities. Support file upload to Supabase Storage, file listing with metadata, and per-user deletion of own uploads. Separate from chat UI.2 days🔵 Connection system & direct messagingKaiwenImplement mutual connection model: send/accept/decline requests. Show Connect button on profiles throughout the app. Gate direct messaging behind mutual connection. Build DM conversation UI using shared chat components.3 days🔵 Basic notifications (in-app)KaiwenBuild notification system for connection requests, group invites, community activity, and high-compatibility alerts (80%+). Display unread count on bell icon. Navigate to relevant screen on tap.2 days⚪ Integration testing & user feedback synthesisBothEnd-to-end testing of matching, chat, communities, and connections. Synthesise user testing feedback. Prioritise critical fixes and UX improvements for Milestone 3.3 days⚪ Milestone 2 documentation & submissionBothWrite milestone report with user testing findings. Update technical documentation. Record demo video and update poster.1 day
 
-Milestone 3 — Extended System
+Goal: ship the core experience with manual group creation, initial matching, real-time chat, communities, direct messaging, and timetable-aware discovery.
+
+### Joel
+
+- Full group creation: add semi-private and private privacy modes, invite flow, and visibility rules. Est. 3 days.
+- Real-time chat: text, images, and files using Supabase Realtime. Est. 4 days.
+- Chat features: polls and pinned messages. Est. 3 days.
+- Timetable import: parse NUSMods share URL and support manual fallback entry. Est. 2 days.
+- Unified chat inbox: merge group chats, community chats, and DMs with unread state. Est. 2 days.
+- User testing coordination: recruit and run sessions with 5–10 NUS students. Est. 2 days.
+
+### Kaiwen
+
+- Initial matching algorithm: implement 2-dimensional scoring in FastAPI using target grade similarity and schedule overlap. Enforce same-module, same-semester matching. Est. 4 days.
+- Matching API and Discover integration: expose ranked people and group matches with compatibility percentages and filters. Est. 3 days.
+- Communities tab: browse, create, join, and chat in communities. Est. 4 days.
+- Shared resources section: support persistent uploads for groups and communities. Est. 2 days.
+- Connection system and direct messaging: mutual connections gate DMs. Est. 3 days.
+- Basic notifications: in-app notifications for requests, invites, activity, and high-match alerts. Est. 2 days.
+
+### Shared
+
+- Integration testing and user feedback synthesis: validate matching, chat, communities, and connections end to end. Est. 3 days.
+- Milestone 2 documentation and submission: report, updated technical notes, demo, and poster updates. Est. 1 day.
+
+## Milestone 3 — Extended System
+
 Deadline: End of July 2026
-Polish and extend: AI-powered features (resume extraction, smart nudges, content moderation) add intelligence, the reputation system adds trust, and shared scheduling adds coordination. Comprehensive testing with 15–20 students validates the full product.
-TaskOwnerDescriptionEst.🟠 AI profile extraction from resumes (Section 7.2)JoelBuild resume upload flow (PDF, DOCX, screenshot). Integrate with AI API to extract skills, interests, competition history, and work experience. Present extracted data in a review screen for user approval. Support both onboarding and profile page entry points.4 days🟠 Smart nudges system (Section 7.3)JoelImplement three nudge categories: time-based (academic calendar triggers), behaviour-based (inactivity detection), and network-based (social graph changes). Build nudge delivery via in-app and push notifications. Add per-category toggle controls in settings.4 days🟠 Threaded replies in chatJoelAdd reply-to-message functionality. Display reply count on parent messages. Build full-screen thread view with its own message input. Support threads in all chat environments.2 days🟠 Push notification infrastructureJoelSet up Expo push notification service. Implement device token registration, notification delivery for all event types, and deep linking from notification tap to relevant screen. Handle notification permissions and fallback gracefully.3 days🟠 Comprehensive user testing (15–20 students)JoelRecruit 15–20 NUS students. Conduct structured testing sessions covering the full feature set. Collect quantitative metrics (task completion rate, time-on-task) and qualitative feedback. Compile findings into a testing report.3 days🟠 Final demo video & posterJoelRecord a polished demo video showcasing the full user journey. Update the Orbital poster with final screenshots and feature highlights. Prepare talking points for the final presentation.2 days🔵 Reputation & rating system (Section 11)KaiwenBuild rating UI (Reliability, Communication, Contribution on 1–5 scale). Enforce minimum group duration eligibility. Implement anonymous rating display. Calculate aggregate scores and assign badge tiers (Bronze, Silver, Gold). Display badges throughout the app.4 days🔵 Shared scheduling (Section 6.3)KaiwenCalculate overlapping free blocks across group members with linked timetables. Suggest top 3–5 time slots sorted by duration and availability. Build accept/decline flow for members without timetables. Confirm session on majority acceptance. Display confirmed sessions on group detail screen.4 days🔵 AI content moderation (Section 12.2)KaiwenIntegrate AI moderation API to scan all user-generated content (group names, descriptions, chat messages, bios). Implement three-tier classification (safe, high-confidence violation, borderline). Block violations pre-post with user explanation. Flag borderline content as hidden. Apply consequence framework (warning, 7-day ban, permanent ban).3 days🔵 Profile completion bar (full calculation)KaiwenImplement complete profile completion percentage calculation across all optional fields (timetable, target grades, professional links, resume, skills, personality quiz). Update profile page with accurate progress indicator.1 day🔵 Full technical documentationKaiwenWrite comprehensive technical documentation covering architecture decisions, API reference, database schema, matching algorithm details, deployment guide, and contribution guidelines. Ensure README covers local development setup.2 days🔵 Final bug fixes & polishKaiwenAddress all issues from user testing. Polish UI consistency, loading states, error handling, and edge cases across the entire app. Performance optimisation for matching queries and chat.4 days⚪ Final integration testingBothComplete end-to-end testing of all features. Verify moderation, nudges, ratings, and scheduling work together. Regression testing on Milestone 1 and 2 features.2 days⚪ Milestone 3 documentation & final submissionBothFinalise all documentation. Submit milestone report, demo video, poster, and project README. Prepare for Orbital evaluation.1 day
 
-Sprint Timeline
-The project spans six two-week sprints. Each sprint has a clear focus area and maps to specific tasks from the milestone breakdown above. Sprint planning happens at the start of each cycle; retrospectives at the end.
-SprintDatesJoelKaiwenSprint FocusSprint 1May 12–25Project scaffolding, Supabase setup, sign-up/login screensFastAPI scaffolding, DB schema, deploy backendFoundation: both sides of the stack are operationalSprint 2May 26–Jun 8SSO integration, onboarding screens 1–3, CI pipelineOnboarding screens 4–5, profile page, basic group creation, basic DiscoverMS1 delivery: onboarding-to-discovery flow worksSprint 3Jun 9–22Full group creation (privacy types), AI autofill, real-time chat (text/images/files)Matching algorithm (5 dimensions), matching API endpoints, Discover integrationCore differentiator: matching + chat are liveSprint 4Jun 23–Jul 6Polls, pinned messages, timetable import, unified inbox, user testingCommunities tab, shared resources, connection system, DMs, notificationsMS2 delivery: full social platform experienceSprint 5Jul 7–20AI resume extraction, smart nudges, threaded replies, push notificationsReputation system, shared scheduling, AI moderation, profile completionIntelligence layer: AI and trust features completeSprint 6Jul 21–31Comprehensive user testing, final demo video and posterTechnical documentation, final bug fixes and polishMS3 delivery: ship-ready product
+Goal: add higher-risk and higher-complexity features after the core product is stable.
 
-Work Allocation Rationale
-The division of work follows two guiding principles: equal volume and specialisation alignment. Each member owns roughly half the individual tasks per milestone, and shared tasks (integration testing, documentation, submission) are done jointly.
-Joel — Frontend-Heavy + AI Integration
-Joel takes primary ownership of the user-facing surfaces and AI-powered features. This includes the authentication and onboarding flow, the chat infrastructure (text, images, files, polls, pinned messages, threads), AI autofill for group creation, AI profile extraction from resumes, the smart nudges system, push notifications, timetable import, and user testing coordination. Joel also owns the CI pipeline setup and the final demo video and poster.
-Kaiwen — Backend-Heavy + Algorithm + Moderation
-Kaiwen takes primary ownership of the backend architecture, the matching algorithm, and the moderation and trust systems. This includes the FastAPI backend scaffolding and deployment, database schema design with migrations and RLS policies, the five-dimension weighted matching algorithm, the Communities tab, the connection system with direct messaging, the reputation and rating system, shared scheduling, AI content moderation, profile completion logic, full technical documentation, and final bug fixes and polish.
-Shared Responsibilities
-Integration testing, milestone documentation, and final submissions are shared tasks completed jointly. Both members participate in user testing sessions and contribute to bug fixes. Sprint planning and retrospectives are conducted together at the start and end of each two-week cycle.
+### Joel
 
-Key Dependencies & Risks
-Cross-Cutting Dependencies
-The matching algorithm (Kaiwen, Sprint 3) depends on the database schema and onboarding flow being complete (Sprint 1–2). Chat infrastructure (Joel, Sprint 3) depends on Supabase Realtime being configured during Sprint 1. AI features (Sprints 3–5) depend on API access to OpenAI or Anthropic being provisioned. Push notifications (Joel, Sprint 5) depend on Expo EAS being configured. All Milestone 2 features depend on Milestone 1 being stable.
-Risk Mitigation
-NUS SSO integration carries the highest technical risk due to dependency on university infrastructure. The fallback email authentication flow ensures the app is usable even if SSO is delayed. The matching algorithm is the most complex individual task; unit tests with known inputs and expected outputs will be written before the implementation to catch regressions early. AI features (autofill, moderation, nudges) depend on external API availability; the app should degrade gracefully if the AI service is temporarily unavailable, with manual fallbacks for all AI-assisted flows.
-Communication & Coordination
-The team uses GitHub Projects for task tracking with columns for Backlog, In Progress, In Review, and Done. Pull requests require teammate approval before merging. Daily async check-ins via Telegram and weekly sync meetings keep both members aligned. Code reviews are expected within 24 hours of PR submission.ShareContentNUSLink_Features (2).docxdocx
+- NUS SSO integration: add Supabase OIDC flow while keeping email/password as fallback. Est. 3 days.
+- AI group creation autofill: natural-language group drafting through FastAPI. Est. 3 days.
+- AI profile extraction from resumes: extract and review professional information from uploaded files. Est. 4 days.
+- Smart nudges system: time-based, behaviour-based, and network-based nudges with user controls. Est. 4 days.
+- Threaded replies in chat. Est. 2 days.
+- Push notification infrastructure. Est. 3 days.
+- Comprehensive user testing with 15–20 students. Est. 3 days.
+- Final demo video and poster. Est. 2 days.
+
+### Kaiwen
+
+- Matching algorithm expansion: extend the initial model to 4 dimensions by adding working style and communication preference with configurable weights. Est. 3 days.
+- Reputation and rating system: collect internal rating inputs but surface only badge tiers to users. Est. 4 days.
+- Shared scheduling: compute overlapping free blocks and support accept/decline coordination. Est. 4 days.
+- AI content moderation: moderate group content, chats, and bios through FastAPI. Est. 3 days.
+- Profile completion bar: full calculation across optional fields. Est. 1 day.
+- Full technical documentation: architecture, API, schema, deployment, contribution guide. Est. 2 days.
+- Final bug fixes and polish. Est. 4 days.
+
+### Shared
+
+- Final integration testing and regression testing. Est. 2 days.
+- Milestone 3 documentation and final submission. Est. 1 day.
+
+## Sprint Timeline
+
+- Sprint 1, May 12–25: project scaffolding, auth foundation, backend foundation, initial schema.
+- Sprint 2, May 26–Jun 8: onboarding completion, profile page, public groups, Discover, CI, Milestone 1 wrap-up.
+- Sprint 3, Jun 9–22: privacy-aware groups, initial matching, chat foundation, Discover integration.
+- Sprint 4, Jun 23–Jul 6: communities, resources, DMs, notifications, timetable import, inbox, Milestone 2 wrap-up.
+- Sprint 5, Jul 7–20: SSO, matching expansion, AI flows, moderation, reputation, scheduling, push notifications.
+- Sprint 6, Jul 21–31: large-scale user testing, polish, documentation, final demo, final submission.
+
+## Dependencies And Risks
+
+### Cross-Cutting Dependencies
+
+- Matching depends on onboarding data, modules, and timetable data being stable.
+- Chat depends on Supabase Realtime and storage setup from the early milestones.
+- AI features depend on FastAPI infrastructure and access to an external AI provider.
+- Push notifications depend on Expo notification setup and device token handling.
+
+### Risk Mitigation
+
+- SSO is deferred to Milestone 3 because it is the highest-risk external dependency.
+- The core product remains usable with email/password auth if SSO slips.
+- The first matching release stays intentionally small and deterministic.
+- Every AI-assisted feature must have a manual fallback.
+
+## Coordination
+
+- Use GitHub Projects for task tracking.
+- Require teammate review before merge.
+- Do sprint planning and retrospectives together.
+- Use milestone integration testing to catch cross-feature regressions early.
