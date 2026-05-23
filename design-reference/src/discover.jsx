@@ -54,7 +54,7 @@ const PEOPLE = [
 function DiscoverFeed({ dark }) {
   const t = useTheme();
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: t.bg }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: t.bgGradient }}>
       <AppTopBar title="NUSLink" unread={3}/>
 
       {/* Segmented Groups/People */}
@@ -153,7 +153,7 @@ function PersonFeedCard({ person }) {
       <div style={{
         padding: '10px 14px',
         borderTop: `1px solid ${t.border}`,
-        background: t.bg,
+        background: t.surface2,
         display: 'flex', alignItems: 'center', gap: 10,
       }}>
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -195,7 +195,7 @@ function DiscoverStack({ dark }) {
   const t = useTheme();
   const p = PEOPLE[0];
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: t.bg, position: 'relative' }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: t.bgGradient, position: 'relative' }}>
       <AppTopBar title="Discover" unread={3}/>
 
       {/* Segmented */}
@@ -244,8 +244,8 @@ function CircBtn({ icon, bg, size = 54, border, elevated }) {
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       cursor: 'pointer',
       boxShadow: elevated
-        ? '0 8px 24px rgba(217,99,63,0.35), 0 2px 6px rgba(217,99,63,0.2)'
-        : '0 2px 8px rgba(45,30,15,0.08), 0 8px 24px rgba(45,30,15,0.06)',
+        ? '0 8px 24px rgba(15,17,21,0.35), 0 2px 6px rgba(15,17,21,0.2)'
+        : '0 2px 8px rgba(20,28,46,0.08), 0 8px 24px rgba(20,28,46,0.06)',
     }}>{icon}</button>
   );
 }

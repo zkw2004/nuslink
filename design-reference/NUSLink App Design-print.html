@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>NUSLink · Design (Print)</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #f0eee9; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    color: #1A1614;
+  }
+  * { box-sizing: border-box; }
+  button { font-family: inherit; }
+
+  /* ── Print pages ────────────────────────────────────────── */
+  .page {
+    width: 210mm;
+    min-height: 297mm;
+    padding: 14mm 14mm 12mm;
+    background: #f0eee9;
+    page-break-after: always;
+    break-after: page;
+    display: flex;
+    flex-direction: column;
+  }
+  .page:last-child { page-break-after: auto; break-after: auto; }
+
+  .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 8mm;
+    padding-bottom: 4mm;
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+  }
+  .page-section {
+    font-size: 10px;
+    font-weight: 700;
+    color: #0F1115;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+  }
+  .page-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: #1A1614;
+    letter-spacing: -0.6px;
+    margin-top: 4px;
+  }
+  .page-subtitle {
+    font-size: 12px;
+    color: #5B5650;
+    margin-top: 2px;
+  }
+  .page-num {
+    font-size: 11px;
+    color: #8C877F;
+    font-family: ui-monospace, "SF Mono", monospace;
+  }
+  .page-body {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4mm 0;
+  }
+  .page-body-fit {
+    align-items: flex-start;
+  }
+
+  /* Frame sizing — letterbox the artboard to fit the page nicely */
+  .frame-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8mm;
+  }
+  .frame-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #5B5650;
+    letter-spacing: -0.1px;
+  }
+  .artboard {
+    border-radius: 6px;
+    overflow: hidden;
+    background: #fff;
+    box-shadow: 0 6px 24px rgba(45,30,15,0.10);
+  }
+
+  /* Print rules */
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+  @media print {
+    html, body { background: #f0eee9; }
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .page {
+      width: 210mm;
+      height: 297mm;
+      page-break-after: always;
+      break-after: page;
+    }
+    .page:last-child { page-break-after: auto; break-after: auto; }
+    /* Disable any overflow clipping inside the rendered screens for print fidelity */
+    .artboard * { overflow: visible !important; }
+  }
+
+  /* On-screen preview: scale-to-fit no, just stack the pages */
+  .preview-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+    padding: 24px;
+  }
+</style>
+</head>
+<body>
+
+<div id="root"></div>
+
+<!-- React + Babel -->
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<!-- Starter components -->
+<script type="text/babel" src="ios-frame.jsx"></script>
+
+<!-- App modules -->
+<script type="text/babel" src="src/tokens.jsx"></script>
+<script type="text/babel" src="src/primitives.jsx"></script>
+<script type="text/babel" src="src/logo.jsx"></script>
+<script type="text/babel" src="src/brief.jsx"></script>
+<script type="text/babel" src="src/onboarding.jsx"></script>
+<script type="text/babel" src="src/discover.jsx"></script>
+<script type="text/babel" src="src/profile.jsx"></script>
+<script type="text/babel" src="src/chat.jsx"></script>
+
+<!-- Print composer -->
+<script type="text/babel">
+
+// Page wrapper component
+function Page({ section, title, subtitle, num, total, fitTop, children }) {
+  return (
+    <div className="page">
+      <div className="page-header">
+        <div>
+          <div className="page-section">{section}</div>
+          <div className="page-title">{title}</div>
+          {subtitle && <div className="page-subtitle">{subtitle}</div>}
+        </div>
+        <div className="page-num">{num} / {total}</div>
+      </div>
+      <div className={'page-body' + (fitTop ? ' page-body-fit' : '')}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// Scale wrap so an artboard always fits inside the page body without clipping.
+// Pass the natural artboard width/height; we apply a CSS transform.
+function ArtboardScaled({ width, height, maxW = 720, maxH = 920, children }) {
+  const sw = maxW / width;
+  const sh = maxH / height;
+  const s = Math.min(1, sw, sh);
+  return (
+    <div style={{
+      width: width * s, height: height * s,
+      position: 'relative',
+    }}>
+      <div className="artboard" style={{
+        width, height,
+        transform: `scale(${s})`, transformOrigin: 'top left',
+        position: 'absolute', top: 0, left: 0,
+      }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// iOS frame helper
+function PhonePage(props) {
+  const { children, screen, ...rest } = props;
+  return (
+    <Page {...rest}>
+      <div className="frame-wrap">
+        <ArtboardScaled width={402} height={874}>
+          <ThemeProvider mode="light">
+            <IOSDevice dark={false}>
+              {screen}
+            </IOSDevice>
+          </ThemeProvider>
+        </ArtboardScaled>
+      </div>
+    </Page>
+  );
+}
+
+function PrintDeck() {
+  // Total page count (computed below)
+  const screens = [
+    // Direction
+    { section: 'Direction', title: 'Brief',          subtitle: "What we're building and why", w: 520, h: 1100, Comp: Brief, fitTop: true },
+    { section: 'Direction', title: 'Visual system',  subtitle: 'Tokens & primitives',          w: 520, h: 1100, Comp: VisualSystem, fitTop: true },
+
+    // Logo
+    { section: 'Logo',      title: 'Primary mark · Arc',       subtitle: 'Two nodes, one bridge — reads as "n" + connection', w: 460, h: 1100, Comp: LogoHero, fitTop: true },
+    { section: 'Logo',      title: 'All directions',           subtitle: '5 marks across contexts',                            w: 520, h: 1500, Comp: LogoExploration, fitTop: true },
+
+    // Onboarding
+    { section: 'Onboarding', title: '1 · Welcome / SSO',        phone: true, Comp: OnboardingSignUp },
+    { section: 'Onboarding', title: '2 · Academic info',        phone: true, Comp: OnboardingAcademic },
+    { section: 'Onboarding', title: '3 · Profile setup',        phone: true, Comp: OnboardingProfile },
+    { section: 'Onboarding', title: '4 · Interests',            phone: true, Comp: OnboardingInterests },
+    { section: 'Onboarding', title: '5 · Intent',               phone: true, Comp: OnboardingIntent },
+
+    // Discover
+    { section: 'Discover · People', title: 'Feed pattern',  subtitle: 'LinkedIn-style scroll of compatibility cards', phone: true, Comp: DiscoverFeed },
+    { section: 'Discover · People', title: 'Stack pattern', subtitle: 'Hinge-style hero card · "Why you match" breakdown', phone: true, Comp: DiscoverStack },
+
+    // Profile
+    { section: 'Profile', title: 'My profile', subtitle: 'Completion bar drives optional-field uptake', phone: true, Comp: ProfileScreen },
+
+    // Chat
+    { section: 'Chat', title: 'CS2040S · DP Squad', subtitle: 'Pin, poll, threaded reply, system message', phone: true, Comp: ChatScreen },
+  ];
+
+  const total = screens.length;
+  return (
+    <React.Fragment>
+      {screens.map((s, i) => {
+        const num = String(i + 1).padStart(2, '0');
+        if (s.phone) {
+          return (
+            <PhonePage key={i} section={s.section} title={s.title} subtitle={s.subtitle} num={num} total={total} screen={<s.Comp/>}/>
+          );
+        }
+        return (
+          <Page key={i} section={s.section} title={s.title} subtitle={s.subtitle} num={num} total={total} fitTop={s.fitTop}>
+            <ArtboardScaled width={s.w} height={s.h}>
+              <s.Comp/>
+            </ArtboardScaled>
+          </Page>
+        );
+      })}
+    </React.Fragment>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<PrintDeck/>);
+
+// Auto-print once everything is ready
+(async () => {
+  // Let Babel finish + fonts load + a safety delay
+  if (document.fonts && document.fonts.ready) {
+    try { await document.fonts.ready; } catch (e) {}
+  }
+  await new Promise(r => setTimeout(r, 800));
+  window.print();
+})();
+</script>
+
+</body>
+</html>
