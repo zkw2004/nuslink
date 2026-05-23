@@ -1,0 +1,165 @@
+NUSLink: Feature Specification
+A Mobile Platform for Building Academic Connections at NUS
+Joel Yap & Zhang Kaiwen
+Orbital 2026 — Apollo 11
+1. Introduction
+1.1 Problem Statement
+University modules in computing and other technical fields are heavily individual. Students sit in the same lectures and tutorials yet rarely form meaningful connections with their peers. As coursework becomes more demanding and in-person lectures become optional, students face increasing isolation. The consequences extend beyond mental well-being: students graduate with weak professional networks, miss opportunities for collaborative learning, and lose access to the peer-driven support structures that make university life academically and personally enriching.
+1.2 Proposed Solution
+NUSLink is a mobile application designed to help NUS students form meaningful academic and professional relationships. Unlike generic social platforms, NUSLink is purpose-built for the academic context. Students create professional profiles, register their current modules, and are intelligently matched with compatible peers for study groups, project teams, competition squads, and tutoring sessions. The platform combines structured profile data with a weighted matching algorithm to surface connections that students would not otherwise make.
+1.3 Target Users
+NUSLink is designed exclusively for NUS students. The primary user groups include freshmen seeking to build their first academic network, students looking for study partners or project teammates for specific modules, students seeking hackathon or competition teammates with complementary skills, and students willing to offer or receive peer tutoring.
+2. User Onboarding
+The onboarding flow follows a hybrid approach: essential information is collected upfront to enable immediate matching, while optional details can be completed later to improve match quality. The flow is designed to be completable in under three minutes.
+2.1 Account Creation
+Users sign up via NUS Single Sign-On (SSO) as the preferred method, with email and password as a fallback. SSO authentication serves two purposes: it verifies the user’s NUS student status and enables auto-population of academic information (faculty, major, year of study) from the university’s identity claims. Users who sign up via email are flagged as unverified and receive read-only access to the platform until they complete SSO verification. This restriction applies to creating groups, posting in communities, and sending messages.
+2.2 Onboarding Screens
+Screen 1 — Sign Up. The user creates an account via SSO or email. SSO users are immediately authenticated and verified.
+Screen 2 — Academic Information. For SSO users, the faculty, major, year of study, and expected graduation date are auto-filled and editable. For email users, these fields are entered manually. Current semester modules are added via a search interface powered by the NUSMods API. Selected modules appear as removable chips.
+Screen 3 — Profile Setup. The user uploads a profile picture and writes a short biography (200 characters maximum). Both fields are mandatory.
+Screen 4 — Academic Interests. The user selects from predefined interest categories (such as AI/ML, Systems, Theory, Security, Data Science, and HCI) and may add custom tags for niche interests. At least one interest is required.
+Screen 5 — Intent Selection. The user selects one or more intents from: Study Groups, Hackathon/Competition Teams, Tutoring/TA, and Internship Networking. This selection informs the matching algorithm’s behaviour but does not restrict the user’s access to any features.
+2.3 Optional Profile Fields
+The following fields may be completed at any time after onboarding and contribute to a higher profile completion score and better match quality:
+•	Timetable: Imported via NUSMods share URL (primary) or entered manually on a weekly grid. Used for schedule overlap scoring and shared scheduling.
+•	Target grades: Set per module. Used by the matching algorithm to pair students with similar or complementary academic goals.
+•	Professional links: LinkedIn, GitHub, or other portfolio URLs.
+•	Resume upload: PDF, Word document, or screenshot. AI extracts skills, interests, competition history, and work experience for auto-population (see Section 7.2).
+•	Skills and language proficiency: Free-text tags for technical and non-technical skills.
+•	Personality and workstyle quiz: A short questionnaire to capture working style preferences for improved matching.
+3. Application Structure
+3.1 Navigation
+The application uses a bottom tab bar with five tabs and a top bar element:
+•	Discover: Browse and search for groups. Displays group cards with compatibility scores, sort and filter controls, and a people discovery section.
+•	Communities: Browse, search, and join larger communities. Includes official NUS club communities and user-created communities.
+•	Create (+): Central elevated button for creating new groups. Opens the group creation form.
+•	Chats: Unified inbox containing all group chats, community chats, and direct messages in a single chronologically sorted list.
+•	Profile: View and edit personal profile. Displays profile completion percentage, connections list, and access to all optional profile fields.
+The top bar contains the app logo and a notifications bell icon accessible from any screen.
+3.2 Notifications
+Notifications are delivered via in-app alerts and push notifications. Users receive notifications for connection requests, group invites, community activity, group recommendations, high-compatibility match alerts (80% or above), and smart nudges. A bell icon in the top bar displays the unread count. Tapping a notification navigates to the relevant screen.
+4. Group Creation and Management
+4.1 Group Types
+Users can create four types of groups: Study Groups, Hackathon/Competition Teams, Project Teams, and Tutoring Sessions. These types are functionally identical in terms of available features; the distinction exists primarily to support filtering, matching context, and user intent. For example, the matching algorithm scores target grade similarity for study groups but target grade complementarity for tutoring sessions.
+4.2 Group Creation Form
+The creation form contains both mandatory and optional fields.
+Mandatory fields: group name (50 characters maximum), group type, module (required if the type is Study Group), and privacy setting.
+Optional fields: scheduled time and venue, minimum and maximum group size, text description (500 characters maximum), and tags.
+Users may toggle between a manual form and an AI-assisted mode (see Section 7.1).
+4.3 Privacy Settings
+Public groups are visible to all users and can be joined by anyone.
+Semi-private groups are visible only to users who satisfy a creator-defined restriction. The creator selects one of three restriction types: same module, same year, or same faculty. Users who meet the restriction can join directly.
+Private groups display limited information (name, type, member count) to all users. Joining requires an explicit invitation. The creator can invite users through three methods: in-app user search, a shareable invite link, or a QR code. A “Request to Join” button is available for uninvited users.
+4.4 Group Management
+The group creator is automatically assigned the admin role and may promote other members to co-admin. Admins and co-admins can kick or mute members. Groups remain active until the creator manually closes them or all members leave. There is no automatic expiration.
+5. Communities
+5.1 Overview
+Communities are larger, persistent groups designed for ongoing interaction around shared interests, clubs, or organisations. Unlike study groups, which are typically short-lived and task-specific, communities are intended to persist across semesters. Examples include NUS Hackers, NUS Developer Student Club, or a user-created community for a specific interest area.
+5.2 Community Types
+There are two categories of communities. Official communities are verified accounts representing recognised NUS clubs and organisations, marked with an official badge. User-created communities can be started by any verified user for any academic or interest-based purpose.
+5.3 Join Policies
+The community creator selects one of two join policies. Open communities allow any user to join immediately. Request-approval communities require the creator or an admin to approve each join request before the user gains access.
+5.4 Community Features
+Inside a community, members have access to a group chat (with all standard chat features described in Section 6), a shared resources section for uploading and organising files, the ability to post group invites to recruit members for study groups or competition teams, and an events and calendar section. Community management follows the same admin and co-admin structure as groups.
+6. Chat and Communication
+6.1 Chat Features
+All chat environments (group chats, community chats, and direct messages) share the same feature set:
+•	Text messaging: Standard text messages with real-time delivery via Supabase Realtime.
+•	Image and file sharing: Users can attach images or files from their device. Images render inline; files appear as downloadable links.
+•	Polls: Any member can create a poll with a question and two to four options. Members vote by tapping an option, and results update in real time.
+•	Pinned messages: Admins and co-admins can pin important messages. Pinned messages are accessible via a dedicated icon at the top of the chat.
+•	Group invites: Members can share group invitations within a chat, allowing others to join relevant study groups or competition teams.
+•	Threaded replies: Users can reply to a specific message to start a thread. The parent message displays a reply count, and tapping it opens a full-screen thread view with its own message input.
+6.2 Shared Resources
+Both groups and communities include a shared resources section, separate from the chat. Any member can upload files (documents, links, notes), and each member can delete their own uploads. This section is intended for persistent reference material such as lecture notes, past-year papers, and useful links, as distinct from the ephemeral flow of chat messages.
+6.3 Shared Scheduling
+Shared scheduling is available for study groups and hackathon/competition teams only. When members have linked their timetables, the system calculates overlapping free blocks across all members and suggests the top three to five time slots sorted by duration and member availability. Members who have not linked their timetable are shown the proposed time and can accept or decline manually. A session is confirmed when a majority of members accept. Confirmed sessions appear in the group detail screen and trigger notifications.
+6.4 Direct Messages
+Direct messages are restricted to mutually connected users. This design decision prevents unsolicited messages from strangers while encouraging users to establish connections before initiating private conversations. A “Connect” button is visible on member profiles within groups and communities to facilitate this.
+6.5 Unified Inbox
+The Chats tab presents a single unified inbox containing all group chats, community chats, and direct messages. Conversations are sorted by most recent message. Each row displays the chat name (or the other user’s name for direct messages), a preview of the last message, a timestamp, and an unread message count badge.
+7. AI-Powered Features
+7.1 Group Creation Autofill
+The group creation screen offers a toggle between manual mode and AI-assisted mode. In AI mode, the user is presented with a single large text input where they describe the group in natural language. For example, a user might type: “CS2040S study group before midterms, 3–5 people at CLB.”
+The system sends this text to an AI language model, which extracts structured fields: group name, type, module, size range, scheduled time, venue, description, and tags. The AI also suggests fields that the user did not mention, such as relevant tags based on the module topic or recommended venues. The extracted fields auto-populate the standard form, and the user reviews and edits before submitting. If the AI cannot extract a required field, it is left empty for the user to complete manually.
+7.2 Profile Autofill from Resume
+Users can import professional information by uploading a PDF resume, a Word document, or a screenshot. The system extracts text from the document (or uses AI vision for screenshots) and identifies skills, academic interests, competition history, and work experience. The extracted data is presented in a review screen where the user can edit, add, or remove items before saving to their profile. This feature is available both during onboarding and on the profile page.
+7.3 Smart Nudges
+The system generates context-aware notifications to encourage engagement and surface timely opportunities. There are three categories of nudges:
+•	Time-based nudges are triggered by the academic calendar. For example, two weeks before midterms, the system might notify a user: “CS2040S midterms in 2 weeks — 3 study groups are forming.”
+•	Behaviour-based nudges are triggered by user inactivity patterns. For example, a user who signed up but has not joined any group after three days might receive: “You haven’t joined a group yet — here are your top matches.”
+•	Network-based nudges are triggered by changes in a user’s social graph. For example, when multiple connections register for the same module next semester: “4 people in your connections are also taking CS3230.”
+Nudges are delivered via in-app notifications and push notifications. Users can toggle each nudge type on or off independently in their settings.
+8. Smart Matching Algorithm
+8.1 Overview
+NUSLink uses a weighted multi-dimensional scoring algorithm to calculate compatibility between users (people-to-people matching) and between users and existing groups (people-to-group matching). This approach was chosen over alternatives such as collaborative filtering or machine learning because it is explainable (users can see why they were matched), works with sparse data (effective even with few users at launch), and is implementable within the project timeline.
+8.2 Matching Dimensions
+The algorithm scores compatibility across five dimensions, listed in order of weight:
+Schedule Overlap (weight: 0.30). The system counts overlapping free time blocks between two users’ timetables and normalises by the maximum possible overlap. This is a soft factor: users with no overlap are not excluded but receive a lower score. If either user has not linked their timetable, this dimension returns zero and its weight is redistributed.
+Skills (weight: 0.25). Complementarity is the default scoring logic. Two users with identical skill sets receive a low score; two users with non-overlapping skills receive a high score. This encourages diverse team formation, particularly for hackathon and competition teams.
+Target Grade (weight: 0.20). Scoring is context-dependent. For study groups, similarity is preferred: two users aiming for the same grade score highly. For tutoring sessions, complementarity is preferred: a student aiming for an A+ paired with a student aiming for a B receives a high score, reflecting the tutor-tutee dynamic.
+Working Style (weight: 0.15). Working styles are mapped to a numeric scale. Complementarity is scored: a structured planner paired with a flexible improviser scores higher than two planners, on the assumption that diverse working styles produce more balanced teams.
+Communication Preference (weight: 0.10). Similarity is preferred. Users who both prefer asynchronous chat score higher than a pairing of one who prefers in-person meetings with one who prefers text. This reduces friction in day-to-day collaboration.
+8.3 Missing Data Handling
+Several of the five dimensions rely on optional profile fields (timetable, target grades, working style, skills). When a dimension has no data for one or both users, its weight is redistributed proportionally across the remaining dimensions. This ensures that users with incomplete profiles still receive meaningful matches, while users with complete profiles receive more nuanced scoring.
+8.4 Matching Modes
+People-to-people matching ranks other users by their pairwise compatibility score with the current user. The Discover tab displays these as profile cards with a compatibility percentage.
+People-to-group matching scores the current user against each existing group. The score is calculated as the average of the user’s pairwise scores with all current group members. A bonus is applied if the group’s module matches one of the user’s registered modules.
+8.5 Scope and Recommendations
+Matching prioritises users in the same module but also surfaces cross-module suggestions, particularly for hackathon and competition intents where skill diversity matters more than module alignment. The system proactively notifies users only when a match scores 80% or above, to avoid notification fatigue.
+9. Discover Tab
+9.1 Group Discovery
+The Discover tab displays available groups as scrollable cards. Each card shows the group name, type badge, module code, member count, scheduled time (if set), and a compatibility percentage based on the current user’s profile. Public groups and qualifying semi-private groups are shown. Private groups appear with limited information and a “Request to Join” button.
+9.2 Sort and Filter
+Users can sort results by compatibility (highest match first, the default), popularity (most members), recently created, or starting soon (groups with the nearest scheduled time). Filter options include activity type, module, faculty, available spots (exclude full groups), and schedule fit (only groups whose scheduled time does not conflict with the user’s linked timetable).
+9.3 People Discovery
+A secondary section or tab within Discover shows individual user profiles ranked by compatibility. Each profile card displays the user’s name, picture, major, year, top skills, and compatibility percentage. Tapping a card opens the full profile with a “Connect” button.
+10. Connection System
+NUSLink uses a mutual connection model. One user sends a connection request; the other accepts or declines. Accepted connections are bilateral: both users appear in each other’s connections list. Declining a request removes it silently without notifying the requester.
+Connections serve as the gateway to direct messaging. Users can only initiate a direct message conversation with someone they are mutually connected with. The “Connect” button appears on user profiles throughout the app: in Discover results, in group member lists, and in community member lists.
+11. Reputation and Rating System
+11.1 Rating Structure
+Users can rate others across three categories: Reliability, Communication, and Contribution. Each category is rated on a one-to-five star scale. Ratings are anonymous: the rated user can see individual scores but not the identity of the reviewer.
+11.2 Eligibility
+Only users who have been in the same group for a minimum duration may rate each other. The minimum duration is configurable by the group creator (with a default of seven days). This ensures that ratings reflect actual collaborative experience rather than superficial interaction.
+11.3 Rating Prompts
+When a user leaves a study group (after meeting the minimum duration), an optional prompt invites them to rate their groupmates. Ratings can also be submitted at any time from the group member list.
+11.4 Badge Tiers
+Aggregate ratings determine a user’s badge tier. Tiers require both a minimum number of ratings and a minimum average score. Tentative thresholds are: Bronze (5 or more ratings with a 3.5 or higher average), Silver (15 or more ratings with a 4.0 or higher average), and Gold (30 or more ratings with a 4.5 or higher average). Badge icons appear next to the user’s display name throughout the app.
+11.5 Future Monetisation
+Premium and paid cosmetic badges are planned as a future revenue stream. Details are to be defined post-Orbital.
+12. Security and Content Moderation
+12.1 Access Control
+NUS SSO verification is required to create groups, post in communities, and send messages. This ensures that all active participants are verified NUS students. Users who signed up via email and have not completed SSO verification receive read-only access.
+12.2 AI Content Moderation
+All user-generated content is scanned by an AI moderation system. This includes group names, descriptions, and tags; chat messages across all environments; and profile biographies. The moderation system classifies content into three categories:
+•	Safe: Content is posted normally.
+•	High-confidence violation: Content is blocked before posting. The user receives an explanation of why the content was rejected.
+•	Borderline: Content is posted but automatically flagged and hidden from other users, pending future human review.
+12.3 Violation Categories
+The moderation system detects five categories of violations: illegal activity (such as selling drugs or contraband), commercial activity unrelated to academics (such as buy-and-sell postings), harassment, hate speech, or explicit content, spam or phishing attempts, and impersonation of other users or organisations.
+12.4 Consequence Framework
+Consequences are severity-based. Minor violations (such as off-topic posts) result in a warning and content removal. Moderate violations (such as repeated off-topic behaviour or minor commercial activity) result in a temporary ban of seven days, during which the user can read content but cannot post. Severe violations (such as illegal activity or harassment) result in an immediate permanent ban and account deactivation.
+12.5 Future Work
+Community reporting (a flag button on any piece of content), a human moderator dashboard for reviewing flagged content, and a formal appeal process for bans are planned for post-Orbital development.
+13. Design Direction
+The visual design of NUSLink follows a clean, modern, and minimalistic aesthetic inspired by applications such as Hinge and Lemon8. The primary colour is a muted NUS orange, used for primary actions, the active tab state, and key UI accents. The accent colour is a soft blue, used for secondary elements and informational content. The typeface is SF Pro, chosen for its professional but approachable feel and native rendering on iOS. Cross-platform font licensing for Android is to be resolved separately.
+The overall design philosophy prioritises readability, generous whitespace, and a card-based layout for browsable content such as groups and user profiles. The interface avoids visual clutter and presents information hierarchically, surfacing the most relevant details (compatibility score, module, group type) at the card level and revealing full details on tap.
+14. Technical Architecture
+14.1 Tech Stack
+Mobile application: React Native with Expo and TypeScript, styled with NativeWind (Tailwind CSS for React Native).
+Backend (data, auth, real-time): Supabase, providing PostgreSQL database, authentication (including OIDC for NUS SSO), real-time subscriptions for chat, and file storage.
+Backend (matching and AI logic): FastAPI in Python, responsible for the matching algorithm, AI-powered features (autofill, moderation, nudges), and complex business logic.
+External APIs: NUSMods API for module data and timetable information. OpenAI or Anthropic API for AI-powered features.
+Hosting: Supabase Cloud for the database and real-time infrastructure. Railway for the FastAPI backend.
+14.2 Software Engineering Practices
+The project follows GitHub Flow with branch protection on the main branch, requiring pull requests with teammate approval and passing CI checks before any merge. GitHub Actions automates linting (ESLint for TypeScript, Ruff for Python), type checking (TypeScript compiler, mypy), and automated tests on every push. Deployment is automated via Expo EAS Update for the mobile app and Railway for the backend.
+The testing strategy covers unit tests for core domain logic (particularly the matching algorithm), integration tests for FastAPI endpoints, and component tests using React Native Testing Library, with a target of 80% coverage on critical modules. Development follows two-week sprints tracked on GitHub Projects with planning and retrospective sessions each cycle.
+The architecture enforces separation of concerns: React Native handles presentation, Supabase handles data persistence and authentication, and FastAPI owns domain logic. A repository pattern keeps business logic testable without requiring a live database. All schema changes go through versioned Supabase migrations committed to version control, with row-level security policies enforcing data access at the database layer.
+15. Development Timeline
+15.1 Milestone 1 — Technical Proof of Concept (End of May)
+Functional sign-up and login (email and SSO). Complete five-screen onboarding flow with data persisted to the database. Basic profile page with completion bar. Module registration via NUSMods API. Basic group creation (public groups only, manual form). Basic Discover tab (list and join groups, no matching). FastAPI backend deployed with health endpoint. CI pipeline operational.
+15.2 Milestone 2 — Core Features Complete (End of June)
+Smart matching algorithm with five-dimension weighted scoring. Compatibility percentage displayed on group and people cards. Full group creation with all three privacy types and AI autofill mode. Communities tab (browse, create, join, chat). Real-time chat with text, images, files, polls, and pinned messages. Shared resources section. Connection system with direct messaging. Timetable import. Unified chat inbox with unread tracking. Basic notifications. User testing with five to ten NUS students.
+15.3 Milestone 3 — Extended System (End of July)
+AI profile extraction from resumes. Smart nudges (time-based, behaviour-based, network-based) with user controls. Reputation and rating system with badge tiers. Threaded replies in chat. Shared scheduling with auto-suggested time slots. AI content moderation. Push notification infrastructure. Profile completion bar with full calculation. Comprehensive user testing with fifteen to twenty students. Full technical and project documentation. Final demo video and updated poster.
