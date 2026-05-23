@@ -17,12 +17,12 @@ function ProfileScreen({ dark }) {
     rating: { reliability: 4.8, communication: 4.6, contribution: 4.7, total: 18 },
   };
   return (
-    <div style={{ height: '100%', background: t.bg, display: 'flex', flexDirection: 'column' }}>
+    <div style={{ height: '100%', background: t.bgGradient, display: 'flex', flexDirection: 'column' }}>
       {/* Custom header: settings, no large title */}
       <div style={{
         paddingTop: 56, padding: '56px 16px 8px',
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        background: t.bg, position: 'relative', zIndex: 5,
+        background: 'transparent', position: 'relative', zIndex: 5,
       }}>
         <span style={{
           fontFamily: FONT_STACK, fontSize: 22, fontWeight: 700,

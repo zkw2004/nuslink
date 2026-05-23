@@ -199,7 +199,7 @@ function Button({ children, variant = 'primary', size = 'md', leading, trailing,
       border: `1px solid ${variants.bd}`, cursor: 'pointer',
       fontFamily: FONT_STACK, fontSize: sizes.fs, fontWeight: 600, letterSpacing: -0.1,
       width: full ? '100%' : undefined,
-      boxShadow: variant === 'primary' ? '0 1px 2px rgba(217,99,63,0.20), 0 4px 12px rgba(217,99,63,0.15)' : undefined,
+      boxShadow: variant === 'primary' ? '0 2px 6px rgba(15,17,21,0.18), 0 8px 20px rgba(15,17,21,0.14)' : undefined,
       ...style,
     }}>
       {leading}{children}{trailing}
@@ -318,7 +318,7 @@ function BottomTabBar({ active = 'discover', onSelect }) {
               width: 52, height: 52, borderRadius: 18, marginTop: -22,
               background: t.primary, border: 'none', cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 6px 18px rgba(217,99,63,0.32), 0 1px 3px rgba(217,99,63,0.2)',
+              boxShadow: '0 6px 18px rgba(15,17,21,0.30), 0 1px 3px rgba(15,17,21,0.2)',
               color: t.onPrimary,
             }}>
               <tab.icon size={26} color={t.onPrimary}/>
@@ -350,7 +350,7 @@ function AppTopBar({ title, unread, leading, trailing }) {
     <div style={{
       paddingTop: 56, paddingBottom: 8, padding: '56px 20px 8px',
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      background: t.bg, position: 'relative', zIndex: 5,
+      background: 'transparent', position: 'relative', zIndex: 5,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         {leading || <Logo size={26}/>}
@@ -394,12 +394,13 @@ function Logo({ size = 28, variant = 'mark' }) {
   if (variant === 'mark') {
     return (
       <div style={{
-        width: size, height: size, borderRadius: size * 0.28,
-        background: t.primary, color: t.onPrimary,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontFamily: FONT_STACK, fontWeight: 800, fontSize: size * 0.5,
-        letterSpacing: -0.5,
-      }}>n</div>
+        width: size, height: size, borderRadius: size * 0.22,
+        background: t.primary, display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        {typeof MarkArc !== 'undefined'
+          ? <MarkArc size={Math.round(size * 0.78)} color={t.onPrimary}/>
+          : <span style={{ color: t.onPrimary, fontWeight: 800, fontSize: size * 0.5 }}>n</span>}
+      </div>
     );
   }
   return (

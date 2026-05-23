@@ -8,7 +8,7 @@ const STATUS_BAR_HEIGHT = 50;
 function OnboardingFrame({ step, total = 5, onBack, onSkip, children, footer, hideHeader, dark }) {
   const t = useTheme();
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: t.bg }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: t.bgGradient }}>
       <div style={{ height: STATUS_BAR_HEIGHT, flexShrink: 0 }}/>
       {!hideHeader && (
         <div style={{
@@ -43,7 +43,7 @@ function OnboardingFrame({ step, total = 5, onBack, onSkip, children, footer, hi
       </div>
       {footer && (
         <div style={{
-          padding: '12px 20px 44px', background: t.bg,
+          padding: '12px 20px 44px', background: 'transparent',
           borderTop: `0.5px solid ${t.border}`,
         }}>{footer}</div>
       )}
@@ -77,7 +77,7 @@ function OnboardingSignUp({ dark }) {
   return (
     <div style={{
       height: '100%', display: 'flex', flexDirection: 'column',
-      background: t.bg, padding: '0 28px',
+      background: t.bgGradient, padding: '0 28px',
     }}>
       <div style={{ height: STATUS_BAR_HEIGHT }}/>
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
@@ -253,7 +253,7 @@ function OnboardingProfile({ dark }) {
             width: 38, height: 38, borderRadius: 999,
             border: `3px solid ${t.bg}`, background: t.primary, color: t.onPrimary,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer', boxShadow: '0 3px 8px rgba(217,99,63,0.30)',
+            cursor: 'pointer', boxShadow: '0 3px 8px rgba(15,17,21,0.25)',
           }}><Icon.camera size={18} color={t.onPrimary}/></button>
         </div>
         <button style={{

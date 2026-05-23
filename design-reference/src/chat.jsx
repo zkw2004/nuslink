@@ -3,7 +3,7 @@
 function ChatScreen({ dark }) {
   const t = useTheme();
   return (
-    <div style={{ height: '100%', background: t.bg, display: 'flex', flexDirection: 'column' }}>
+    <div style={{ height: '100%', background: t.bgGradient, display: 'flex', flexDirection: 'column' }}>
       <ChatHeader/>
       <PinnedBanner/>
 
@@ -341,7 +341,7 @@ function ChatInputBar() {
         width: 40, height: 40, borderRadius: 999, border: 'none',
         background: t.primary, cursor: 'pointer',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        boxShadow: '0 2px 6px rgba(217,99,63,0.25)',
+        boxShadow: '0 2px 6px rgba(15,17,21,0.25)',
       }}><Icon.send size={20} color={t.onPrimary} fill={t.onPrimary}/></button>
     </div>
   );
