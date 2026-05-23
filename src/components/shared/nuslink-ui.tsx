@@ -55,11 +55,11 @@ type CompatibilityBadgeProps = {
 };
 
 const avatarPalette = [
-  { background: "#D4471C", foreground: "#FFF4EE" },
-  { background: "#4A90D9", foreground: "#EFF6FF" },
-  { background: "#6E8F77", foreground: "#F1F7F3" },
-  { background: "#B46A83", foreground: "#FDF1F5" },
-  { background: "#9C7B45", foreground: "#FBF6EC" },
+  { background: "#A5BBD5", foreground: "#F8FBFF" },
+  { background: "#8AA1BC", foreground: "#F8FBFF" },
+  { background: "#B7C5D8", foreground: "#FFFFFF" },
+  { background: "#9AAEC8", foreground: "#F7FAFE" },
+  { background: "#C2CFDF", foreground: "#FFFFFF" },
 ];
 
 function getInitials(name: string) {
@@ -83,14 +83,14 @@ export function AppScreenHeader({
   actions = [],
 }: AppScreenHeaderProps) {
   return (
-    <View className="px-5 pt-3 pb-4">
+    <View className="px-4 pt-6 pb-2">
       <View className="flex-row items-start justify-between gap-4">
         <View className="flex-1">
-          <Text className="text-[30px] font-bold tracking-tight text-gray-900">
+          <Text className="pl-1 text-[22px] font-bold tracking-[-0.6px] text-[#0F1115]">
             {title}
           </Text>
           {subtitle ? (
-            <Text className="mt-1 text-[14px] leading-5 text-gray-500">
+            <Text className="mt-1 pl-1 text-[13px] leading-5 text-[#5C6370]">
               {subtitle}
             </Text>
           ) : null}
@@ -103,12 +103,12 @@ export function AppScreenHeader({
                 key={`${title}-${action.icon}`}
                 accessibilityRole="button"
                 accessibilityLabel={action.accessibilityLabel}
-                className="h-10 w-10 items-center justify-center rounded-full border border-[#E8E1D8] bg-white"
+                className="h-10 w-10 items-center justify-center rounded-full bg-[#EEF2F7]"
               >
                 <SymbolView
                   name={{ ios: action.icon, android: "star", web: "star" }}
                   size={18}
-                  tintColor={action.icon === "sparkles" ? "#D4471C" : "#2C241E"}
+                  tintColor="#0F1115"
                 />
               </Pressable>
             ))}
@@ -143,7 +143,16 @@ export function AppAvatar({ name, size = 56, rounded = true }: AvatarProps) {
 
 export function SectionCard({ children, className = "" }: SectionCardProps) {
   return (
-    <View className={`rounded-[22px] border border-[#E8E1D8] bg-white p-4 ${className}`}>
+    <View
+      className={`rounded-[18px] border border-[#E4E9F1] bg-white p-4 ${className}`}
+      style={{
+        shadowColor: "#141C2E",
+        shadowOpacity: 0.06,
+        shadowRadius: 18,
+        shadowOffset: { width: 0, height: 6 },
+        elevation: 2,
+      }}
+    >
       {children}
     </View>
   );
@@ -152,11 +161,11 @@ export function SectionCard({ children, className = "" }: SectionCardProps) {
 export function SectionHeader({ title, actionLabel }: SectionHeaderProps) {
   return (
     <View className="mb-3 flex-row items-center justify-between gap-3">
-      <Text className="text-[11px] font-bold uppercase tracking-[1.2px] text-gray-500">
+      <Text className="text-[11px] font-bold uppercase tracking-[0.6px] text-[#9AA0AB]">
         {title}
       </Text>
       {actionLabel ? (
-        <Text className="text-[13px] font-semibold text-accent">
+        <Text className="text-[13px] font-semibold text-[#5B7BA3]">
           {actionLabel}
         </Text>
       ) : null}
@@ -166,14 +175,14 @@ export function SectionHeader({ title, actionLabel }: SectionHeaderProps) {
 
 export function AppChip({ label, variant = "default" }: AppChipProps) {
   const variantClasses = {
-    default: "border-transparent bg-[#F2EEE7] text-[#5A4B41]",
-    module: "border-transparent bg-[#EAF3FB] text-accent",
-    outline: "border-[#DED5CA] bg-white text-[#5A4B41]",
-    solid: "border-primary bg-primary text-white",
+    default: "border-transparent bg-[#EEF2F7] text-[#5C6370]",
+    module: "border-transparent bg-[#E1EAF5] text-[#5B7BA3]",
+    outline: "border-[#E4E9F1] bg-white text-[#5C6370]",
+    solid: "border-[#0F1115] bg-[#0F1115] text-white",
   };
 
   return (
-    <View className={`rounded-full border px-3 py-2 ${variantClasses[variant]}`}>
+    <View className={`rounded-full border px-3 py-[7px] ${variantClasses[variant]}`}>
       <Text className="text-[13px] font-medium">{label}</Text>
     </View>
   );
@@ -181,10 +190,10 @@ export function AppChip({ label, variant = "default" }: AppChipProps) {
 
 export function BadgeTierPill({ tier }: BadgeTierPillProps) {
   const tierStyles: Record<BadgeTier, { bg: string; text: string }> = {
-    New: { bg: "#F4EFE7", text: "#7A6657" },
-    Reliable: { bg: "#EAF3FB", text: "#2B73BD" },
-    Trusted: { bg: "#EEF6F1", text: "#3F7A55" },
-    Standout: { bg: "#FFF2E8", text: "#C66A1A" },
+    New: { bg: "#F1F3F6", text: "#7A8595" },
+    Reliable: { bg: "#E1EAF5", text: "#5B7BA3" },
+    Trusted: { bg: "#E7F0EA", text: "#3F7D63" },
+    Standout: { bg: "#EEF2F7", text: "#0F1115" },
   };
 
   return (
@@ -206,9 +215,9 @@ export function ProgressBar({ value }: ProgressBarProps) {
   const safeValue = Math.max(0, Math.min(100, value));
 
   return (
-    <View className="h-2 overflow-hidden rounded-full bg-[#EFE8DD]">
+    <View className="h-[6px] overflow-hidden rounded-full bg-[#E4E9F1]">
       <View
-        className="h-full rounded-full bg-primary"
+        className="h-full rounded-full bg-[#0F1115]"
         style={{ width: `${safeValue}%` }}
       />
     </View>
@@ -224,23 +233,23 @@ export function AppButton({
   const className =
     variant === "primary"
       ? disabled
-        ? "bg-[#E6DDD1]"
-        : "bg-primary"
-      : "border border-[#DED5CA] bg-white";
+        ? "bg-[#CCD5E0]"
+        : "bg-[#0F1115]"
+      : "border border-[#D0D7E2] bg-white";
 
   const textClassName =
     variant === "primary"
       ? disabled
-        ? "text-[#9B8C7D]"
+        ? "text-[#6B7280]"
         : "text-white"
-      : "text-[#2C241E]";
+      : "text-[#0F1115]";
 
   return (
     <Pressable
       accessibilityRole="button"
       disabled={disabled}
       onPress={onPress}
-      className={`items-center justify-center rounded-2xl px-4 py-4 ${className}`}
+      className={`items-center justify-center rounded-[12px] px-4 py-[10px] ${className}`}
     >
       <Text className={`text-[15px] font-semibold ${textClassName}`}>{label}</Text>
     </Pressable>
@@ -249,12 +258,12 @@ export function AppButton({
 
 export function CompatibilityBadge({ score }: CompatibilityBadgeProps) {
   return (
-    <View className="h-14 w-14 items-center justify-center rounded-full border-[3px] border-primary/20 bg-primary/5">
-      <Text className="text-[16px] font-bold tracking-tight text-primary">
+    <View className="h-12 w-12 items-center justify-center rounded-full border-[4px] border-[#E4E9F1] bg-white">
+      <Text className="text-[15px] font-bold tracking-tight text-[#0F1115]">
         {score}
       </Text>
-      <Text className="-mt-0.5 text-[10px] font-semibold uppercase tracking-[0.8px] text-primary/70">
-        match
+      <Text className="-mt-0.5 text-[9px] font-semibold uppercase tracking-[0.8px] text-[#9AA0AB]">
+        %
       </Text>
     </View>
   );
