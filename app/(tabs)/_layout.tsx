@@ -5,11 +5,11 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: "#D4471C",
+        tabBarActiveTintColor: "#0F1115",
         tabBarInactiveTintColor: "#9CA3AF",
         tabBarStyle: {
           borderTopWidth: 1,
-          borderTopColor: "#E5E7EB",
+          borderTopColor: "#E4E9F1",
           backgroundColor: "#FFFFFF",
         },
         headerShown: false,
@@ -48,7 +48,7 @@ export default function TabLayout() {
           tabBarIcon: () => (
             <SymbolView
               name={{ ios: "plus.circle.fill", android: "add_circle", web: "add_circle" }}
-              tintColor="#D4471C"
+              tintColor="#0F1115"
               size={32}
             />
           ),

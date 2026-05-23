@@ -35,7 +35,7 @@ export default function CreateScreen() {
   }, [groupName, moduleCode, selectedGroupType]);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#F6F1EA" }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#EEF3F9" }}>
       <AppScreenHeader
         title="Create Group"
         subtitle="Manual public-group creation for Milestone 1. More advanced privacy and AI tools come later."
@@ -43,7 +43,7 @@ export default function CreateScreen() {
 
       <ScrollView
         className="flex-1 px-5"
-        contentContainerStyle={{ paddingBottom: 120 }}
+        contentContainerStyle={{ paddingBottom: 96 }}
         showsVerticalScrollIndicator={false}
       >
         <SectionCard className="mb-4">
@@ -53,9 +53,9 @@ export default function CreateScreen() {
             onChangeText={setGroupName}
             placeholder="e.g. CS2040S Midterm Prep"
             placeholderTextColor="#9B8C7D"
-            className="rounded-[18px] border border-[#DED5CA] bg-[#FCFAF7] px-4 py-4 text-[15px] text-gray-900"
+            className="rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-4 text-[15px] text-[#0F1115]"
           />
-          <Text className="mt-2 text-[12px] text-gray-500">
+          <Text className="mt-2 text-[12px] text-[#9AA0AB]">
             Keep it clear and easy to scan in Discover.
           </Text>
         </SectionCard>
@@ -72,8 +72,8 @@ export default function CreateScreen() {
                   onPress={() => setSelectedGroupType(groupType.value)}
                   className={`rounded-full border px-4 py-3 text-[13px] font-semibold ${
                     isSelected
-                      ? "border-primary bg-primary text-white"
-                      : "border-[#DED5CA] bg-white text-[#5A4B41]"
+                      ? "border-[#0F1115] bg-[#0F1115] text-white"
+                      : "border-[#E4E9F1] bg-white text-[#5C6370]"
                   }`}
                 >
                   {groupType.label}
@@ -91,10 +91,10 @@ export default function CreateScreen() {
             autoCapitalize="characters"
             placeholder="Enter a module code"
             placeholderTextColor="#9B8C7D"
-            className="rounded-[18px] border border-[#DED5CA] bg-[#FCFAF7] px-4 py-4 text-[15px] uppercase text-gray-900"
+            className="rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-4 text-[15px] uppercase text-[#0F1115]"
           />
 
-          <Text className="mt-3 text-[12px] font-semibold text-gray-500">
+          <Text className="mt-3 text-[12px] font-semibold text-[#9AA0AB]">
             Quick picks
           </Text>
           <View className="mt-2 flex-row flex-wrap gap-2">
@@ -102,7 +102,7 @@ export default function CreateScreen() {
               <Text
                 key={suggestedModule}
                 onPress={() => setModuleCode(suggestedModule)}
-                className="rounded-full border border-transparent bg-[#EAF3FB] px-3 py-2 text-[13px] font-medium text-accent"
+                className="rounded-full border border-transparent bg-[#E1EAF5] px-3 py-2 text-[13px] font-medium text-[#5B7BA3]"
               >
                 {suggestedModule}
               </Text>
@@ -112,11 +112,11 @@ export default function CreateScreen() {
 
         <SectionCard className="mb-5">
           <SectionHeader title="Privacy" />
-          <View className="rounded-[18px] bg-primary/10 px-4 py-4">
-            <Text className="text-[14px] font-semibold text-primary">
+          <View className="rounded-[14px] bg-[#E7EEF7] px-4 py-4">
+            <Text className="text-[14px] font-semibold text-[#0F1115]">
               Public groups only in M1
             </Text>
-            <Text className="mt-1 text-[12px] leading-5 text-[#7A6657]">
+            <Text className="mt-1 text-[12px] leading-5 text-[#5C6370]">
               Anyone using the app can discover and join this group. Semi-private
               and private flows are intentionally deferred to a later milestone.
             </Text>
