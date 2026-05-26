@@ -1,7 +1,9 @@
 import { useState } from "react";
-import { View, Text, ScrollView, TouchableOpacity } from "react-native";
+import { Alert, View, Text, ScrollView, TouchableOpacity } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+import { useAuthStore, useOnboardingStore } from "@store/index";
 import type { Intent } from "@appTypes/index";
 
 const INTENTS: { id: Intent; label: string; desc: string }[] = [
@@ -32,7 +34,16 @@ const CURRENT_STEP = 5;
 
 export default function IntentScreen() {
   const router = useRouter();
-  const [selected, setSelected] = useState<Set<Intent>>(new Set());
+  const profile = useAuthStore((state) => state.profile);
+  const completeOnboarding = useAuthStore((state) => state.completeOnboarding);
+  const isProfileLoading = useAuthStore((state) => state.isProfileLoading);
+  const interests = useOnboardingStore((state) => state.interests);
+  const savedIntents = useOnboardingStore((state) => state.intents);
+  const setIntents = useOnboardingStore((state) => state.setIntents);
+  const resetOnboarding = useOnboardingStore((state) => state.reset);
+  const [selected, setSelected] = useState<Set<Intent>>(
+    new Set(savedIntents.length > 0 ? savedIntents : (profile?.intents ?? [])),
+  );
 
   function toggleIntent(id: Intent) {
     setSelected((prev) => {
@@ -41,6 +52,38 @@ export default function IntentScreen() {
       else next.add(id);
       return next;
     });
+  }
+
+  async function handleFinishOnboarding() {
+    const nextIntents = Array.from(selected);
+
+    if (nextIntents.length === 0) {
+      Alert.alert("Pick at least one intent", "Choose one reason for joining NUSLink before continuing.");
+      return;
+    }
+
+    if (interests.length === 0) {
+      Alert.alert("Missing interests", "Go back and choose at least one interest before finishing onboarding.");
+      return;
+    }
+
+    setIntents(nextIntents);
+
+    try {
+      await completeOnboarding({
+        interests,
+        intents: nextIntents,
+      });
+      resetOnboarding();
+      router.replace("/(tabs)/discover");
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Something went wrong while saving your onboarding details.";
+
+      Alert.alert("Could not finish onboarding", message);
+    }
   }
 
   return (
@@ -111,12 +154,21 @@ export default function IntentScreen() {
       {/* Footer */}
       <View className="px-5 pb-8 pt-3 border-t border-gray-100">
         <TouchableOpacity
-          onPress={() => router.replace("/(tabs)/discover")}
+          onPress={() => {
+            void handleFinishOnboarding();
+          }}
           activeOpacity={0.85}
-          className="bg-primary py-4 rounded-2xl items-center"
+          disabled={isProfileLoading}
+          className={`py-4 rounded-2xl items-center ${
+            isProfileLoading ? "bg-gray-200" : "bg-primary"
+          }`}
         >
-          <Text className="text-white text-base font-semibold">
-            Let's go →
+          <Text
+            className={`text-base font-semibold ${
+              isProfileLoading ? "text-gray-400" : "text-white"
+            }`}
+          >
+            {isProfileLoading ? "Saving..." : "Let's go →"}
           </Text>
         </TouchableOpacity>
       </View>

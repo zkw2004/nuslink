@@ -1,7 +1,27 @@
-import { Tabs } from "expo-router";
+import { Redirect, Tabs } from "expo-router";
 import { SymbolView } from "expo-symbols";
 
+import { AppLoadingScreen } from "@components/ui";
+import { useAuthStore } from "@store/index";
+
 export default function TabLayout() {
+  const session = useAuthStore((state) => state.session);
+  const profile = useAuthStore((state) => state.profile);
+  const isInitialized = useAuthStore((state) => state.isInitialized);
+  const isProfileLoading = useAuthStore((state) => state.isProfileLoading);
+
+  if (!isInitialized || (session && isProfileLoading && !profile)) {
+    return <AppLoadingScreen message="Loading your workspace..." />;
+  }
+
+  if (!session) {
+    return <Redirect href="/(auth)/sign-in" />;
+  }
+
+  if (!profile?.onboarding_completed) {
+    return <Redirect href="/(onboarding)/academic-info" />;
+  }
+
   return (
     <Tabs
       screenOptions={{
