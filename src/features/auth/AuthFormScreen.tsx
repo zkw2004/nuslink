@@ -111,7 +111,7 @@ export function AuthFormScreen({ mode }: AuthFormScreenProps) {
         return;
       }
 
-      router.replace(mode === "sign-in" ? "/(tabs)/discover" : "/(onboarding)/academic-info");
+      router.replace("/");
     } catch {
       setError("Something went wrong. Check your connection and try again.");
     } finally {
@@ -120,18 +120,27 @@ export function AuthFormScreen({ mode }: AuthFormScreenProps) {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
+    <SafeAreaView className="flex-1 bg-[#EEF3F9]">
       <KeyboardAvoidingView
         className="flex-1"
         behavior={Platform.select({ ios: "padding", android: undefined })}
       >
         <View className="flex-1 justify-center px-6 py-10">
-          <View>
-            <Text className="text-4xl font-bold text-gray-950">{screenCopy.title}</Text>
-            <Text className="mt-3 text-base leading-6 text-gray-600">{screenCopy.subtitle}</Text>
+          <View className="mb-6">
+            <Text className="text-[42px] font-bold tracking-[-1px] text-[#0F1115]">{screenCopy.title}</Text>
+            <Text className="mt-3 text-base leading-6 text-[#5C6370]">{screenCopy.subtitle}</Text>
           </View>
 
-          <View className="mt-10">
+          <View
+            className="rounded-[28px] border border-[#E4E9F1] bg-white px-5 py-6"
+            style={{
+              shadowColor: "#141C2E",
+              shadowOpacity: 0.06,
+              shadowRadius: 18,
+              shadowOffset: { width: 0, height: 8 },
+              elevation: 2,
+            }}
+          >
             <Text className="mb-2 text-sm font-semibold text-gray-800">Email</Text>
             <TextInput
               className="h-14 rounded-xl border border-gray-200 bg-gray-50 px-4 text-base text-gray-950"
@@ -175,7 +184,7 @@ export function AuthFormScreen({ mode }: AuthFormScreenProps) {
             ) : null}
 
             <Pressable
-              className={`mt-6 h-14 items-center justify-center rounded-xl bg-primary ${
+              className={`mt-6 h-14 items-center justify-center rounded-xl bg-[#0F1115] ${
                 isLoading ? "opacity-80" : "opacity-100"
               }`}
               disabled={isLoading}
@@ -189,9 +198,9 @@ export function AuthFormScreen({ mode }: AuthFormScreenProps) {
             </Pressable>
 
             <View className="mt-6 flex-row justify-center">
-              <Text className="text-sm text-gray-600">{screenCopy.switchPrompt} </Text>
+              <Text className="text-sm text-[#5C6370]">{screenCopy.switchPrompt} </Text>
               <Link href={screenCopy.switchHref}>
-                <Text className="text-sm font-bold text-primary">{screenCopy.switchAction}</Text>
+                <Text className="text-sm font-bold text-[#5B7BA3]">{screenCopy.switchAction}</Text>
               </Link>
             </View>
           </View>
