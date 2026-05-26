@@ -11,10 +11,17 @@ export function useAuthBootstrap() {
   const refreshProfile = useAuthStore((state) => state.refreshProfile);
 
   useEffect(() => {
-    void initialize();
+    const safetyTimeout = setTimeout(() => {
+      setInitialized(true);
+    }, 4000);
+
+    void initialize().finally(() => {
+      clearTimeout(safetyTimeout);
+    });
 
     if (!supabase) {
       setInitialized(true);
+      clearTimeout(safetyTimeout);
       return;
     }
 
@@ -33,6 +40,7 @@ export function useAuthBootstrap() {
     });
 
     return () => {
+      clearTimeout(safetyTimeout);
       subscription.unsubscribe();
     };
   }, [clearProfile, initialize, refreshProfile, setInitialized, setSession]);

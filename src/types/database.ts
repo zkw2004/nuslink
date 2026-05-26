@@ -106,9 +106,101 @@ export type Database = {
         };
         Relationships: [];
       };
+      groups: {
+        Row: {
+          created_at: string;
+          creator_id: string;
+          description: string | null;
+          id: string;
+          is_active: boolean;
+          max_size: number | null;
+          min_size: number | null;
+          module_code: string | null;
+          name: string;
+          privacy: "public" | "semi_private" | "private";
+          restriction: "same_module" | "same_year" | "same_faculty" | null;
+          scheduled_time: string | null;
+          tags: string[];
+          type: "study_group" | "hackathon_team" | "project_team" | "tutoring_session";
+          updated_at: string;
+          venue: string | null;
+        };
+        Insert: {
+          created_at?: string;
+          creator_id: string;
+          description?: string | null;
+          id?: string;
+          is_active?: boolean;
+          max_size?: number | null;
+          min_size?: number | null;
+          module_code?: string | null;
+          name: string;
+          privacy?: "public" | "semi_private" | "private";
+          restriction?: "same_module" | "same_year" | "same_faculty" | null;
+          scheduled_time?: string | null;
+          tags?: string[];
+          type: "study_group" | "hackathon_team" | "project_team" | "tutoring_session";
+          updated_at?: string;
+          venue?: string | null;
+        };
+        Update: {
+          created_at?: string;
+          creator_id?: string;
+          description?: string | null;
+          id?: string;
+          is_active?: boolean;
+          max_size?: number | null;
+          min_size?: number | null;
+          module_code?: string | null;
+          name?: string;
+          privacy?: "public" | "semi_private" | "private";
+          restriction?: "same_module" | "same_year" | "same_faculty" | null;
+          scheduled_time?: string | null;
+          tags?: string[];
+          type?: "study_group" | "hackathon_team" | "project_team" | "tutoring_session";
+          updated_at?: string;
+          venue?: string | null;
+        };
+        Relationships: [];
+      };
+      group_members: {
+        Row: {
+          group_id: string;
+          id: string;
+          joined_at: string;
+          role: "member" | "co_admin" | "admin";
+          user_id: string;
+        };
+        Insert: {
+          group_id: string;
+          id?: string;
+          joined_at?: string;
+          role?: "member" | "co_admin" | "admin";
+          user_id: string;
+        };
+        Update: {
+          group_id?: string;
+          id?: string;
+          joined_at?: string;
+          role?: "member" | "co_admin" | "admin";
+          user_id?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {
+      create_public_group: {
+        Args: {
+          module_code_input: string;
+          module_name_input: string;
+          module_department_input: string | null;
+          module_faculty_input: string | null;
+          group_name_input: string;
+          group_type_input: "study_group" | "hackathon_team" | "project_team" | "tutoring_session";
+        };
+        Returns: string;
+      };
       upsert_user_module: {
         Args: {
           module_code_input: string;
@@ -123,6 +215,10 @@ export type Database = {
     Enums: {
       badge_tier: "bronze" | "silver" | "gold";
       intent: "study_group" | "hackathon" | "tutoring" | "internship_networking";
+      group_type: "study_group" | "hackathon_team" | "project_team" | "tutoring_session";
+      privacy_setting: "public" | "semi_private" | "private";
+      semi_private_restriction: "same_module" | "same_year" | "same_faculty";
+      user_role: "member" | "co_admin" | "admin";
     };
   };
 };

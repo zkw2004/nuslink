@@ -1,9 +1,10 @@
 import { SymbolView } from "expo-symbols";
-import { Pressable, Text, View } from "react-native";
+import { Image, Pressable, Text, View } from "react-native";
 
 type HeaderAction = {
-  icon: "sparkles" | "gearshape.fill";
+  icon: "sparkles" | "gearshape.fill" | "pencil";
   accessibilityLabel: string;
+  onPress?: () => void;
 };
 
 type AppScreenHeaderProps = {
@@ -16,6 +17,7 @@ type AvatarProps = {
   name: string;
   size?: number;
   rounded?: boolean;
+  imageUri?: string | null;
 };
 
 type SectionCardProps = {
@@ -104,6 +106,7 @@ export function AppScreenHeader({
                 accessibilityRole="button"
                 accessibilityLabel={action.accessibilityLabel}
                 className="h-10 w-10 items-center justify-center rounded-full bg-[#EEF2F7]"
+                onPress={action.onPress}
               >
                 <SymbolView
                   name={{ ios: action.icon, android: "star", web: "star" }}
@@ -119,8 +122,14 @@ export function AppScreenHeader({
   );
 }
 
-export function AppAvatar({ name, size = 56, rounded = true }: AvatarProps) {
+export function AppAvatar({
+  name,
+  size = 56,
+  rounded = true,
+  imageUri = null,
+}: AvatarProps) {
   const colors = getAvatarColors(name);
+  const borderRadius = rounded ? size / 2 : 18;
 
   return (
     <View
@@ -129,14 +138,23 @@ export function AppAvatar({ name, size = 56, rounded = true }: AvatarProps) {
         width: size,
         height: size,
         backgroundColor: colors.background,
+        overflow: "hidden",
       }}
     >
-      <Text
-        style={{ color: colors.foreground, fontSize: Math.round(size * 0.34) }}
-        className="font-bold tracking-tight"
-      >
-        {getInitials(name)}
-      </Text>
+      {imageUri ? (
+        <Image
+          key={imageUri}
+          source={{ uri: imageUri, cache: "reload" }}
+          style={{ width: size, height: size, borderRadius }}
+        />
+      ) : (
+        <Text
+          style={{ color: colors.foreground, fontSize: Math.round(size * 0.34) }}
+          className="font-bold tracking-tight"
+        >
+          {getInitials(name)}
+        </Text>
+      )}
     </View>
   );
 }
@@ -174,16 +192,23 @@ export function SectionHeader({ title, actionLabel }: SectionHeaderProps) {
 }
 
 export function AppChip({ label, variant = "default" }: AppChipProps) {
-  const variantClasses = {
-    default: "border-transparent bg-[#EEF2F7] text-[#5C6370]",
-    module: "border-transparent bg-[#E1EAF5] text-[#5B7BA3]",
-    outline: "border-[#E4E9F1] bg-white text-[#5C6370]",
-    solid: "border-[#0F1115] bg-[#0F1115] text-white",
+  const containerClasses = {
+    default: "border-transparent bg-[#EEF2F7]",
+    module: "border-transparent bg-[#E1EAF5]",
+    outline: "border-[#E4E9F1] bg-white",
+    solid: "border-[#0F1115] bg-[#0F1115]",
+  };
+
+  const textClasses = {
+    default: "text-[#5C6370]",
+    module: "text-[#5B7BA3]",
+    outline: "text-[#5C6370]",
+    solid: "text-white",
   };
 
   return (
-    <View className={`rounded-full border px-3 py-[7px] ${variantClasses[variant]}`}>
-      <Text className="text-[13px] font-medium">{label}</Text>
+    <View className={`rounded-full border px-3 py-[7px] ${containerClasses[variant]}`}>
+      <Text className={`text-[13px] font-medium ${textClasses[variant]}`}>{label}</Text>
     </View>
   );
 }

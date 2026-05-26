@@ -117,7 +117,7 @@ export function ProfileSetupScreen() {
       footer={
         <Pressable
           accessibilityRole="button"
-          className={`items-center rounded-2xl py-4 ${isSaving ? "bg-gray-300" : "bg-primary"}`}
+          className={`items-center rounded-2xl py-4 ${isSaving ? "bg-gray-300" : "bg-[#0F1115]"}`}
           disabled={isSaving}
           onPress={handleContinue}
         >
@@ -143,7 +143,7 @@ export function ProfileSetupScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Choose profile photo"
-            className="absolute -bottom-1 -right-1 h-10 w-10 items-center justify-center rounded-full border-[3px] border-white bg-primary"
+            className="absolute -bottom-1 -right-1 h-10 w-10 items-center justify-center rounded-full border-[3px] border-white bg-[#0F1115]"
             disabled={isPicking}
             onPress={handlePickImage}
           >

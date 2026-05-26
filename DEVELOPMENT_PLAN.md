@@ -22,7 +22,7 @@ This plan breaks the product into six two-week sprints across three milestones.
 
 Deadline: End of May 2026
 
-Goal: users can sign up, finish onboarding, create basic public groups, and browse or join them. The backend, database, and CI pipeline are working.
+Goal: users can sign up, finish onboarding, see real profile data, create basic public groups, browse or join them, and sign out cleanly. The backend, database, and CI pipeline are working.
 
 ### Joel
 
@@ -36,21 +36,24 @@ Goal: users can sign up, finish onboarding, create basic public groups, and brow
 
 - FastAPI backend scaffolding and deployment: set up project structure, health endpoint, CORS, and Railway deployment. Est. 2 days.
 - Database schema design and migrations: create initial schema for users, profiles, modules, groups, and memberships with RLS. Est. 2 days.
-- Onboarding screens 4–5: academic interests and intent selection, including persistence and onboarding completion flow. Est. 3 days.
-- Basic profile page with completion bar: show user info, modules, interests, and intents with editable fields. Est. 3 days.
-- Basic group creation: public groups only, manual form only. Est. 2 days.
-- Basic Discover tab: list and join public groups, no matching yet. Est. 2 days.
+- Onboarding screens 4–5: generalized cross-faculty interests, intent selection, persistence, onboarding completion flow, and navigation stability. Est. 3 days.
+- Basic profile page with completion bar: show real user info, modules, interests, intents, and sign-out. Est. 3 days.
+- Basic group creation: public groups only, manual form only, with creator membership saved correctly. Est. 2 days.
+- Basic Discover tab: group-only list and join flow, no people matching yet. Est. 2 days.
+- Theme consistency polish: align auth and onboarding with the shipped M1 app surface. Est. 1 day.
 
 ### Shared
 
-- Integration testing and bug fixes: verify onboarding through group join end to end. Est. 2 days.
+- Integration testing and bug fixes: verify auth, onboarding, profile, group creation, and group join end to end. Est. 2 days.
 - Milestone 1 documentation and submission: report, README updates, demo prep, poster updates. Est. 1 day.
+
+Note: QA and demo preparation may use seeded Supabase users and groups, but shipped M1 surfaces should not rely on fake placeholder UI.
 
 ## Milestone 2 — Core Features Complete
 
 Deadline: End of June 2026
 
-Goal: ship the core experience with manual group creation, initial matching, real-time chat, communities, direct messaging, and timetable-aware discovery.
+Goal: ship the core experience with people discovery, manual and privacy-aware group creation, initial matching, real-time chat, communities, direct messaging, and timetable-aware discovery.
 
 ### Joel
 
@@ -110,7 +113,7 @@ Goal: add higher-risk and higher-complexity features after the core product is s
 ## Sprint Timeline
 
 - Sprint 1, May 12–25: project scaffolding, auth foundation, backend foundation, initial schema.
-- Sprint 2, May 26–Jun 8: onboarding completion, profile page, public groups, Discover, CI, Milestone 1 wrap-up.
+- Sprint 2, May 26–Jun 8: onboarding completion, profile page, public groups, group-only Discover, auth polish, CI, Milestone 1 wrap-up.
 - Sprint 3, Jun 9–22: privacy-aware groups, initial matching, chat foundation, Discover integration.
 - Sprint 4, Jun 23–Jul 6: communities, resources, DMs, notifications, timetable import, inbox, Milestone 2 wrap-up.
 - Sprint 5, Jul 7–20: SSO, matching expansion, AI flows, moderation, reputation, scheduling, push notifications.

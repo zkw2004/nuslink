@@ -20,13 +20,20 @@ export function OnboardingFrame({
   subtitle,
 }: OnboardingFrameProps) {
   return (
-    <SafeAreaView className="flex-1 bg-white">
+    <SafeAreaView className="flex-1 bg-[#EEF3F9]">
       <View className="flex-row items-center gap-3 px-5 pb-2 pt-3">
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Go back"
           className="h-9 w-9 items-center justify-center rounded-full"
-          onPress={() => router.back()}
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back();
+              return;
+            }
+
+            router.replace("/(auth)/sign-in");
+          }}
         >
           <Text className="text-[22px] text-gray-500">‹</Text>
         </Pressable>
@@ -36,7 +43,7 @@ export function OnboardingFrame({
             <View
               key={index}
               className={`h-1 flex-1 rounded-full ${
-                index < step ? "bg-primary" : "bg-gray-200"
+                index < step ? "bg-[#0F1115]" : "bg-gray-200"
               }`}
             />
           ))}
@@ -59,7 +66,7 @@ export function OnboardingFrame({
         <View className="mt-7">{children}</View>
       </ScrollView>
 
-      <View className="border-t border-gray-100 px-5 pb-8 pt-3">{footer}</View>
+      <View className="border-t border-[#E4E9F1] px-5 pb-8 pt-3">{footer}</View>
     </SafeAreaView>
   );
 }

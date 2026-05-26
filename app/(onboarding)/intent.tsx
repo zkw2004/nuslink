@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Alert, View, Text, ScrollView, TouchableOpacity } from "react-native";
+import { Alert, Pressable, View, Text, ScrollView, TouchableOpacity } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -87,17 +87,33 @@ export default function IntentScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
-      {/* Progress bar */}
-      <View className="flex-row gap-1 px-5 pt-3 pb-2">
-        {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
-          <View
-            key={i}
-            className={`flex-1 h-1 rounded-full ${
-              i < CURRENT_STEP ? "bg-primary" : "bg-gray-200"
-            }`}
-          />
-        ))}
+    <SafeAreaView className="flex-1 bg-[#EEF3F9]">
+      <View className="flex-row items-center gap-3 px-5 pb-2 pt-3">
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+          className="h-9 w-9 items-center justify-center rounded-full"
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back();
+              return;
+            }
+
+            router.replace("/(auth)/sign-in");
+          }}
+        >
+          <Text className="text-[22px] text-gray-500">‹</Text>
+        </Pressable>
+        <View className="flex-1 flex-row gap-1">
+          {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
+            <View
+              key={i}
+              className={`flex-1 h-1 rounded-full ${
+                i < CURRENT_STEP ? "bg-[#0F1115]" : "bg-gray-200"
+              }`}
+            />
+          ))}
+        </View>
       </View>
 
       <ScrollView
@@ -108,8 +124,8 @@ export default function IntentScreen() {
           What brings you here?
         </Text>
         <Text className="mt-2 text-[15px] text-gray-500 leading-snug">
-          Multi-select. This shapes which matches we surface first — you'll still
-          see everything.
+          Multi-select. This helps complete your M1 profile and the kinds of groups
+          you may want to browse first.
         </Text>
 
         <View className="mt-6 gap-3">
@@ -122,13 +138,13 @@ export default function IntentScreen() {
                 activeOpacity={0.8}
                 className={`flex-row items-center gap-4 p-4 rounded-2xl border-[1.5px] ${
                   isSelected
-                    ? "bg-orange-50 border-primary"
+                    ? "bg-[#E7EEF7] border-[#0F1115]"
                     : "bg-gray-50 border-gray-200"
                 }`}
               >
                 <View
                   className={`w-6 h-6 rounded-full border-[1.5px] items-center justify-center ${
-                    isSelected ? "bg-primary border-primary" : "border-gray-400"
+                    isSelected ? "bg-[#0F1115] border-[#0F1115]" : "border-gray-400"
                   }`}
                 >
                   {isSelected && (
@@ -160,7 +176,7 @@ export default function IntentScreen() {
           activeOpacity={0.85}
           disabled={isProfileLoading}
           className={`py-4 rounded-2xl items-center ${
-            isProfileLoading ? "bg-gray-200" : "bg-primary"
+            isProfileLoading ? "bg-gray-200" : "bg-[#0F1115]"
           }`}
         >
           <Text
