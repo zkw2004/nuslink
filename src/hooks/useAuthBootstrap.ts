@@ -13,6 +13,11 @@ export function useAuthBootstrap() {
   useEffect(() => {
     void initialize();
 
+    if (!supabase) {
+      setInitialized(true);
+      return;
+    }
+
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
