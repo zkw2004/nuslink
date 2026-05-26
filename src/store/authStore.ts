@@ -6,6 +6,8 @@ import type { Database } from "@appTypes/database";
 import type { UserProfile } from "@appTypes/index";
 
 type ProfileUpdate = Database["public"]["Tables"]["profiles"]["Update"];
+type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
+type ProfileInsert = Database["public"]["Tables"]["profiles"]["Insert"];
 
 interface AuthState {
   session: Session | null;
@@ -14,6 +16,7 @@ interface AuthState {
   isProfileLoading: boolean;
   initialize: () => Promise<void>;
   setSession: (session: Session | null) => void;
+  setProfile: (profile: UserProfile | null) => void;
   setInitialized: (isInitialized: boolean) => void;
   clearProfile: () => void;
   refreshProfile: (userId?: string) => Promise<UserProfile | null>;
@@ -21,10 +24,11 @@ interface AuthState {
     interests: string[];
     intents: UserProfile["intents"];
   }) => Promise<UserProfile>;
+  signOut: () => Promise<void>;
 }
 
 function mapProfileRowToUserProfile(
-  row: Database["public"]["Tables"]["profiles"]["Row"],
+  row: ProfileRow,
 ): UserProfile {
   return {
     ...row,
@@ -32,6 +36,33 @@ function mapProfileRowToUserProfile(
     interests: row.interests ?? [],
     skills: row.skills ?? [],
   };
+}
+
+async function ensureProfileRow(userId: string) {
+  if (!supabase) {
+    return null;
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const insertPayload: ProfileInsert = {
+    id: userId,
+    display_name: user?.user_metadata?.full_name ?? "",
+  };
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .upsert(insertPayload, { onConflict: "id" })
+    .select("*")
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -56,15 +87,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     set({ session });
 
-    if (session?.user) {
-      await get().refreshProfile(session.user.id);
+    try {
+      if (session?.user) {
+        await get().refreshProfile(session.user.id);
+      }
+    } finally {
+      set({ isInitialized: true });
     }
-
-    set({ isInitialized: true });
   },
 
   setSession(session) {
     set({ session });
+  },
+
+  setProfile(profile) {
+    set({ profile, isProfileLoading: false });
   },
 
   setInitialized(isInitialized) {
@@ -97,6 +134,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       .single();
 
     if (error) {
+      if (error.code === "PGRST116") {
+        const createdProfile = await ensureProfileRow(nextUserId);
+
+        if (!createdProfile) {
+          set({ profile: null, isProfileLoading: false });
+          return null;
+        }
+
+        const profile = mapProfileRowToUserProfile(createdProfile);
+        set({ profile, isProfileLoading: false });
+        return profile;
+      }
+
       set({ isProfileLoading: false });
       throw error;
     }
@@ -140,5 +190,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const profile = mapProfileRowToUserProfile(data);
     set({ profile, isProfileLoading: false });
     return profile;
+  },
+
+  async signOut() {
+    if (!supabase) {
+      set({ session: null, profile: null, isProfileLoading: false });
+      return;
+    }
+
+    const { error } = await supabase.auth.signOut();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    set({ session: null, profile: null, isProfileLoading: false });
   },
 }));

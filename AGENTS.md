@@ -22,6 +22,7 @@ The app includes:
 See `FEATURES.md` for the canonical feature list and `DEVELOPMENT_PLAN.md` for milestone scope. In practice, use this file as the implementation guardrail: if the product spec is more ambitious than the current milestone, follow the smaller scope here and defer the rest.
 
 Keep implementations simple and readable. Do not build M2 or M3 features until M1 is solid.
+If a feature belongs to a later milestone, do not leave it exposed as if it already works. Prefer honest preview states or empty states over misleading interactive placeholders.
 
 ---
 
@@ -152,6 +153,7 @@ These are non-negotiable for NUSLink:
 - **Match candidates must have completed onboarding.** Do not show profiles that lack the required preference fields.
 - **Reliability is shown as badge tiers, never as a numeric score.** Use tier labels (e.g., New, Reliable, Trusted, Standout). Never expose a 4.7-out-of-5 style rating.
 - **No public ranking.** Users see their personal matches. There are no global leaderboards, popularity counts, or visible follower counts.
+- **Milestone 1 Discover is group-first.** Do not expose people matching, compatibility chips, or connect CTAs in shipped M1 surfaces.
 
 ---
 
@@ -171,6 +173,7 @@ For any UI task:
 - Replicate the provided design exactly.
 - Match layout, spacing, padding, font sizes, font hierarchy, colors, border radius, shadows, alignment, and proportions.
 - Do not approximate. Do not simplify unless explicitly asked.
+- Auth and onboarding should follow the same shipped visual language as the rest of the M1 app unless an explicit design says otherwise.
 
 ---
 
@@ -326,6 +329,7 @@ When building a feature:
 5. Follow existing patterns. If you can't find a pattern, ask before inventing one.
 6. Make sure the feature works end-to-end. If mobile and backend both change, test the round trip.
 7. Fix lint and type errors before finishing.
+8. If a screen still depends on mock or demo data, label it honestly or replace it before calling the feature complete.
 
 ---
 

@@ -19,8 +19,8 @@ For the initial release, users sign up via email and password using Supabase Aut
 Screen 1 — Sign Up. The user creates an account via email and password. A future milestone may add SSO as an alternative sign-up path.
 Screen 2 — Academic Information. The user enters faculty, major, year of study, and expected graduation date. Current semester modules are added via a search interface powered by the NUSMods API. Selected modules appear as removable chips. If SSO is added later, these fields can be pre-filled and remain editable.
 Screen 3 — Profile Setup. The user uploads a profile picture and writes a short biography (200 characters maximum). Both fields are mandatory.
-Screen 4 — Academic Interests. The user selects from predefined interest categories (such as AI/ML, Systems, Theory, Security, Data Science, and HCI) and may add custom tags for niche interests. At least one interest is required.
-Screen 5 — Intent Selection. The user selects one or more intents from: Study Groups, Hackathon/Competition Teams, Tutoring/TA, and Internship Networking. This selection informs the matching algorithm’s behaviour but does not restrict the user’s access to any features.
+Screen 4 — Academic Interests. The user selects from broad predefined interest categories (such as AI/ML, Software Engineering, Data Science, Economics, Finance, Consulting, Design, and Research) and may add custom tags for niche interests. At least one interest is required. In M1 these suggestions are intentionally generalized across faculties rather than personalized by major or year.
+Screen 5 — Intent Selection. The user selects one or more intents from: Study Groups, Hackathon/Competition Teams, Tutoring/TA, and Internship Networking. This selection is stored on the profile during onboarding completion. In M1 it helps complete the user profile and prepare later discovery features, but does not yet power people matching.
 2.3 Optional Profile Fields
 The following fields may be completed at any time after onboarding and contribute to a higher profile completion score and better match quality:
 •	Timetable: Imported via NUSMods share URL (primary) or entered manually on a weekly grid. Used for schedule overlap scoring and shared scheduling.
@@ -32,12 +32,12 @@ The following fields may be completed at any time after onboarding and contribut
 3. Application Structure
 3.1 Navigation
 The application uses a bottom tab bar with five tabs and a top bar element:
-•	Discover: Browse and search for groups. Displays group cards with compatibility scores, sort and filter controls, and a people discovery section.
+•	Discover: In M1, browse and join public groups for the current semester. Group compatibility scores, advanced filters, and people discovery arrive in Milestone 2.
 •	Communities: Browse, search, and join larger communities. Includes official NUS club communities and user-created communities.
 •	Create (+): Central elevated button for creating new groups. Opens the group creation form.
-•	Chats: Unified inbox containing all group chats, community chats, and direct messages in a single chronologically sorted list.
-•	Profile: View and edit personal profile. Displays profile completion percentage, connections list, and access to all optional profile fields.
-The top bar contains the app logo and a notifications bell icon accessible from any screen.
+•	Chats: Milestone 2 surface for the unified inbox containing group chats, community chats, and direct messages.
+•	Profile: View the saved profile, current-semester modules, interests, intents, and M1 completion percentage. Rich editing and connection management are deferred.
+The top bar contains the app logo and a notifications bell icon accessible from any screen in the fuller product vision. M1 may ship without the bell if notifications are not yet implemented.
 3.2 Notifications
 Notifications are delivered via in-app alerts and push notifications. Users receive notifications for connection requests, group invites, community activity, group recommendations, high-compatibility match alerts (80% or above), and smart nudges. A bell icon in the top bar displays the unread count. Tapping a notification navigates to the relevant screen.
 4. Group Creation and Management
@@ -45,9 +45,9 @@ Notifications are delivered via in-app alerts and push notifications. Users rece
 Users can create four types of groups: Study Groups, Hackathon/Competition Teams, Project Teams, and Tutoring Sessions. These types are functionally identical in terms of available features; the distinction exists primarily to support filtering, matching context, and user intent. For example, the matching algorithm scores target grade similarity for study groups but target grade complementarity for tutoring sessions.
 4.2 Group Creation Form
 The creation form contains both mandatory and optional fields.
-Mandatory fields: group name (50 characters maximum), group type, module (required if the type is Study Group), and privacy setting.
+Mandatory fields: group name (50 characters maximum), group type, module, and privacy setting.
 Optional fields: scheduled time and venue, minimum and maximum group size, text description (500 characters maximum), and tags.
-Users may toggle between a manual form and an AI-assisted mode (see Section 7.1).
+In M1, only the manual public-group flow ships. Semi-private, private, and AI-assisted creation are deferred.
 4.3 Privacy Settings
 Public groups are visible to all users and can be joined by anyone.
 Semi-private groups are visible only to users who satisfy a creator-defined restriction. The creator selects one of three restriction types: same module, same year, or same faculty. Users who meet the restriction can join directly.
@@ -111,14 +111,14 @@ People-to-group matching scores the current user against each existing group. Th
 Live matching is scoped to users in the same module in the same semester. Past semesters are read-only history and are never used for live matching. The system proactively notifies users only when a match scores 80% or above, to avoid notification fatigue.
 9. Discover Tab
 9.1 Group Discovery
-The Discover tab displays available groups as scrollable cards. Each card shows the group name, type badge, module code, member count, scheduled time (if set), and a compatibility percentage based on the current user’s profile. Public groups and qualifying semi-private groups are shown. Private groups appear with limited information and a “Request to Join” button.
+The M1 Discover tab displays available public groups as scrollable cards. Each card shows the group name, type badge, module code, and an action to join. Honest empty states are preferred over fake cards if no groups exist.
 9.2 Sort and Filter
-Users can sort results by compatibility (highest match first, the default), popularity (most members), recently created, or starting soon (groups with the nearest scheduled time). Filter options include activity type, module, faculty, available spots (exclude full groups), and schedule fit (only groups whose scheduled time does not conflict with the user’s linked timetable).
+M1 keeps Discover intentionally simple. Advanced sorting, richer filters, and timetable-aware ranking are deferred to later milestones.
 9.3 People Discovery
-A secondary section or tab within Discover shows individual user profiles ranked by compatibility. Each profile card displays the user’s name, picture, major, year, top skills, and compatibility percentage. Tapping a card opens the full profile with a “Connect” button.
+People discovery is explicitly deferred to Milestone 2. The shipped M1 surface should not expose compatibility percentages, “High match” chips, or “Connect” actions as if they are functional.
 10. Connection System
 NUSLink uses a mutual connection model. One user sends a connection request; the other accepts or declines. Accepted connections are bilateral: both users appear in each other’s connections list. Declining a request removes it silently without notifying the requester.
-Connections serve as the gateway to direct messaging. Users can only initiate a direct message conversation with someone they are mutually connected with. The “Connect” button appears on user profiles throughout the app: in Discover results, in group member lists, and in community member lists.
+Connections serve as the gateway to direct messaging. Users can only initiate a direct message conversation with someone they are mutually connected with. This entire connection system is deferred beyond M1.
 11. Reputation and Rating System
 11.1 Rating Structure
 Users can rate others across three categories: Reliability, Communication, and Contribution. A numeric input may be used internally to compute aggregates, but the rated user is only shown an overall badge tier rather than raw category averages or individual review entries.
@@ -145,8 +145,8 @@ Consequences are severity-based. Minor violations (such as off-topic posts) resu
 12.5 Future Work
 Community reporting (a flag button on any piece of content), a human moderator dashboard for reviewing flagged content, and a formal appeal process for bans are planned for post-Orbital development.
 13. Design Direction
-The visual design of NUSLink follows a clean, modern, and minimalistic aesthetic inspired by applications such as Hinge and Lemon8. The primary colour is a muted NUS orange, used for primary actions, the active tab state, and key UI accents. The accent colour is a soft blue, used for secondary elements and informational content. The typeface is SF Pro, chosen for its professional but approachable feel and native rendering on iOS. Cross-platform font licensing for Android is to be resolved separately.
-The overall design philosophy prioritises readability, generous whitespace, and a card-based layout for browsable content such as groups and user profiles. The interface avoids visual clutter and presents information hierarchically, surfacing the most relevant details (compatibility score, module, group type) at the card level and revealing full details on tap.
+The visual design of NUSLink follows a clean, modern, and minimalistic aesthetic built around white surfaces, black primary actions, and soft slate-blue accents. The typeface is SF Pro, chosen for its professional but approachable feel and native rendering on iOS. Cross-platform font licensing for Android is to be resolved separately.
+The overall design philosophy prioritises readability, generous whitespace, and a card-based layout for browsable content such as groups and user profiles. The interface avoids visual clutter and presents information hierarchically, surfacing the most relevant M1 details (module, group type, completion state) at the card level and revealing richer social signals in later milestones.
 14. Technical Architecture
 14.1 Tech Stack
 Mobile application: React Native with Expo and TypeScript, styled with NativeWind (Tailwind CSS for React Native).
@@ -160,8 +160,8 @@ The testing strategy covers unit tests for core domain logic (particularly the m
 The architecture enforces separation of concerns: React Native handles presentation, Supabase handles data persistence and authentication, and FastAPI owns domain logic. A repository pattern keeps business logic testable without requiring a live database. All schema changes go through versioned Supabase migrations committed to version control, with row-level security policies enforcing data access at the database layer.
 15. Development Timeline
 15.1 Milestone 1 — Technical Proof of Concept (End of May)
-Functional email sign-up and login. Complete five-screen onboarding flow with data persisted to the database. Basic profile page with completion bar. Module registration via NUSMods API. Basic group creation (public groups only, manual form). Basic Discover tab (list and join groups, no matching). FastAPI backend deployed with health endpoint. CI pipeline operational.
+Functional email sign-up and login. Stable auth routing and onboarding guards. Complete five-screen onboarding flow with data persisted to the database. Basic profile page with real saved data and a completion bar. Module registration via NUSMods API. Basic group creation (public groups only, manual form). Basic Discover tab (list and join groups, no people matching). Basic sign-out. FastAPI backend deployed with health endpoint. CI pipeline operational.
 15.2 Milestone 2 — Core Features Complete (End of June)
-Initial smart matching algorithm with two-dimensional scoring (target grade similarity and schedule overlap). Compatibility percentage displayed on group and people cards. Full group creation with all three privacy types using the manual flow. Communities tab (browse, create, join, chat). Real-time chat with text, images, files, polls, and pinned messages. Shared resources section. Connection system with direct messaging. Timetable import. Unified chat inbox with unread tracking. Basic notifications. User testing with five to ten NUS students.
+Initial smart matching algorithm with two-dimensional scoring (target grade similarity and schedule overlap). Compatibility percentage displayed on group and people cards. People discovery and connection requests. Full group creation with all three privacy types using the manual flow. Communities tab (browse, create, join, chat). Real-time chat with text, images, files, polls, and pinned messages. Shared resources section. Direct messaging. Timetable import. Unified chat inbox with unread tracking. Basic notifications. User testing with five to ten NUS students.
 15.3 Milestone 3 — Extended System (End of July)
 NUS SSO via OpenID Connect. Matching algorithm expanded to four dimensions with configurable weights. AI group creation autofill. AI profile extraction from resumes. Smart nudges (time-based, behaviour-based, network-based) with user controls. Reputation and rating system with badge tiers. Threaded replies in chat. Shared scheduling with auto-suggested time slots. AI content moderation. Push notification infrastructure. Profile completion bar with full calculation. Comprehensive user testing with fifteen to twenty students. Full technical and project documentation. Final demo video and updated poster.

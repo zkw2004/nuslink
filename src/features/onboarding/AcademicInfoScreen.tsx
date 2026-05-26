@@ -124,7 +124,7 @@ export function AcademicInfoScreen() {
       footer={
         <Pressable
           accessibilityRole="button"
-          className={`items-center rounded-2xl py-4 ${isSaving ? "bg-gray-300" : "bg-primary"}`}
+          className={`items-center rounded-2xl py-4 ${isSaving ? "bg-gray-300" : "bg-[#0F1115]"}`}
           disabled={isSaving}
           onPress={handleContinue}
         >
@@ -217,7 +217,7 @@ export function AcademicInfoScreen() {
 
         {isSearching ? (
           <View className="mt-3 items-start">
-            <ActivityIndicator color="#D4471C" />
+            <ActivityIndicator color="#5B7BA3" />
           </View>
         ) : null}
 
