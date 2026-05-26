@@ -1,5 +1,6 @@
 import { useState } from "react";
 import {
+  Pressable,
   View,
   Text,
   ScrollView,
@@ -13,17 +14,17 @@ import { useAuthStore, useOnboardingStore } from "@store/index";
 
 const PREDEFINED_INTERESTS = [
   "AI / ML",
-  "Systems",
-  "Theory & Algos",
-  "Security",
+  "Software Engineering",
   "Data Science",
-  "HCI / Design",
-  "Web & Mobile",
-  "Computer Vision",
-  "NLP",
-  "Graphics",
-  "Robotics",
-  "Fintech",
+  "Economics",
+  "Finance",
+  "Consulting",
+  "Entrepreneurship",
+  "Design",
+  "Public Policy",
+  "Operations",
+  "Marketing",
+  "Research",
 ];
 
 const TOTAL_STEPS = 5;
@@ -67,17 +68,33 @@ export default function InterestsScreen() {
   const canContinue = selected.size >= 1;
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
-      {/* Progress bar */}
-      <View className="flex-row gap-1 px-5 pt-3 pb-2">
-        {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
-          <View
-            key={i}
-            className={`flex-1 h-1 rounded-full ${
-              i < CURRENT_STEP ? "bg-primary" : "bg-gray-200"
-            }`}
-          />
-        ))}
+    <SafeAreaView className="flex-1 bg-[#EEF3F9]">
+      <View className="flex-row items-center gap-3 px-5 pb-2 pt-3">
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+          className="h-9 w-9 items-center justify-center rounded-full"
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back();
+              return;
+            }
+
+            router.replace("/(auth)/sign-in");
+          }}
+        >
+          <Text className="text-[22px] text-gray-500">‹</Text>
+        </Pressable>
+        <View className="flex-1 flex-row gap-1">
+          {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
+            <View
+              key={i}
+              className={`flex-1 h-1 rounded-full ${
+                i < CURRENT_STEP ? "bg-[#0F1115]" : "bg-gray-200"
+              }`}
+            />
+          ))}
+        </View>
       </View>
 
       <ScrollView
@@ -89,7 +106,7 @@ export default function InterestsScreen() {
           What are you into?
         </Text>
         <Text className="mt-2 text-[15px] text-gray-500 leading-snug">
-          Pick the areas you care about. Matches surface peers who overlap.
+          Choose the academic and professional areas you care about right now.
         </Text>
 
         <View className="flex-row flex-wrap gap-2 mt-6">
@@ -102,7 +119,7 @@ export default function InterestsScreen() {
                 activeOpacity={0.75}
                 className={`px-4 py-2 rounded-full border ${
                   isSelected
-                    ? "bg-primary border-primary"
+                    ? "bg-[#0F1115] border-[#0F1115]"
                     : "bg-gray-100 border-transparent"
                 }`}
               >
@@ -144,15 +161,15 @@ export default function InterestsScreen() {
         </View>
 
         {/* Tip card */}
-        <View className="mt-6 p-4 bg-orange-50 rounded-2xl border border-orange-100 flex-row gap-3 items-start">
-          <Text className="text-primary text-base mt-0.5">✦</Text>
+        <View className="mt-6 p-4 bg-[#E7EEF7] rounded-2xl border border-[#D0D7E2] flex-row gap-3 items-start">
+          <Text className="text-[#5B7BA3] text-base mt-0.5">✦</Text>
           <View className="flex-1">
             <Text className="text-sm font-semibold text-gray-900">
               You can add custom tags later
             </Text>
             <Text className="text-xs text-gray-500 mt-1 leading-relaxed">
-              Niche interests like "competitive programming" or "embedded
-              systems" help with hackathon matching.
+              Mix broad areas like finance, consulting, policy, or entrepreneurship
+              with technical interests if they matter to you.
             </Text>
           </View>
         </View>
@@ -171,7 +188,7 @@ export default function InterestsScreen() {
           disabled={!canContinue}
           activeOpacity={0.85}
           className={`py-4 rounded-2xl items-center ${
-            canContinue ? "bg-primary" : "bg-gray-200"
+            canContinue ? "bg-[#0F1115]" : "bg-gray-200"
           }`}
         >
           <Text

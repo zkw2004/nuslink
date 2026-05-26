@@ -1,8 +1,21 @@
-import { ScrollView, Text, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { router } from "expo-router";
+import * as ImagePicker from "expo-image-picker";
+import { SymbolView } from "expo-symbols";
 
 import {
   AppAvatar,
+  AppButton,
   AppChip,
   AppScreenHeader,
   BadgeTierPill,
@@ -10,42 +23,530 @@ import {
   SectionCard,
   SectionHeader,
 } from "@components/shared";
-import { mockProfile } from "@features/m1/mockData";
+import { saveProfileSetup, uploadProfileImage } from "@features/onboarding/onboardingService";
+import { toSelectedModule, type SelectedModule } from "@features/onboarding/types";
+import { searchNusmodsModules } from "@lib/nusmods";
+import {
+  fetchCurrentSemesterModules,
+  fetchProfileViewModel,
+  updateEditableProfile,
+} from "@services/index";
+import { useAuthStore } from "@store/index";
+
+const YEAR_OPTIONS = [1, 2, 3, 4, 5, 6];
+
+const INTEREST_OPTIONS = [
+  "AI / ML",
+  "Software Engineering",
+  "Data Science",
+  "Economics",
+  "Finance",
+  "Consulting",
+  "Entrepreneurship",
+  "Design",
+  "Public Policy",
+  "Operations",
+  "Marketing",
+  "Research",
+];
+
+const INTENT_OPTIONS = [
+  { id: "study_group", label: "Study groups" },
+  { id: "hackathon", label: "Hackathons / comps" },
+  { id: "tutoring", label: "Tutoring / TA" },
+  { id: "internship_networking", label: "Internship networking" },
+] as const;
 
 export default function ProfileScreen() {
+  const profile = useAuthStore((state) => state.profile);
+  const refreshProfile = useAuthStore((state) => state.refreshProfile);
+  const setProfile = useAuthStore((state) => state.setProfile);
+  const signOut = useAuthStore((state) => state.signOut);
+
+  const [moduleCodes, setModuleCodes] = useState<string[]>([]);
+  const [completion, setCompletion] = useState(0);
+  const [editableModules, setEditableModules] = useState<SelectedModule[]>([]);
+  const [displayNameDraft, setDisplayNameDraft] = useState("");
+  const [bioDraft, setBioDraft] = useState("");
+  const [facultyDraft, setFacultyDraft] = useState("");
+  const [majorDraft, setMajorDraft] = useState("");
+  const [yearOfStudyDraft, setYearOfStudyDraft] = useState(1);
+  const [interestsDraft, setInterestsDraft] = useState<string[]>([]);
+  const [intentsDraft, setIntentsDraft] = useState<NonNullable<typeof profile>["intents"]>([]);
+  const [moduleQuery, setModuleQuery] = useState("");
+  const [moduleResults, setModuleResults] = useState<SelectedModule[]>([]);
+  const [customInterestInput, setCustomInterestInput] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isUpdatingPhoto, setIsUpdatingPhoto] = useState(false);
+  const [isSearchingModules, setIsSearchingModules] = useState(false);
+  const [avatarPreviewUri, setAvatarPreviewUri] = useState<string | null>(null);
+
+  const badgeTierLabel = useMemo(() => {
+    switch (profile?.badge_tier) {
+      case "gold":
+        return "Standout" as const;
+      case "silver":
+        return "Trusted" as const;
+      case "bronze":
+        return "Reliable" as const;
+      default:
+        return "New" as const;
+    }
+  }, [profile?.badge_tier]);
+
+  useEffect(() => {
+    async function loadProfileDetails() {
+      if (!profile) {
+        setModuleCodes([]);
+        setEditableModules([]);
+        setCompletion(0);
+        return;
+      }
+
+      try {
+        const [viewModel, modules] = await Promise.all([
+          fetchProfileViewModel(profile.id, profile),
+          fetchCurrentSemesterModules(profile.id),
+        ]);
+
+        setModuleCodes(viewModel.modules);
+        setEditableModules(modules);
+        setCompletion(viewModel.completion);
+
+        if (!isEditing) {
+          setDisplayNameDraft(profile.display_name);
+          setBioDraft(profile.bio);
+          setFacultyDraft(profile.faculty ?? "");
+          setMajorDraft(profile.major ?? "");
+          setYearOfStudyDraft(profile.year_of_study ?? 1);
+          setInterestsDraft(profile.interests);
+          setIntentsDraft(profile.intents);
+        }
+
+        if (!isEditing) {
+          setAvatarPreviewUri(profile.avatar_url);
+        }
+      } catch {
+        setModuleCodes([]);
+        setEditableModules([]);
+        setCompletion(0);
+      }
+    }
+
+    void loadProfileDetails();
+  }, [isEditing, profile]);
+
+  useEffect(() => {
+    let isActive = true;
+    const query = moduleQuery.trim();
+
+    if (!isEditing || query.length < 2) {
+      setModuleResults([]);
+      setIsSearchingModules(false);
+      return;
+    }
+
+    setIsSearchingModules(true);
+
+    const timeoutId = setTimeout(() => {
+      void searchNusmodsModules(query)
+        .then((modules) => {
+          if (!isActive) {
+            return;
+          }
+
+          const selectedCodes = new Set(
+            editableModules.map((module) => module.moduleCode),
+          );
+
+          setModuleResults(
+            modules
+              .map(toSelectedModule)
+              .filter((module) => !selectedCodes.has(module.moduleCode)),
+          );
+        })
+        .catch(() => {
+          if (isActive) {
+            setModuleResults([]);
+          }
+        })
+        .finally(() => {
+          if (isActive) {
+            setIsSearchingModules(false);
+          }
+        });
+    }, 300);
+
+    return () => {
+      isActive = false;
+      clearTimeout(timeoutId);
+    };
+  }, [editableModules, isEditing, moduleQuery]);
+
+  function resetDrafts() {
+    if (!profile) {
+      return;
+    }
+
+    setDisplayNameDraft(profile.display_name);
+    setBioDraft(profile.bio);
+    setFacultyDraft(profile.faculty ?? "");
+    setMajorDraft(profile.major ?? "");
+    setYearOfStudyDraft(profile.year_of_study ?? 1);
+    setInterestsDraft(profile.interests);
+    setIntentsDraft(profile.intents);
+    setModuleQuery("");
+    setModuleResults([]);
+    setCustomInterestInput("");
+  }
+
+  function handleToggleEdit() {
+    if (isEditing) {
+      resetDrafts();
+      setIsEditing(false);
+      return;
+    }
+
+    resetDrafts();
+    setIsEditing(true);
+  }
+
+  function handleSignOut() {
+    Alert.alert("Sign out", "Are you sure you want to sign out?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Sign out",
+        style: "destructive",
+        onPress: async () => {
+          await signOut();
+          router.replace("/(auth)/sign-in");
+        },
+      },
+    ]);
+  }
+
+  async function handlePickProfilePhoto() {
+    if (!profile) {
+      return;
+    }
+
+    setIsUpdatingPhoto(true);
+
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (!permission.granted) {
+        Alert.alert(
+          "Permission needed",
+          "Photo library permission is needed to change your profile image.",
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        allowsEditing: true,
+        aspect: [1, 1],
+        base64: true,
+        mediaTypes: ["images"],
+        quality: 0.82,
+      });
+
+      if (result.canceled) {
+        return;
+      }
+
+      const asset = result.assets[0];
+
+      if (!asset.base64) {
+        Alert.alert("Could not read image", "Try choosing a different photo.");
+        return;
+      }
+
+      setAvatarPreviewUri(
+        `data:${asset.mimeType ?? "image/jpeg"};base64,${asset.base64}`,
+      );
+
+      const avatarUrl = await uploadProfileImage({
+        base64: asset.base64,
+        uri: asset.uri,
+      });
+
+      const savedProfile = await saveProfileSetup({
+        avatarUrl,
+        bio: profile.bio,
+        displayName: profile.display_name,
+      });
+
+      setProfile(savedProfile);
+    } catch (error) {
+      setAvatarPreviewUri(profile.avatar_url);
+      Alert.alert(
+        "Could not update photo",
+        error instanceof Error ? error.message : "Please try again.",
+      );
+    } finally {
+      setIsUpdatingPhoto(false);
+    }
+  }
+
+  async function handleRemoveProfilePhoto() {
+    if (!profile) {
+      return;
+    }
+
+    setIsUpdatingPhoto(true);
+
+    try {
+      const savedProfile = await saveProfileSetup({
+        avatarUrl: null,
+        bio: profile.bio,
+        displayName: profile.display_name,
+      });
+
+      setProfile(savedProfile);
+      setAvatarPreviewUri(null);
+    } catch (error) {
+      Alert.alert(
+        "Could not remove photo",
+        error instanceof Error ? error.message : "Please try again.",
+      );
+    } finally {
+      setIsUpdatingPhoto(false);
+    }
+  }
+
+  function handleEditPhoto() {
+    if (!profile || !isEditing) {
+      return;
+    }
+
+    const buttons: {
+      text: string;
+      style?: "cancel" | "destructive" | "default";
+      onPress?: () => void;
+    }[] = [
+      {
+        text: profile.avatar_url ? "Change photo" : "Add photo",
+        onPress: () => {
+          void handlePickProfilePhoto();
+        },
+      },
+    ];
+
+    if (profile.avatar_url) {
+      buttons.push({
+        text: "Remove photo",
+        style: "destructive",
+        onPress: () => {
+          void handleRemoveProfilePhoto();
+        },
+      });
+    }
+
+    buttons.push({ text: "Cancel", style: "cancel" });
+
+    Alert.alert("Edit profile photo", "Update your display picture.", buttons);
+  }
+
+  function toggleInterest(interest: string) {
+    setInterestsDraft((current) =>
+      current.includes(interest)
+        ? current.filter((item) => item !== interest)
+        : [...current, interest],
+    );
+  }
+
+  function addCustomInterest() {
+    const trimmedInterest = customInterestInput.trim();
+
+    if (!trimmedInterest || interestsDraft.includes(trimmedInterest)) {
+      return;
+    }
+
+    setInterestsDraft((current) => [...current, trimmedInterest]);
+    setCustomInterestInput("");
+  }
+
+  function removeInterest(interest: string) {
+    setInterestsDraft((current) => current.filter((item) => item !== interest));
+  }
+
+  function toggleIntent(
+    intent: NonNullable<typeof profile>["intents"][number],
+  ) {
+    setIntentsDraft((current) =>
+      current.includes(intent)
+        ? current.filter((item) => item !== intent)
+        : [...current, intent],
+    );
+  }
+
+  function addModule(module: SelectedModule) {
+    setEditableModules((current) => [...current, module]);
+    setModuleQuery("");
+    setModuleResults([]);
+  }
+
+  function removeModule(moduleCode: string) {
+    setEditableModules((current) =>
+      current.filter((module) => module.moduleCode !== moduleCode),
+    );
+  }
+
+  async function handleSaveDetails() {
+    if (!profile) {
+      return;
+    }
+
+    if (!displayNameDraft.trim() || !facultyDraft.trim() || !majorDraft.trim()) {
+      Alert.alert(
+        "Missing fields",
+        "Display name, faculty, and major are required.",
+      );
+      return;
+    }
+
+    if (interestsDraft.length === 0) {
+      Alert.alert("Add interests", "Choose at least one interest before saving.");
+      return;
+    }
+
+    if (intentsDraft.length === 0) {
+      Alert.alert("Add intents", "Choose at least one intent before saving.");
+      return;
+    }
+
+    if (editableModules.length === 0) {
+      Alert.alert(
+        "Add modules",
+        "Choose at least one current-semester module before saving.",
+      );
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      await updateEditableProfile(profile.id, {
+        displayName: displayNameDraft,
+        bio: bioDraft,
+        faculty: facultyDraft,
+        major: majorDraft,
+        yearOfStudy: yearOfStudyDraft,
+        interests: interestsDraft,
+        intents: intentsDraft,
+        modules: editableModules,
+      });
+
+      await refreshProfile(profile.id);
+      setIsEditing(false);
+    } catch (error) {
+      Alert.alert(
+        "Could not save profile",
+        error instanceof Error ? error.message : "Please try again.",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  if (!profile) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: "#EEF3F9" }}>
+        <AppScreenHeader title="Profile" />
+        <View className="flex-1 items-center justify-center px-6">
+          <Text className="text-base text-[#5C6370]">
+            Sign in to view your M1 profile.
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const subtitleParts = [
+    profile.major,
+    profile.year_of_study ? `Y${profile.year_of_study}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  const visibleInterests = isEditing ? interestsDraft : profile.interests;
+  const visibleIntents = isEditing ? intentsDraft : profile.intents;
+  const visibleModules = isEditing
+    ? editableModules.map((module) => module.moduleCode)
+    : moduleCodes;
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#EEF3F9" }}>
       <AppScreenHeader
         title="Profile"
         actions={[
-          { icon: "sparkles", accessibilityLabel: "View profile tips" },
-          { icon: "gearshape.fill", accessibilityLabel: "Open settings" },
+          {
+            icon: "pencil",
+            accessibilityLabel: isEditing ? "Stop editing" : "Edit profile",
+            onPress: handleToggleEdit,
+          },
+          {
+            icon: "gearshape.fill",
+            accessibilityLabel: "Sign out",
+            onPress: () => {
+              void handleSignOut();
+            },
+          },
         ]}
       />
 
       <ScrollView
         className="flex-1 px-5"
         contentContainerStyle={{ paddingBottom: 120 }}
+        keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
         <View className="mb-4 flex-row items-center gap-[14px] px-[2px] pb-4 pt-2">
-          <AppAvatar name={mockProfile.name} size={84} rounded={false} />
+          <View className="items-center">
+            <Pressable
+              className="relative"
+              disabled={!isEditing || isUpdatingPhoto}
+              onPress={handleEditPhoto}
+            >
+              <AppAvatar
+                name={profile.display_name || "NUSLink"}
+                imageUri={avatarPreviewUri ?? profile.avatar_url}
+                size={84}
+                rounded={false}
+              />
+              {isEditing ? (
+                <View className="absolute -bottom-1 -right-1 h-8 w-8 items-center justify-center rounded-full border-[2px] border-white bg-[#0F1115]">
+                  {isUpdatingPhoto ? (
+                    <ActivityIndicator color="#FFFFFF" size="small" />
+                  ) : (
+                    <SymbolView
+                      name={{ ios: "pencil", android: "edit", web: "edit" }}
+                      size={14}
+                      tintColor="#FFFFFF"
+                    />
+                  )}
+                </View>
+              ) : null}
+            </Pressable>
+          </View>
 
           <View className="flex-1">
             <View className="flex-row items-center gap-2">
               <Text className="flex-1 text-[22px] font-bold tracking-[-0.6px] text-[#0F1115]">
-                {mockProfile.name}
+                {isEditing
+                  ? displayNameDraft || "Set your display name"
+                  : profile.display_name || "Set your display name"}
               </Text>
-              <BadgeTierPill tier={mockProfile.badgeTier} />
+              <BadgeTierPill tier={badgeTierLabel} />
             </View>
-
             <Text className="mt-[3px] text-[14px] text-[#5C6370]">
-              {mockProfile.major} · Y{mockProfile.year}
-            </Text>
-            <Text className="mt-2 text-[12px] text-[#5C6370]">
-              <Text className="font-semibold text-[#0F1115]">
-                {mockProfile.connections}
-              </Text>{" "}connections
+              {isEditing
+                ? [majorDraft, `Y${yearOfStudyDraft}`].filter(Boolean).join(" · ")
+                : subtitleParts ||
+                  profile.faculty ||
+                  "Complete onboarding to finish your profile"}
             </Text>
           </View>
         </View>
@@ -56,91 +557,339 @@ export default function ProfileScreen() {
               Profile completion
             </Text>
             <Text className="text-[18px] font-bold tracking-[-0.4px] text-[#0F1115]">
-              {mockProfile.completion}%
+              {completion}%
             </Text>
           </View>
 
-          <ProgressBar value={mockProfile.completion} />
+          <ProgressBar value={completion} />
 
           <View className="mt-3 flex-row items-center gap-[10px] rounded-xl bg-[#E7EEF7] px-3 py-[10px]">
             <View className="h-4 w-4 items-center justify-center rounded-full bg-[#0F1115]">
               <Text className="text-[10px] font-bold text-white">+</Text>
             </View>
             <Text className="flex-1 text-[12px] font-medium leading-[17px] text-[#0F1115]">
-              Add your timetable to improve schedule-overlap matching by roughly 30%.
+              Milestone 1 completion is based on your core onboarding fields and current-semester modules.
             </Text>
-            <View className="rounded-lg bg-[#0F1115] px-[10px] py-[6px]">
-              <Text className="text-[12px] font-semibold text-white">Add</Text>
+          </View>
+        </SectionCard>
+
+        <SectionCard className="mb-3">
+          <SectionHeader title="Profile Basics" />
+          {isEditing ? (
+            <View className="gap-3">
+              <TextInput
+                value={displayNameDraft}
+                onChangeText={setDisplayNameDraft}
+                className="rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-4 text-[15px] text-[#0F1115]"
+                placeholder="Display name"
+                placeholderTextColor="#9AA0AB"
+              />
+              <TextInput
+                value={bioDraft}
+                onChangeText={setBioDraft}
+                multiline
+                textAlignVertical="top"
+                className="min-h-[110px] rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-3 text-[15px] leading-6 text-[#0F1115]"
+                placeholder="What you're studying and what you're looking for."
+                placeholderTextColor="#9AA0AB"
+              />
             </View>
-          </View>
+          ) : (
+            <View className="gap-3">
+              <Text className="text-[14px] font-semibold text-[#0F1115]">
+                {profile.display_name || "No display name saved yet."}
+              </Text>
+              <Text className="text-[14px] leading-6 text-[#0F1115]">
+                {profile.bio ||
+                  "Add a short bio during onboarding to help other students know what you are looking for."}
+              </Text>
+            </View>
+          )}
         </SectionCard>
 
         <SectionCard className="mb-3">
-          <SectionHeader title="Bio" actionLabel="Edit" />
-          <Text className="text-[14px] leading-6 text-[#0F1115]">
-            {mockProfile.bio}
-          </Text>
-        </SectionCard>
-
-        <SectionCard className="mb-3">
-          <SectionHeader title="Here For" actionLabel="Edit" />
-          <View className="flex-row flex-wrap gap-2">
-            {mockProfile.intents.map((intent) => (
-              <AppChip key={intent} label={intent} />
-            ))}
-          </View>
-        </SectionCard>
-
-        <SectionCard className="mb-3">
-          <SectionHeader
-            title={`This Semester · ${mockProfile.modules.length}`}
-            actionLabel="Manage"
-          />
-          <View className="flex-row flex-wrap gap-2">
-            {mockProfile.modules.map((moduleCode) => (
-              <AppChip
-                key={moduleCode}
-                label={moduleCode}
-                variant="module"
+          <SectionHeader title="Academics" />
+          {isEditing ? (
+            <View className="gap-3">
+              <TextInput
+                value={facultyDraft}
+                onChangeText={setFacultyDraft}
+                className="rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-4 text-[15px] text-[#0F1115]"
+                placeholder="Faculty"
+                placeholderTextColor="#9AA0AB"
               />
-            ))}
-          </View>
-        </SectionCard>
-
-        <SectionCard className="mb-3">
-          <SectionHeader title="Interests" actionLabel="Edit" />
-          <View className="flex-row flex-wrap gap-2">
-            {mockProfile.interests.map((interest) => (
-              <AppChip
-                key={interest}
-                label={interest}
-                variant="outline"
+              <TextInput
+                value={majorDraft}
+                onChangeText={setMajorDraft}
+                className="rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-4 text-[15px] text-[#0F1115]"
+                placeholder="Major"
+                placeholderTextColor="#9AA0AB"
               />
-            ))}
-          </View>
+              <View className="flex-row gap-1 rounded-2xl bg-[#EEF2F7] p-1">
+                {YEAR_OPTIONS.map((year) => {
+                  const isSelected = year === yearOfStudyDraft;
+                  return (
+                    <Pressable
+                      key={year}
+                      className={`h-10 flex-1 items-center justify-center rounded-xl ${
+                        isSelected ? "bg-[#0F1115]" : "bg-transparent"
+                      }`}
+                      onPress={() => setYearOfStudyDraft(year)}
+                    >
+                      <Text
+                        className={`text-sm font-semibold ${
+                          isSelected ? "text-white" : "text-[#5C6370]"
+                        }`}
+                      >
+                        Y{year}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          ) : (
+            <Text className="text-[14px] leading-6 text-[#0F1115]">
+              {[profile.faculty, profile.major, profile.year_of_study ? `Year ${profile.year_of_study}` : null]
+                .filter(Boolean)
+                .join(" · ") || "No academic details saved yet."}
+            </Text>
+          )}
         </SectionCard>
 
         <SectionCard className="mb-3">
-          <SectionHeader title="Skills" actionLabel="Edit" />
-          <View className="flex-row flex-wrap gap-2">
-            {mockProfile.skills.map((skill) => (
-              <AppChip key={skill} label={skill} variant="outline" />
-            ))}
-          </View>
+          <SectionHeader title="Here For" />
+          {isEditing ? (
+            <View className="flex-row flex-wrap gap-2">
+              {INTENT_OPTIONS.map((intent) => {
+                const isSelected = intentsDraft.includes(intent.id);
 
-          <Text className="mt-[10px] text-[13px] font-semibold text-[#5B7BA3]">
-            Import from resume later
-          </Text>
+                return (
+                  <Pressable
+                    key={intent.id}
+                    className={`rounded-full border px-4 py-2 ${
+                      isSelected
+                        ? "border-[#0F1115] bg-[#0F1115]"
+                        : "border-[#E4E9F1] bg-white"
+                    }`}
+                    onPress={() => toggleIntent(intent.id)}
+                  >
+                    <Text
+                      className={`text-[13px] font-semibold ${
+                        isSelected ? "text-white" : "text-[#5C6370]"
+                      }`}
+                    >
+                      {intent.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : (
+            <View className="flex-row flex-wrap gap-2">
+              {visibleIntents.length > 0 ? (
+                visibleIntents.map((intent) => (
+                  <AppChip
+                    key={intent}
+                    label={intent
+                      .replaceAll("_", " ")
+                      .replace(/\b\w/g, (char) => char.toUpperCase())}
+                  />
+                ))
+              ) : (
+                <Text className="text-[13px] text-[#5C6370]">No intents saved yet.</Text>
+              )}
+            </View>
+          )}
         </SectionCard>
 
-        <View className="mt-1 rounded-2xl bg-[#E1EAF5] px-[14px] py-3">
-          <Text className="text-[13px] font-semibold text-[#5B7BA3]">
-            Future boost
-          </Text>
-          <Text className="mt-1 text-[13px] leading-5 text-[#5B7BA3]">
-            Take the short workstyle quiz later to unlock richer matching.
-          </Text>
-        </View>
+        <SectionCard className="mb-3">
+          <SectionHeader title={`This Semester · ${visibleModules.length}`} />
+          {isEditing ? (
+            <View>
+              <TextInput
+                value={moduleQuery}
+                onChangeText={(nextValue) => setModuleQuery(nextValue.toUpperCase())}
+                autoCapitalize="characters"
+                className="rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-4 text-[15px] uppercase text-[#0F1115]"
+                placeholder="Search NUSMods e.g. CS2040S"
+                placeholderTextColor="#9AA0AB"
+              />
+
+              {isSearchingModules ? (
+                <View className="mt-3 items-start">
+                  <ActivityIndicator color="#5B7BA3" />
+                </View>
+              ) : null}
+
+              {moduleResults.length > 0 ? (
+                <View className="mt-3 overflow-hidden rounded-2xl border border-[#E4E9F1]">
+                  {moduleResults.map((module) => (
+                    <Pressable
+                      key={module.moduleCode}
+                      className="border-b border-[#EEF2F7] bg-white px-4 py-3"
+                      onPress={() => addModule(module)}
+                    >
+                      <Text className="text-sm font-bold text-[#0F1115]">
+                        {module.moduleCode}
+                      </Text>
+                      <Text className="mt-1 text-xs leading-4 text-[#5C6370]">
+                        {module.title}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : null}
+
+              <View className="mt-3 flex-row flex-wrap gap-2">
+                {editableModules.map((module) => (
+                  <Pressable
+                    key={module.moduleCode}
+                    className="rounded-full bg-[#E1EAF5] px-3 py-2"
+                    onPress={() => removeModule(module.moduleCode)}
+                  >
+                    <Text className="text-[13px] font-semibold text-[#5B7BA3]">
+                      {module.moduleCode} ×
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          ) : (
+            <View className="flex-row flex-wrap gap-2">
+              {visibleModules.length > 0 ? (
+                visibleModules.map((moduleCode) => (
+                  <AppChip key={moduleCode} label={moduleCode} variant="module" />
+                ))
+              ) : (
+                <Text className="text-[13px] text-[#5C6370]">
+                  No current-semester modules saved yet.
+                </Text>
+              )}
+            </View>
+          )}
+        </SectionCard>
+
+        <SectionCard className="mb-3">
+          <SectionHeader title="Interests" />
+          {isEditing ? (
+            <View>
+              <View className="flex-row flex-wrap gap-2">
+                {Array.from(new Set([...INTEREST_OPTIONS, ...interestsDraft])).map(
+                  (interest) => {
+                    const isSelected = interestsDraft.includes(interest);
+
+                    return (
+                      <Pressable
+                        key={interest}
+                        className={`rounded-full border px-4 py-2 ${
+                          isSelected
+                            ? "border-[#0F1115] bg-[#0F1115]"
+                            : "border-[#E4E9F1] bg-white"
+                        }`}
+                        onPress={() => toggleInterest(interest)}
+                      >
+                        <Text
+                          className={`text-[13px] font-semibold ${
+                            isSelected ? "text-white" : "text-[#5C6370]"
+                          }`}
+                        >
+                          {interest}
+                        </Text>
+                      </Pressable>
+                    );
+                  },
+                )}
+              </View>
+
+              <View className="mt-3 flex-row items-center gap-2">
+                <TextInput
+                  value={customInterestInput}
+                  onChangeText={setCustomInterestInput}
+                  className="flex-1 rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-4 text-[15px] text-[#0F1115]"
+                  placeholder="Add a custom interest"
+                  placeholderTextColor="#9AA0AB"
+                />
+                <Pressable
+                  className="rounded-full bg-[#0F1115] px-4 py-3"
+                  onPress={addCustomInterest}
+                >
+                  <Text className="text-[13px] font-semibold text-white">Add</Text>
+                </Pressable>
+              </View>
+
+              {interestsDraft.length > 0 ? (
+                <View className="mt-3 flex-row flex-wrap gap-2">
+                  {interestsDraft
+                    .filter((interest) => !INTEREST_OPTIONS.includes(interest))
+                    .map((interest) => (
+                      <Pressable
+                        key={interest}
+                        className="rounded-full border border-[#E4E9F1] bg-white px-3 py-2"
+                        onPress={() => removeInterest(interest)}
+                      >
+                        <Text className="text-[13px] font-medium text-[#5C6370]">
+                          {interest} ×
+                        </Text>
+                      </Pressable>
+                    ))}
+                </View>
+              ) : null}
+            </View>
+          ) : (
+            <View className="flex-row flex-wrap gap-2">
+              {visibleInterests.length > 0 ? (
+                visibleInterests.map((interest) => (
+                  <AppChip key={interest} label={interest} variant="outline" />
+                ))
+              ) : (
+                <Text className="text-[13px] text-[#5C6370]">No interests saved yet.</Text>
+              )}
+            </View>
+          )}
+        </SectionCard>
+
+        <SectionCard className="mb-3">
+          <SectionHeader title="Skills" />
+          <View className="flex-row flex-wrap gap-2">
+            {profile.skills.length > 0 ? (
+              profile.skills.map((skill) => (
+                <AppChip key={skill} label={skill} variant="outline" />
+              ))
+            ) : (
+              <Text className="text-[13px] text-[#5C6370]">
+                Skills and richer profile editing are intentionally deferred beyond M1.
+              </Text>
+            )}
+          </View>
+        </SectionCard>
+
+        {isEditing ? (
+          <View className="mt-1 gap-3">
+            <AppButton
+              label={isSaving ? "Saving..." : "Save changes"}
+              disabled={isSaving}
+              onPress={() => {
+                void handleSaveDetails();
+              }}
+            />
+            <AppButton
+              label="Cancel"
+              disabled={isSaving}
+              variant="secondary"
+              onPress={handleToggleEdit}
+            />
+          </View>
+        ) : (
+          <View className="mt-1 rounded-2xl bg-[#E1EAF5] px-[14px] py-3">
+            <Text className="text-[13px] font-semibold text-[#5B7BA3]">
+              Milestone 2 preview
+            </Text>
+            <Text className="mt-1 text-[13px] leading-5 text-[#5B7BA3]">
+              People matching, timetable-driven recommendations, and richer profile editing come after the M1 core flow is solid.
+            </Text>
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );

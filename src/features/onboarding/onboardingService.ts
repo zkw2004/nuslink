@@ -1,4 +1,5 @@
 import { isSupabaseConfigured, supabase } from "@lib/supabase";
+import type { UserProfile } from "@appTypes/index";
 import type { SelectedModule } from "./types";
 
 type AcademicProfileInput = {
@@ -115,13 +116,13 @@ export async function uploadProfileImage(file: FileUpload) {
 
   const userId = await getUserId();
   const metadata = getUploadMetadata(file.uri);
-  const filePath = `${userId}/profile.${metadata.extension}`;
+  const filePath = `${userId}/profile-${Date.now()}.${metadata.extension}`;
 
   const { error: uploadError } = await supabase.storage
     .from("avatars")
     .upload(filePath, decodeBase64(file.base64), {
       contentType: metadata.contentType,
-      upsert: true,
+      upsert: false,
     });
 
   if (uploadError) {
@@ -133,23 +134,32 @@ export async function uploadProfileImage(file: FileUpload) {
   return data.publicUrl;
 }
 
-export async function saveProfileSetup(input: ProfileSetupInput) {
+export async function saveProfileSetup(input: ProfileSetupInput): Promise<UserProfile> {
   if (!supabase) {
     throw new Error("Supabase is not configured.");
   }
 
   const userId = await getUserId();
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("profiles")
     .update({
       avatar_url: input.avatarUrl,
       bio: input.bio.trim(),
       display_name: input.displayName.trim(),
     })
-    .eq("id", userId);
+    .eq("id", userId)
+    .select("*")
+    .single();
 
   if (error) {
     throw new Error(error.message);
   }
+
+  return {
+    ...data,
+    intents: data.intents ?? [],
+    interests: data.interests ?? [],
+    skills: data.skills ?? [],
+  };
 }

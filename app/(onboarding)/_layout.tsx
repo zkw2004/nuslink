@@ -7,9 +7,8 @@ export default function OnboardingLayout() {
   const session = useAuthStore((state) => state.session);
   const profile = useAuthStore((state) => state.profile);
   const isInitialized = useAuthStore((state) => state.isInitialized);
-  const isProfileLoading = useAuthStore((state) => state.isProfileLoading);
 
-  if (!isInitialized || (session && isProfileLoading && !profile)) {
+  if (!isInitialized) {
     return <AppLoadingScreen message="Loading onboarding..." />;
   }
 
