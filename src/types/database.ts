@@ -15,6 +15,7 @@ export type Database = {
           interests: string[];
           is_sso_verified: boolean;
           major: string | null;
+          onboarding_completed: boolean;
           skills: string[];
           updated_at: string;
           year_of_study: number | null;
@@ -32,6 +33,7 @@ export type Database = {
           interests?: string[];
           is_sso_verified?: boolean;
           major?: string | null;
+          onboarding_completed?: boolean;
           skills?: string[];
           updated_at?: string;
           year_of_study?: number | null;
@@ -49,6 +51,7 @@ export type Database = {
           interests?: string[];
           is_sso_verified?: boolean;
           major?: string | null;
+          onboarding_completed?: boolean;
           skills?: string[];
           updated_at?: string;
           year_of_study?: number | null;

@@ -26,7 +26,6 @@ export type UserRole = "member" | "co_admin" | "admin";
 
 export interface UserProfile {
   id: string;
-  email: string;
   display_name: string;
   bio: string;
   avatar_url: string | null;
@@ -39,7 +38,9 @@ export interface UserProfile {
   interests: string[];
   skills: string[];
   badge_tier: BadgeTier | null;
+  onboarding_completed: boolean;
   created_at: string;
+  updated_at: string;
 }
 
 export interface Group {
