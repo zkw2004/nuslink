@@ -45,6 +45,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       return;
     }
 
+    if (!supabase) {
+      set({ session: null, profile: null, isInitialized: true, isProfileLoading: false });
+      return;
+    }
+
     const {
       data: { session },
     } = await supabase.auth.getSession();
@@ -78,6 +83,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       return null;
     }
 
+    if (!supabase) {
+      set({ profile: null, isProfileLoading: false });
+      return null;
+    }
+
     set({ isProfileLoading: true });
 
     const { data, error } = await supabase
@@ -101,6 +111,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     if (!userId) {
       throw new Error("You must be signed in to complete onboarding.");
+    }
+
+    if (!supabase) {
+      throw new Error("Supabase is not configured.");
     }
 
     set({ isProfileLoading: true });
