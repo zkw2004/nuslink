@@ -1,9 +1,25 @@
 import { Redirect } from "expo-router";
 
+import { AppLoadingScreen } from "@components/ui";
+import { useAuthStore } from "@store/index";
+
 export default function Index() {
-  // TODO (Joel): Check auth state from Supabase and redirect accordingly
-  // Authenticated → /(tabs)/discover
-  // First login → /(onboarding)/academic-info
-  // Not authenticated → /(auth)/sign-in
-  return <Redirect href="/(auth)/sign-in" />;
+  const session = useAuthStore((state) => state.session);
+  const profile = useAuthStore((state) => state.profile);
+  const isInitialized = useAuthStore((state) => state.isInitialized);
+  const isProfileLoading = useAuthStore((state) => state.isProfileLoading);
+
+  if (!isInitialized || (session && isProfileLoading && !profile)) {
+    return <AppLoadingScreen message="Checking your account..." />;
+  }
+
+  if (!session) {
+    return <Redirect href="/(auth)/sign-in" />;
+  }
+
+  if (!profile?.onboarding_completed) {
+    return <Redirect href="/(onboarding)/academic-info" />;
+  }
+
+  return <Redirect href="/(tabs)/discover" />;
 }

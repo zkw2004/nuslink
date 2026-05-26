@@ -9,6 +9,8 @@ import {
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { useAuthStore, useOnboardingStore } from "@store/index";
+
 const PREDEFINED_INTERESTS = [
   "AI / ML",
   "Systems",
@@ -29,8 +31,18 @@ const CURRENT_STEP = 4;
 
 export default function InterestsScreen() {
   const router = useRouter();
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [customTags, setCustomTags] = useState<string[]>([]);
+  const profile = useAuthStore((state) => state.profile);
+  const savedInterests = useOnboardingStore((state) => state.interests);
+  const setInterests = useOnboardingStore((state) => state.setInterests);
+  const initialInterests =
+    savedInterests.length > 0 ? savedInterests : (profile?.interests ?? []);
+  const initialCustomTags = initialInterests.filter(
+    (interest) => !PREDEFINED_INTERESTS.includes(interest),
+  );
+  const [selected, setSelected] = useState<Set<string>>(
+    new Set(initialInterests),
+  );
+  const [customTags, setCustomTags] = useState<string[]>(initialCustomTags);
   const [customInput, setCustomInput] = useState("");
   const [showCustomInput, setShowCustomInput] = useState(false);
 
@@ -152,7 +164,10 @@ export default function InterestsScreen() {
           {selected.size} selected · pick at least 1
         </Text>
         <TouchableOpacity
-          onPress={() => router.push("/(onboarding)/intent")}
+          onPress={() => {
+            setInterests(Array.from(selected));
+            router.push("/(onboarding)/intent");
+          }}
           disabled={!canContinue}
           activeOpacity={0.85}
           className={`py-4 rounded-2xl items-center ${
