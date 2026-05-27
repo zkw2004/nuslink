@@ -36,6 +36,7 @@ interface GroupsState {
   refreshGroups: (userId?: string | null) => Promise<void>;
   createGroup: (input: CreateGroupInput) => Promise<string>;
   joinGroup: (groupId: string, userId: string) => Promise<void>;
+  deleteGroup: (groupId: string, userId: string) => Promise<void>;
   reset: () => void;
 }
 
@@ -142,6 +143,24 @@ export const useGroupsStore = create<GroupsState>((set, get) => ({
     });
 
     if (error && error.code !== "23505") {
+      throw new Error(error.message);
+    }
+
+    await get().refreshGroups(userId);
+  },
+
+  async deleteGroup(groupId, userId) {
+    if (!supabase) {
+      throw new Error("Supabase is not configured.");
+    }
+
+    const { error } = await supabase
+      .from("groups")
+      .delete()
+      .eq("id", groupId)
+      .eq("creator_id", userId);
+
+    if (error) {
       throw new Error(error.message);
     }
 

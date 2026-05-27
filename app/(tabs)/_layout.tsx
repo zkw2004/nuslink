@@ -8,8 +8,9 @@ export default function TabLayout() {
   const session = useAuthStore((state) => state.session);
   const profile = useAuthStore((state) => state.profile);
   const isInitialized = useAuthStore((state) => state.isInitialized);
+  const isProfileLoading = useAuthStore((state) => state.isProfileLoading);
 
-  if (!isInitialized) {
+  if (!isInitialized || isProfileLoading || (session && !profile)) {
     return <AppLoadingScreen message="Loading your workspace..." />;
   }
 

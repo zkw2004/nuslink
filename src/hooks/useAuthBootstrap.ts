@@ -28,11 +28,11 @@ export function useAuthBootstrap() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setSession(session);
-
       if (session?.user) {
         await refreshProfile(session.user.id).catch(() => undefined);
+        setSession(session);
       } else {
+        setSession(null);
         clearProfile();
       }
 

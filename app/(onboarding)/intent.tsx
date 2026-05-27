@@ -30,7 +30,7 @@ const INTENTS: { id: Intent; label: string; desc: string }[] = [
 ];
 
 const TOTAL_STEPS = 5;
-const CURRENT_STEP = 5;
+const CURRENT_STEP = 4;
 
 export default function IntentScreen() {
   const router = useRouter();
@@ -93,14 +93,7 @@ export default function IntentScreen() {
           accessibilityRole="button"
           accessibilityLabel="Go back"
           className="h-9 w-9 items-center justify-center rounded-full"
-          onPress={() => {
-            if (router.canGoBack()) {
-              router.back();
-              return;
-            }
-
-            router.replace("/(auth)/sign-in");
-          }}
+          onPress={() => router.replace("/(onboarding)/interests")}
         >
           <Text className="text-[22px] text-gray-500">‹</Text>
         </Pressable>
