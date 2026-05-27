@@ -11,6 +11,7 @@ import {
 import { Link, router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { isSupabaseConfigured, supabase } from "@lib/supabase";
+import { useAuthStore } from "@store/index";
 
 type AuthMode = "sign-in" | "sign-up";
 
@@ -62,6 +63,8 @@ function getEmailError(email: string) {
 }
 
 export function AuthFormScreen({ mode }: AuthFormScreenProps) {
+  const refreshProfile = useAuthStore((state) => state.refreshProfile);
+  const setSession = useAuthStore((state) => state.setSession);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -109,6 +112,11 @@ export function AuthFormScreen({ mode }: AuthFormScreenProps) {
       if (mode === "sign-up" && !data.session) {
         setSuccessMessage("Account created. Check your email to confirm your account before logging in.");
         return;
+      }
+
+      if (data.session?.user) {
+        await refreshProfile(data.session.user.id);
+        setSession(data.session);
       }
 
       router.replace("/");

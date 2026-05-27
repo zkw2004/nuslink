@@ -3,7 +3,9 @@ import { supabase } from "@lib/supabase";
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8000";
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
-  const { data } = await supabase.auth.getSession();
+  const { data } = supabase
+    ? await supabase.auth.getSession()
+    : { data: { session: null } };
   const token = data.session?.access_token;
   return {
     "Content-Type": "application/json",

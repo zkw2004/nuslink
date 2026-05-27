@@ -23,6 +23,7 @@ export default function DiscoverScreen() {
   const isLoading = useGroupsStore((state) => state.isLoading);
   const error = useGroupsStore((state) => state.error);
   const joinGroup = useGroupsStore((state) => state.joinGroup);
+  const deleteGroup = useGroupsStore((state) => state.deleteGroup);
   const refreshGroups = useGroupsStore((state) => state.refreshGroups);
 
   useEffect(() => {
@@ -57,6 +58,35 @@ export default function DiscoverScreen() {
     }
   }
 
+  function handleDeleteGroup(groupId: string, groupName: string) {
+    if (!session?.user) {
+      Alert.alert("Sign in required", "Please sign in again before deleting a group.");
+      return;
+    }
+
+    Alert.alert(
+      "Delete group",
+      `Delete "${groupName}"? This removes the group from Discover.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteGroup(groupId, session.user.id);
+            } catch (deleteError) {
+              Alert.alert(
+                "Could not delete group",
+                deleteError instanceof Error ? deleteError.message : "Please try again.",
+              );
+            }
+          },
+        },
+      ],
+    );
+  }
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#EEF3F9" }}>
       <AppScreenHeader title="Discover" subtitle="Browse and join public groups for the current semester." />
@@ -88,6 +118,11 @@ export default function DiscoverScreen() {
         <View className="gap-4">
           {groups.map((group) => (
             <SectionCard key={group.id} className="overflow-hidden rounded-[20px] p-0">
+              {(() => {
+                const isOwner = session?.user.id === group.creator_id;
+
+                return (
+                  <>
               <View className="gap-3 p-[16px]">
                 <View className="flex-row items-start justify-between gap-3">
                   <View className="flex-1">
@@ -106,25 +141,41 @@ export default function DiscoverScreen() {
                     <AppChip label={group.module_code} variant="outline" />
                   ) : null}
                   <AppChip label="Public group" variant="outline" />
+                  {isOwner ? <AppChip label="Owner" variant="solid" /> : null}
                   {group.joined ? <AppChip label="Joined" variant="solid" /> : null}
                 </View>
               </View>
 
               <View className="flex-row items-center gap-[10px] border-t border-[#E4E9F1] bg-[#EEF2F7] px-[16px] py-[12px]">
                 <Text className="flex-1 text-[12px] text-[#5C6370]">
-                  {group.joined ? "You are already in this group." : "Open for students in the same semester."}
+                  {isOwner
+                    ? "You created this group."
+                    : group.joined
+                      ? "You are already in this group."
+                      : "Open for students in the same semester."}
                 </Text>
 
-                <View className="min-w-[104px]">
-                  <AppButton
-                    label={group.joined ? "Joined" : "Join group"}
-                    disabled={group.joined}
-                    onPress={() => {
-                      void handleJoinGroup(group.id);
-                    }}
-                  />
+                <View className="min-w-[104px] flex-row gap-2">
+                  {isOwner ? (
+                    <AppButton
+                      label="Delete"
+                      variant="secondary"
+                      onPress={() => handleDeleteGroup(group.id, group.name)}
+                    />
+                  ) : (
+                    <AppButton
+                      label={group.joined ? "Joined" : "Join group"}
+                      disabled={group.joined}
+                      onPress={() => {
+                        void handleJoinGroup(group.id);
+                      }}
+                    />
+                  )}
                 </View>
               </View>
+                  </>
+                );
+              })()}
             </SectionCard>
           ))}
         </View>
