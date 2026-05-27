@@ -85,14 +85,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       data: { session },
     } = await supabase.auth.getSession();
 
-    set({ session });
-
     try {
       if (session?.user) {
         await get().refreshProfile(session.user.id);
       }
     } finally {
-      set({ isInitialized: true });
+      set({ session, isInitialized: true });
     }
   },
 

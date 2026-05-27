@@ -28,7 +28,7 @@ const PREDEFINED_INTERESTS = [
 ];
 
 const TOTAL_STEPS = 5;
-const CURRENT_STEP = 4;
+const CURRENT_STEP = 3;
 
 export default function InterestsScreen() {
   const router = useRouter();
@@ -74,14 +74,7 @@ export default function InterestsScreen() {
           accessibilityRole="button"
           accessibilityLabel="Go back"
           className="h-9 w-9 items-center justify-center rounded-full"
-          onPress={() => {
-            if (router.canGoBack()) {
-              router.back();
-              return;
-            }
-
-            router.replace("/(auth)/sign-in");
-          }}
+          onPress={() => router.replace("/(onboarding)/profile-setup")}
         >
           <Text className="text-[22px] text-gray-500">‹</Text>
         </Pressable>

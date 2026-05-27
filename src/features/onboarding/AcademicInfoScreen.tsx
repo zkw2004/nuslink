@@ -8,6 +8,7 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import { getCurrentSemester, searchNusmodsModules } from "@lib/nusmods";
+import { useAuthStore, useOnboardingStore } from "@store/index";
 import { saveAcademicProfile } from "./onboardingService";
 import { toSelectedModule, type SelectedModule } from "./types";
 import { OnboardingFrame } from "./OnboardingFrame";
@@ -15,12 +16,17 @@ import { OnboardingFrame } from "./OnboardingFrame";
 const YEAR_OPTIONS = [1, 2, 3, 4, 5, 6];
 
 export function AcademicInfoScreen() {
+  const signOut = useAuthStore((state) => state.signOut);
+  const academicDraft = useOnboardingStore((state) => state.academicDraft);
+  const setAcademicDraft = useOnboardingStore((state) => state.setAcademicDraft);
   const currentSemester = useMemo(() => getCurrentSemester(), []);
-  const [faculty, setFaculty] = useState("");
-  const [major, setMajor] = useState("");
-  const [yearOfStudy, setYearOfStudy] = useState(1);
+  const [faculty, setFaculty] = useState(academicDraft.faculty);
+  const [major, setMajor] = useState(academicDraft.major);
+  const [yearOfStudy, setYearOfStudy] = useState(academicDraft.yearOfStudy);
   const [moduleQuery, setModuleQuery] = useState("");
-  const [selectedModules, setSelectedModules] = useState<SelectedModule[]>([]);
+  const [selectedModules, setSelectedModules] = useState<SelectedModule[]>(
+    academicDraft.selectedModules,
+  );
   const [results, setResults] = useState<SelectedModule[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -71,16 +77,22 @@ export function AcademicInfoScreen() {
   }, [moduleQuery, selectedModules]);
 
   function addModule(module: SelectedModule) {
-    setSelectedModules((currentModules) => [...currentModules, module]);
+    const nextModules = [...selectedModules, module];
+
+    setSelectedModules(nextModules);
+    setAcademicDraft({ selectedModules: nextModules });
     setModuleQuery("");
     setResults([]);
     setError(null);
   }
 
   function removeModule(moduleCode: string) {
-    setSelectedModules((currentModules) =>
-      currentModules.filter((module) => module.moduleCode !== moduleCode),
+    const nextModules = selectedModules.filter(
+      (module) => module.moduleCode !== moduleCode,
     );
+
+    setSelectedModules(nextModules);
+    setAcademicDraft({ selectedModules: nextModules });
   }
 
   async function handleContinue() {
@@ -118,7 +130,12 @@ export function AcademicInfoScreen() {
 
   return (
     <OnboardingFrame
-      step={2}
+      step={1}
+      onBack={() => {
+        signOut()
+          .catch(() => null)
+          .finally(() => router.replace("/(auth)/sign-in" as never));
+      }}
       title="Your academics"
       subtitle="Add your current NUS academic details and modules for this semester."
       footer={
@@ -150,7 +167,10 @@ export function AcademicInfoScreen() {
           <Text className="mb-2 text-[13px] font-semibold text-gray-700">Faculty</Text>
           <TextInput
             className="h-14 rounded-2xl border border-gray-200 bg-gray-50 px-4 text-base text-gray-900"
-            onChangeText={setFaculty}
+            onChangeText={(value) => {
+              setFaculty(value);
+              setAcademicDraft({ faculty: value });
+            }}
             placeholder="School of Computing"
             placeholderTextColor="#9CA3AF"
             value={faculty}
@@ -161,7 +181,10 @@ export function AcademicInfoScreen() {
           <Text className="mb-2 text-[13px] font-semibold text-gray-700">Major</Text>
           <TextInput
             className="h-14 rounded-2xl border border-gray-200 bg-gray-50 px-4 text-base text-gray-900"
-            onChangeText={setMajor}
+            onChangeText={(value) => {
+              setMajor(value);
+              setAcademicDraft({ major: value });
+            }}
             placeholder="Computer Science"
             placeholderTextColor="#9CA3AF"
             value={major}
@@ -182,7 +205,10 @@ export function AcademicInfoScreen() {
                   className={`h-10 flex-1 items-center justify-center rounded-xl ${
                     isSelected ? "bg-white" : "bg-transparent"
                   }`}
-                  onPress={() => setYearOfStudy(year)}
+                  onPress={() => {
+                    setYearOfStudy(year);
+                    setAcademicDraft({ yearOfStudy: year });
+                  }}
                 >
                   <Text
                     className={`text-sm font-semibold ${

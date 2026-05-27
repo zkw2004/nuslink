@@ -8,6 +8,8 @@ type OnboardingFrameProps = {
   step: number;
   title: string;
   subtitle: string;
+  backHref?: string;
+  onBack?: () => void;
 };
 
 const TOTAL_STEPS = 5;
@@ -18,6 +20,8 @@ export function OnboardingFrame({
   step,
   title,
   subtitle,
+  backHref,
+  onBack,
 }: OnboardingFrameProps) {
   return (
     <SafeAreaView className="flex-1 bg-[#EEF3F9]">
@@ -25,14 +29,18 @@ export function OnboardingFrame({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Go back"
-          className="h-9 w-9 items-center justify-center rounded-full"
+          hitSlop={16}
+          className="h-11 w-11 items-center justify-center rounded-full"
           onPress={() => {
-            if (router.canGoBack()) {
-              router.back();
+            if (onBack) {
+              onBack();
               return;
             }
-
-            router.replace("/(auth)/sign-in");
+            if (backHref) {
+              router.replace(backHref as never);
+              return;
+            }
+            router.replace("/(auth)/sign-in" as never);
           }}
         >
           <Text className="text-[22px] text-gray-500">‹</Text>
