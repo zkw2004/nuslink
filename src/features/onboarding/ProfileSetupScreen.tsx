@@ -11,17 +11,22 @@ import { SymbolView } from "expo-symbols";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { AppAvatar } from "@components/shared";
+import { useOnboardingStore } from "@store/index";
 import { saveProfileSetup, uploadProfileImage } from "./onboardingService";
 import { OnboardingFrame } from "./OnboardingFrame";
 
 const BIO_LIMIT = 200;
 
 export function ProfileSetupScreen() {
-  const [displayName, setDisplayName] = useState("");
-  const [bio, setBio] = useState("");
-  const [avatarUri, setAvatarUri] = useState<string | null>(null);
-  const [avatarBase64, setAvatarBase64] = useState<string | null>(null);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const profileDraft = useOnboardingStore((state) => state.profileDraft);
+  const setProfileDraft = useOnboardingStore((state) => state.setProfileDraft);
+  const [displayName, setDisplayName] = useState(profileDraft.displayName);
+  const [bio, setBio] = useState(profileDraft.bio);
+  const [avatarUri, setAvatarUri] = useState<string | null>(profileDraft.avatarUri);
+  const [avatarBase64, setAvatarBase64] = useState<string | null>(
+    profileDraft.avatarBase64,
+  );
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(profileDraft.avatarUrl);
   const [isPicking, setIsPicking] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -60,6 +65,11 @@ export function ProfileSetupScreen() {
       setAvatarUri(asset.uri);
       setAvatarBase64(asset.base64);
       setAvatarUrl(null);
+      setProfileDraft({
+        avatarUri: asset.uri,
+        avatarBase64: asset.base64,
+        avatarUrl: null,
+      });
     } catch {
       setError("Unable to choose a profile image.");
     } finally {
@@ -93,6 +103,7 @@ export function ProfileSetupScreen() {
           uri: avatarUri,
         });
         setAvatarUrl(uploadedAvatarUrl);
+        setProfileDraft({ avatarUrl: uploadedAvatarUrl });
       }
 
       await saveProfileSetup({
@@ -111,9 +122,10 @@ export function ProfileSetupScreen() {
 
   return (
     <OnboardingFrame
-      step={3}
+      step={2}
       title="Your profile"
       subtitle="A photo and a short bio help peers know who they're matching with."
+      backHref="/(onboarding)/academic-info"
       footer={
         <Pressable
           accessibilityRole="button"
@@ -176,7 +188,10 @@ export function ProfileSetupScreen() {
           </Text>
           <TextInput
             className="h-14 rounded-2xl border border-gray-200 bg-gray-50 px-4 text-base text-gray-900"
-            onChangeText={setDisplayName}
+            onChangeText={(value) => {
+              setDisplayName(value);
+              setProfileDraft({ displayName: value });
+            }}
             placeholder="Joel Yap"
             placeholderTextColor="#9CA3AF"
             value={displayName}
@@ -194,7 +209,10 @@ export function ProfileSetupScreen() {
             className="min-h-[116px] rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-base leading-6 text-gray-900"
             maxLength={BIO_LIMIT}
             multiline
-            onChangeText={setBio}
+            onChangeText={(value) => {
+              setBio(value);
+              setProfileDraft({ bio: value });
+            }}
             placeholder="What you're working on, what you're looking for."
             placeholderTextColor="#9CA3AF"
             textAlignVertical="top"
