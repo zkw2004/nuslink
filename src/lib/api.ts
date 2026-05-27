@@ -1,19 +1,32 @@
-// FastAPI (Railway) HTTP client
-// Install dependency: npm install axios
-// Then uncomment the code below and delete this comment block.
+import { supabase } from "@lib/supabase";
 
-// import axios from "axios";
-//
-// export const api = axios.create({
-//   baseURL: process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8000",
-//   timeout: 10_000,
-//   headers: { "Content-Type": "application/json" },
-// });
-//
-// // Attach Supabase auth token to every request
-// api.interceptors.request.use(async (config) => {
-//   // TODO: get session token from Supabase and attach as Bearer
-//   return config;
-// });
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8000";
 
-export {};
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
+export const api = {
+  async get<T>(path: string): Promise<T> {
+    const headers = await getAuthHeaders();
+    const res = await fetch(`${BASE_URL}${path}`, { headers });
+    if (!res.ok) throw new Error(`GET ${path} failed: ${res.status}`);
+    return res.json();
+  },
+
+  async post<T>(path: string, body: unknown): Promise<T> {
+    const headers = await getAuthHeaders();
+    const res = await fetch(`${BASE_URL}${path}`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`POST ${path} failed: ${res.status}`);
+    return res.json();
+  },
+};
