@@ -1,5 +1,5 @@
 import { Stack } from "expo-router";
 
-export default function CommunitiesLayout() {
+export default function PeopleLayout() {
   return <Stack screenOptions={{ headerShown: false }} />;
 }

@@ -49,12 +49,12 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="communities"
+        name="people"
         options={{
-          title: "Communities",
+          title: "People",
           tabBarIcon: ({ color }) => (
             <SymbolView
-              name={{ ios: "person.3.fill", android: "group", web: "group" }}
+              name={{ ios: "person.2.fill", android: "group", web: "group" }}
               tintColor={color}
               size={24}
             />
