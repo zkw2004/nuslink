@@ -187,6 +187,66 @@ export type Database = {
         };
         Relationships: [];
       };
+      communities: {
+        Row: {
+          created_at: string;
+          creator_id: string;
+          description: string;
+          id: string;
+          is_active: boolean;
+          join_policy: "open" | "request_approval";
+          name: string;
+          type: "official" | "user_created";
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          creator_id: string;
+          description?: string;
+          id?: string;
+          is_active?: boolean;
+          join_policy?: "open" | "request_approval";
+          name: string;
+          type?: "official" | "user_created";
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          creator_id?: string;
+          description?: string;
+          id?: string;
+          is_active?: boolean;
+          join_policy?: "open" | "request_approval";
+          name?: string;
+          type?: "official" | "user_created";
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      community_members: {
+        Row: {
+          community_id: string;
+          id: string;
+          joined_at: string;
+          role: "member" | "co_admin" | "admin";
+          user_id: string;
+        };
+        Insert: {
+          community_id: string;
+          id?: string;
+          joined_at?: string;
+          role?: "member" | "co_admin" | "admin";
+          user_id: string;
+        };
+        Update: {
+          community_id?: string;
+          id?: string;
+          joined_at?: string;
+          role?: "member" | "co_admin" | "admin";
+          user_id?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -219,6 +279,8 @@ export type Database = {
       privacy_setting: "public" | "semi_private" | "private";
       semi_private_restriction: "same_module" | "same_year" | "same_faculty";
       user_role: "member" | "co_admin" | "admin";
+      community_join_policy: "open" | "request_approval";
+      community_type: "official" | "user_created";
     };
   };
 };
