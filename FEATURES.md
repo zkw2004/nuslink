@@ -32,9 +32,9 @@ The following fields may be completed at any time after onboarding and contribut
 3. Application Structure
 3.1 Navigation
 The application uses a bottom tab bar with five tabs and a top bar element:
-•	Discover: In M1, browse and join public groups for the current semester. Group compatibility scores, advanced filters, and people discovery arrive in Milestone 2.
-•	Communities: Browse, search, and join larger communities. Includes official NUS club communities and user-created communities.
+•	Discover: The main browsing surface for both groups and communities. It contains a shared search bar and two browse modes: Groups and Communities. In M1, users can browse and join public groups and browse communities, while richer sorting and filtering remain intentionally light.
 •	Create (+): Central elevated button for creating new groups. Opens the group creation form.
+•	People: Dedicated people discovery and connection surface. In M1 it may appear only as an honest preview shell without functional matching or connect actions. In Milestone 2 it becomes the live people-discovery tab with list view, search, filters, compatibility sorting, and visible compatibility percentages.
 •	Chats: Milestone 2 surface for the unified inbox containing group chats, community chats, and direct messages.
 •	Profile: View the saved profile, current-semester modules, interests, intents, and M1 completion percentage. Rich editing and connection management are deferred.
 The top bar contains the app logo and a notifications bell icon accessible from any screen in the fuller product vision. M1 may ship without the bell if notifications are not yet implemented.
@@ -58,7 +58,7 @@ The group creator is automatically assigned the admin role and may promote other
 5.1 Overview
 Communities are larger, persistent groups designed for ongoing interaction around shared interests, clubs, or organisations. Unlike study groups, which are typically short-lived and task-specific, communities are intended to persist across semesters. Examples include NUS Hackers, NUS Developer Student Club, or a user-created community for a specific interest area.
 5.2 Community Types
-There are two categories of communities. Official communities are verified accounts representing recognised NUS clubs and organisations, marked with an official badge. User-created communities can be started by any verified user for any academic or interest-based purpose.
+There are two categories of communities. Any verified user can create a community for an academic, professional, or interest-based purpose without prior approval. Official communities representing recognised NUS clubs and organisations are distinguished by a verified badge granted through a manual verification process. User-created communities do not require approval to create, but they are not marked as official unless they complete that verification flow.
 5.3 Join Policies
 The community creator selects one of two join policies. Open communities allow any user to join immediately. Request-approval communities require the creator or an admin to approve each join request before the user gains access.
 5.4 Community Features
@@ -105,29 +105,31 @@ In a later milestone, the algorithm expands to four dimensions by adding Working
 8.3 Missing Data Handling
 Several dimensions rely on optional profile fields (timetable, target grades, working style, communication preference). When a dimension has no data for one or both users, its weight is redistributed proportionally across the remaining dimensions. This ensures that users with incomplete profiles still receive meaningful matches, while users with complete profiles receive more nuanced scoring.
 8.4 Matching Modes
-People-to-people matching ranks other users by their pairwise compatibility score with the current user. The Discover tab displays these as profile cards with a compatibility percentage.
+People-to-people matching ranks other users by their pairwise compatibility score with the current user. The People tab displays these as profile cards or list items with a compatibility percentage.
 People-to-group matching scores the current user against each existing group. The score is calculated as the average of the user’s pairwise scores with all current group members. A bonus is applied if the group’s module matches one of the user’s registered modules.
 8.5 Scope and Recommendations
 Live matching is scoped to users in the same module in the same semester. Past semesters are read-only history and are never used for live matching. The system proactively notifies users only when a match scores 80% or above, to avoid notification fatigue.
 9. Discover Tab
 9.1 Group Discovery
-The M1 Discover tab displays available public groups as scrollable cards. Each card shows the group name, type badge, module code, and an action to join. Honest empty states are preferred over fake cards if no groups exist.
-9.2 Sort and Filter
-M1 keeps Discover intentionally simple. Advanced sorting, richer filters, and timetable-aware ranking are deferred to later milestones.
-9.3 People Discovery
-People discovery is explicitly deferred to Milestone 2. The shipped M1 surface should not expose compatibility percentages, “High match” chips, or “Connect” actions as if they are functional.
+The Discover tab is the main browsing surface for group and community discovery. In M1, the Groups mode displays available public groups as scrollable cards. Each card shows the group name, type badge, module code, and an action to join. Honest empty states are preferred over fake cards if no groups exist.
+9.2 Community Discovery
+The Communities mode inside Discover allows users to browse, search, and join larger communities. This includes official NUS club communities and user-created communities. In M1, the browsing experience should be real but lightweight rather than overbuilt.
+9.3 Search, Sort, and Filter
+Discover includes a shared search bar for searching groups and communities. M1 keeps search and filtering intentionally simple. Advanced sorting, richer filters, and timetable-aware ranking are deferred to later milestones.
+9.4 People Tab
+The People tab is the dedicated surface for people discovery and connection. In M1 it should be presented only as an honest preview if included at all, without functional compatibility percentages, “High match” chips, or “Connect” actions. In Milestone 2 it ships as a simple list view with search, filters, sort by compatibility, and visible compatibility percentages.
 10. Connection System
 NUSLink uses a mutual connection model. One user sends a connection request; the other accepts or declines. Accepted connections are bilateral: both users appear in each other’s connections list. Declining a request removes it silently without notifying the requester.
-Connections serve as the gateway to direct messaging. Users can only initiate a direct message conversation with someone they are mutually connected with. This entire connection system is deferred beyond M1.
+In Milestone 2, the People tab becomes the main surface for discovering users, viewing compatibility percentages, and sending connection requests. Connections serve as the gateway to direct messaging. Users can only initiate a direct message conversation with someone they are mutually connected with. This entire connection system remains deferred beyond M1.
 11. Reputation and Rating System
 11.1 Rating Structure
-Users can rate others across three categories: Reliability, Communication, and Contribution. A numeric input may be used internally to compute aggregates, but the rated user is only shown an overall badge tier rather than raw category averages or individual review entries.
+Users can rate others across three categories: Reliability, Communication, and Contribution, and may also leave a written review or testimonial. A numeric input may be used internally to compute aggregates, but the public-facing trust summary should prioritize badge tiers and written reviews rather than raw category averages or public numeric scores.
 11.2 Eligibility
 Only users who have been in the same group for a minimum duration may rate each other. The minimum duration is configurable by the group creator (with a default of seven days). This ensures that ratings reflect actual collaborative experience rather than superficial interaction.
 11.3 Rating Prompts
 When a user leaves a study group (after meeting the minimum duration), an optional prompt invites them to rate their groupmates. Ratings can also be submitted at any time from the group member list.
 11.4 Badge Tiers
-Aggregate ratings determine a user’s badge tier. The exact thresholds can be tuned during implementation, but the product should surface tier labels rather than public numeric scores. Tentative tier labels are New, Reliable, Trusted, and Standout. Badge icons appear next to the user’s display name throughout the app.
+Aggregate ratings determine a user’s badge tier. The exact thresholds can be tuned during implementation, but the product should surface tier labels rather than public numeric scores. Tentative tier labels are New, Reliable, Trusted, and Standout. Badge icons appear next to the user’s display name throughout the app, and written reviews can be shown on the reviewed user’s profile.
 11.5 Future Monetisation
 Premium and paid cosmetic badges are planned as a future revenue stream. Details are to be defined post-Orbital.
 12. Security and Content Moderation
@@ -160,8 +162,8 @@ The testing strategy covers unit tests for core domain logic (particularly the m
 The architecture enforces separation of concerns: React Native handles presentation, Supabase handles data persistence and authentication, and FastAPI owns domain logic. A repository pattern keeps business logic testable without requiring a live database. All schema changes go through versioned Supabase migrations committed to version control, with row-level security policies enforcing data access at the database layer.
 15. Development Timeline
 15.1 Milestone 1 — Technical Proof of Concept (End of May)
-Functional email sign-up and login. Stable auth routing and onboarding guards. Complete five-screen onboarding flow with data persisted to the database. Basic profile page with real saved data and a completion bar. Module registration via NUSMods API. Basic group creation (public groups only, manual form). Basic Discover tab (list and join groups, no people matching). Basic sign-out. FastAPI backend deployed with health endpoint. CI pipeline operational.
+Functional email sign-up and login. Stable auth routing and onboarding guards. Complete five-screen onboarding flow with data persisted to the database. Basic profile page with real saved data and a completion bar. Module registration via NUSMods API. Basic group creation (public groups only, manual form). Basic Discover tab for groups and communities with simple search and honest empty states. People tab preview only, with no functional people matching or connect actions. Basic sign-out. FastAPI backend deployed with health endpoint. CI pipeline operational.
 15.2 Milestone 2 — Core Features Complete (End of June)
-Initial smart matching algorithm with two-dimensional scoring (target grade similarity and schedule overlap). Compatibility percentage displayed on group and people cards. People discovery and connection requests. Full group creation with all three privacy types using the manual flow. Communities tab (browse, create, join, chat). Real-time chat with text, images, files, polls, and pinned messages. Shared resources section. Direct messaging. Timetable import. Unified chat inbox with unread tracking. Basic notifications. User testing with five to ten NUS students.
+Initial smart matching algorithm with two-dimensional scoring (target grade similarity and schedule overlap). People tab ships with a simple list view, search, filters, sort by compatibility, visible compatibility percentages, and connection requests. Compatibility percentage may also be shown on relevant group discovery surfaces where appropriate. Full group creation with all three privacy types using the manual flow. Communities support browse, create, join, and chat flows within the Discover and chat architecture. Real-time chat with text, images, files, polls, and pinned messages. Shared resources section. Direct messaging. Timetable import. Unified chat inbox with unread tracking. Basic notifications. User testing with five to ten NUS students.
 15.3 Milestone 3 — Extended System (End of July)
-NUS SSO via OpenID Connect. Matching algorithm expanded to four dimensions with configurable weights. AI group creation autofill. AI profile extraction from resumes. Smart nudges (time-based, behaviour-based, network-based) with user controls. Reputation and rating system with badge tiers. Threaded replies in chat. Shared scheduling with auto-suggested time slots. AI content moderation. Push notification infrastructure. Profile completion bar with full calculation. Comprehensive user testing with fifteen to twenty students. Full technical and project documentation. Final demo video and updated poster.
+NUS SSO via OpenID Connect. Matching algorithm expanded to four dimensions with configurable weights. AI group creation autofill. AI profile extraction from resumes. Smart nudges (time-based, behaviour-based, network-based) with user controls. Reputation and rating system with badge tiers plus visible written reviews on user profiles. Threaded replies in chat. Shared scheduling with auto-suggested time slots. AI content moderation. Push notification infrastructure. Profile completion bar with full calculation. Comprehensive user testing with fifteen to twenty students. Full technical and project documentation. Final demo video and updated poster.

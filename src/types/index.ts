@@ -59,6 +59,18 @@ export interface Group {
   created_at: string;
 }
 
+export interface Community {
+  id: string;
+  name: string;
+  description: string;
+  type: CommunityType;
+  join_policy: JoinPolicy;
+  creator_id: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface MatchScore {
   user_id: string;
   score: number;
