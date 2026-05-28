@@ -16,7 +16,7 @@ The app includes:
 - Module registration via NUSMods API, scoped per semester
 - Smart matching algorithm (2-dimensional initial release → 4-dimensional with configurable weights in M3)
 - Timetable sync with free-block detection
-- In-app messaging, group formation, micro-communities, reputation system, competition hub (M2 and M3)
+- In-app messaging, group formation, micro-communities, people discovery, visible profile reviews, reputation system, competition hub (M2 and M3)
 - AI-powered nudges and NUS SSO (M3 only)
 
 See `FEATURES.md` for the canonical feature list and `DEVELOPMENT_PLAN.md` for milestone scope. In practice, use this file as the implementation guardrail: if the product spec is more ambitious than the current milestone, follow the smaller scope here and defer the rest.
@@ -151,9 +151,9 @@ These are non-negotiable for NUSLink:
 - **Matching is scoped per module per semester.** Never return matches who are not co-enrolled in the same module in the same semester. Enforce this in the FastAPI matching endpoint and in the RLS policy on any view that exposes match candidates.
 - **Current semester only.** Past semesters are read-only history and never used for live matching.
 - **Match candidates must have completed onboarding.** Do not show profiles that lack the required preference fields.
-- **Reliability is shown as badge tiers, never as a numeric score.** Use tier labels (e.g., New, Reliable, Trusted, Standout). Never expose a 4.7-out-of-5 style rating.
+- **Reliability is summarized with badge tiers, not public numeric scores.** Use tier labels (e.g., New, Reliable, Trusted, Standout). Written reviews may be shown on profiles, but avoid exposing a 4.7-out-of-5 style public rating unless the feature spec explicitly changes.
 - **No public ranking.** Users see their personal matches. There are no global leaderboards, popularity counts, or visible follower counts.
-- **Milestone 1 Discover is group-first.** Do not expose people matching, compatibility chips, or connect CTAs in shipped M1 surfaces.
+- **Milestone 1 Discover is group/community-first.** Do not expose functional people matching, compatibility chips, or connect CTAs in shipped M1 surfaces. A preview-only People tab is acceptable if it is clearly non-functional.
 
 ---
 
@@ -161,7 +161,7 @@ These are non-negotiable for NUSLink:
 
 - Profile fields are opt-in per field. A user may choose to share their faculty but not their target grades.
 - Free-block timetable data is only used for matching computation. Do not display another user's full timetable.
-- Reputation data is aggregated to the reviewee — they see their tier, not individual reviews.
+- Reputation data may include visible written reviews on a user's profile, but public numeric aggregates should stay hidden unless the feature spec explicitly says otherwise.
 - Personal data access is enforced by Supabase row-level security policies at the database layer, not just in the client or the FastAPI layer.
 
 ---

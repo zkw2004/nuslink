@@ -22,7 +22,7 @@ This plan breaks the product into six two-week sprints across three milestones.
 
 Deadline: End of May 2026
 
-Goal: users can sign up, finish onboarding, see real profile data, create basic public groups, browse or join them, and sign out cleanly. The backend, database, and CI pipeline are working.
+Goal: users can sign up, finish onboarding, see real profile data, create basic public groups, browse groups and communities from Discover, see an honest preview of the People tab, and sign out cleanly. The backend, database, and CI pipeline are working.
 
 ### Joel
 
@@ -39,7 +39,7 @@ Goal: users can sign up, finish onboarding, see real profile data, create basic 
 - Onboarding screens 4–5: generalized cross-faculty interests, intent selection, persistence, onboarding completion flow, and navigation stability. Est. 3 days.
 - Basic profile page with completion bar: show real user info, modules, interests, intents, and sign-out. Est. 3 days.
 - Basic group creation: public groups only, manual form only, with creator membership saved correctly. Est. 2 days.
-- Basic Discover tab: group-only list and join flow, no people matching yet. Est. 2 days.
+- Basic Discover tab: group and community browsing structure with simple search, plus a non-functional People tab preview shell. Est. 2 days.
 - Theme consistency polish: align auth and onboarding with the shipped M1 app surface. Est. 1 day.
 
 ### Shared
@@ -53,7 +53,7 @@ Note: QA and demo preparation may use seeded Supabase users and groups, but ship
 
 Deadline: End of June 2026
 
-Goal: ship the core experience with people discovery, manual and privacy-aware group creation, initial matching, real-time chat, communities, direct messaging, and timetable-aware discovery.
+Goal: ship the core experience with a functional People tab, manual and privacy-aware group creation, initial matching, community flows inside the new information architecture, real-time chat, direct messaging, and timetable-aware discovery.
 
 ### Joel
 
@@ -67,8 +67,8 @@ Goal: ship the core experience with people discovery, manual and privacy-aware g
 ### Kaiwen
 
 - Initial matching algorithm: implement 2-dimensional scoring in FastAPI using target grade similarity and schedule overlap. Enforce same-module, same-semester matching. Est. 4 days.
-- Matching API and Discover integration: expose ranked people and group matches with compatibility percentages and filters. Est. 3 days.
-- Communities tab: browse, create, join, and chat in communities. Est. 4 days.
+- Matching API and People tab integration: expose a simple people list with search, filters, sort by compatibility, visible compatibility percentages, and connection requests. Est. 3 days.
+- Community flows: browse, create, join, and chat in communities within the Discover and chat architecture. Est. 4 days.
 - Shared resources section: support persistent uploads for groups and communities. Est. 2 days.
 - Connection system and direct messaging: mutual connections gate DMs. Est. 3 days.
 - Basic notifications: in-app notifications for requests, invites, activity, and high-match alerts. Est. 2 days.
@@ -98,7 +98,7 @@ Goal: add higher-risk and higher-complexity features after the core product is s
 ### Kaiwen
 
 - Matching algorithm expansion: extend the initial model to 4 dimensions by adding working style and communication preference with configurable weights. Est. 3 days.
-- Reputation and rating system: collect internal rating inputs but surface only badge tiers to users. Est. 4 days.
+- Reputation and rating system: collect internal rating inputs, surface badge tiers, and show visible written reviews on user profiles without exposing public numeric scores. Est. 4 days.
 - Shared scheduling: compute overlapping free blocks and support accept/decline coordination. Est. 4 days.
 - AI content moderation: moderate group content, chats, and bios through FastAPI. Est. 3 days.
 - Profile completion bar: full calculation across optional fields. Est. 1 day.
@@ -113,7 +113,7 @@ Goal: add higher-risk and higher-complexity features after the core product is s
 ## Sprint Timeline
 
 - Sprint 1, May 12–25: project scaffolding, auth foundation, backend foundation, initial schema.
-- Sprint 2, May 26–Jun 8: onboarding completion, profile page, public groups, group-only Discover, auth polish, CI, Milestone 1 wrap-up.
+- Sprint 2, May 26–Jun 8: onboarding completion, profile page, public groups, Discover for groups and communities, People preview shell, auth polish, CI, Milestone 1 wrap-up.
 - Sprint 3, Jun 9–22: privacy-aware groups, initial matching, chat foundation, Discover integration.
 - Sprint 4, Jun 23–Jul 6: communities, resources, DMs, notifications, timetable import, inbox, Milestone 2 wrap-up.
 - Sprint 5, Jul 7–20: SSO, matching expansion, AI flows, moderation, reputation, scheduling, push notifications.
