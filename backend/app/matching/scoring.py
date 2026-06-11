@@ -28,7 +28,10 @@ def get_current_semester_string() -> str:
     academic_year_end = academic_year_start + 1
     semester_number = 1 if 8 <= month <= 12 else 2
 
-    return f"AY{str(academic_year_start)[-2:]}{str(academic_year_end)[-2:]}S{semester_number}"
+    return (
+        f"AY{str(academic_year_start)[-2:]}"
+        f"{str(academic_year_end)[-2:]}S{semester_number}"
+    )
 
 
 def _normalize_grade(grade: str | None) -> str | None:
@@ -85,8 +88,12 @@ def calculate_schedule_overlap_score(
     if overlap_minutes == 0:
         return 0.0, 0
 
-    current_total = sum(slot.end_minute - slot.start_minute for slot in current_user_slots)
-    candidate_total = sum(slot.end_minute - slot.start_minute for slot in candidate_slots)
+    current_total = sum(
+        slot.end_minute - slot.start_minute for slot in current_user_slots
+    )
+    candidate_total = sum(
+        slot.end_minute - slot.start_minute for slot in candidate_slots
+    )
     normalizer = min(current_total, candidate_total)
 
     if normalizer <= 0:
@@ -167,7 +174,8 @@ def rank_candidates(
     timetable_slots: list[TimetableSlot],
 ) -> list[dict]:
     current_user_modules = {
-        registration.module_code: registration for registration in current_user_registrations
+        registration.module_code: registration
+        for registration in current_user_registrations
     }
     candidate_module_map = build_module_map(candidate_registrations)
     timetable_map = build_timetable_map(timetable_slots)
@@ -176,7 +184,9 @@ def rank_candidates(
 
     for profile in profiles:
         candidate_modules = candidate_module_map.get(profile.id, {})
-        shared_modules = sorted(set(current_user_modules).intersection(candidate_modules))
+        shared_modules = sorted(
+            set(current_user_modules).intersection(candidate_modules)
+        )
 
         if not shared_modules:
             continue
