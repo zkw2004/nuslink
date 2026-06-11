@@ -71,14 +71,34 @@ export interface Community {
   updated_at: string;
 }
 
-export interface MatchScore {
+export interface MatchBreakdown {
+  schedule_overlap: number | null;
+  target_grade: number | null;
+}
+
+export interface PeopleMatch {
   user_id: string;
-  score: number;
+  display_name: string;
+  bio: string;
+  avatar_url: string | null;
+  faculty: string | null;
+  major: string | null;
+  year_of_study: number | null;
+  badge_tier: BadgeTier | null;
+  interests: string[];
+  intents: string[];
+  shared_modules: string[];
+  compatibility_percentage: number;
   breakdown: {
-    schedule_overlap: number;
-    skills: number;
-    target_grade: number;
-    working_style: number;
-    communication: number;
+    schedule_overlap: number | null;
+    target_grade: number | null;
   };
+  target_grade_summary: string;
+  schedule_summary: string;
+}
+
+export interface PeopleMatchesResponse {
+  semester: string;
+  available_modules: string[];
+  candidates: PeopleMatch[];
 }
