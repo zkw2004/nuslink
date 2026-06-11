@@ -1,7 +1,8 @@
 import { supabase } from "@lib/supabase";
 import { getCurrentSemester } from "@lib/nusmods";
-import type { UserProfile } from "@appTypes/index";
+import type { TimetableSlot, UserProfile } from "@appTypes/index";
 import type { SelectedModule } from "@features/onboarding/types";
+import { replaceCurrentSemesterTimetableSlots } from "./timetableService";
 
 export type ProfileViewModel = {
   badgeTierLabel: "New" | "Reliable" | "Trusted" | "Standout";
@@ -20,6 +21,7 @@ type EditableProfileInput = {
   interests: string[];
   intents: UserProfile["intents"];
   modules: SelectedModule[];
+  timetableSlots: TimetableSlot[];
 };
 
 const COMPLETION_FIELDS: (keyof Pick<
@@ -198,4 +200,6 @@ export async function updateEditableProfile(
       throw new Error(error.message);
     }
   }
+
+  await replaceCurrentSemesterTimetableSlots(userId, input.timetableSlots);
 }

@@ -23,6 +23,7 @@ export type CommunityType = "official" | "user_created";
 export type JoinPolicy = "open" | "request_approval";
 
 export type UserRole = "member" | "co_admin" | "admin";
+export type TimetableSource = "manual" | "nusmods";
 
 export interface UserProfile {
   id: string;
@@ -69,6 +70,16 @@ export interface Community {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface TimetableSlot {
+  id?: string;
+  user_id?: string;
+  semester?: string;
+  day_of_week: number;
+  start_minute: number;
+  end_minute: number;
+  source: TimetableSource;
 }
 
 export interface MatchBreakdown {

@@ -6,6 +6,26 @@ export type NusmodsModule = {
   department?: string;
 };
 
+export type NusmodsTimetableLesson = {
+  classNo: string;
+  lessonType: string;
+  day: string;
+  startTime: string;
+  endTime: string;
+  weeks?: number[] | { start: number; end: number; weekInterval?: number };
+};
+
+export type NusmodsSemesterData = {
+  semester: number;
+  timetable?: NusmodsTimetableLesson[];
+};
+
+export type NusmodsModuleDetail = {
+  moduleCode: string;
+  title: string;
+  semesterData?: NusmodsSemesterData[];
+};
+
 type CurrentSemester = {
   academicYear: string;
   semester: string;
@@ -13,6 +33,7 @@ type CurrentSemester = {
 
 let cachedAcademicYear: string | null = null;
 let moduleCache: NusmodsModule[] | null = null;
+const moduleDetailCache = new Map<string, NusmodsModuleDetail>();
 
 export function getCurrentSemester(date = new Date()): CurrentSemester {
   const year = date.getFullYear();
@@ -65,4 +86,33 @@ export async function searchNusmodsModules(query: string, limit = 8) {
       return code.includes(trimmedQuery) || title.includes(trimmedQuery);
     })
     .slice(0, limit);
+}
+
+export async function fetchNusmodsModuleDetail(moduleCode: string) {
+  const normalizedModuleCode = moduleCode.trim().toUpperCase();
+
+  if (!normalizedModuleCode) {
+    throw new Error("Module code is required.");
+  }
+
+  const { academicYear } = getCurrentSemester();
+  const cacheKey = `${academicYear}:${normalizedModuleCode}`;
+  const cachedDetail = moduleDetailCache.get(cacheKey);
+
+  if (cachedDetail) {
+    return cachedDetail;
+  }
+
+  const response = await fetch(
+    `https://api.nusmods.com/v2/${academicYear}/modules/${normalizedModuleCode}.json`,
+  );
+
+  if (!response.ok) {
+    throw new Error(`Unable to load timetable data for ${normalizedModuleCode}.`);
+  }
+
+  const detail = (await response.json()) as NusmodsModuleDetail;
+  moduleDetailCache.set(cacheKey, detail);
+
+  return detail;
 }

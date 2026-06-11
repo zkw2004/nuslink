@@ -106,6 +106,42 @@ export type Database = {
         };
         Relationships: [];
       };
+      timetable_slots: {
+        Row: {
+          created_at: string;
+          day_of_week: number;
+          end_minute: number;
+          id: string;
+          semester: string;
+          source: "manual" | "nusmods";
+          start_minute: number;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          day_of_week: number;
+          end_minute: number;
+          id?: string;
+          semester: string;
+          source?: "manual" | "nusmods";
+          start_minute: number;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          day_of_week?: number;
+          end_minute?: number;
+          id?: string;
+          semester?: string;
+          source?: "manual" | "nusmods";
+          start_minute?: number;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       groups: {
         Row: {
           created_at: string;

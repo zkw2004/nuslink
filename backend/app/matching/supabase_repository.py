@@ -7,6 +7,11 @@ from app.core.config import settings
 from app.matching.models import ModuleRegistration, ProfileSummary, TimetableSlot
 from app.matching.repository import MatchRepository
 
+PROFILE_SELECT_FIELDS = (
+    "id,display_name,bio,avatar_url,faculty,major,"
+    "year_of_study,badge_tier,interests,intents,onboarding_completed"
+)
+
 
 class SupabaseMatchRepository(MatchRepository):
     def __init__(self) -> None:
@@ -49,7 +54,7 @@ class SupabaseMatchRepository(MatchRepository):
         rows = self._get(
             "profiles",
             {
-                "select": "id,display_name,bio,avatar_url,faculty,major,year_of_study,badge_tier,interests,intents,onboarding_completed",
+                "select": PROFILE_SELECT_FIELDS,
                 "id": f"eq.{user_id}",
                 "limit": "1",
             },
@@ -67,7 +72,7 @@ class SupabaseMatchRepository(MatchRepository):
         rows = self._get(
             "profiles",
             {
-                "select": "id,display_name,bio,avatar_url,faculty,major,year_of_study,badge_tier,interests,intents,onboarding_completed",
+                "select": PROFILE_SELECT_FIELDS,
                 "id": _build_in_filter(user_ids),
                 "onboarding_completed": "eq.true",
             },
