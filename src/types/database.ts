@@ -106,6 +106,90 @@ export type Database = {
         };
         Relationships: [];
       };
+      timetable_slots: {
+        Row: {
+          created_at: string;
+          day_of_week: number;
+          end_minute: number;
+          id: string;
+          semester: string;
+          source: "manual" | "nusmods";
+          start_minute: number;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          day_of_week: number;
+          end_minute: number;
+          id?: string;
+          semester: string;
+          source?: "manual" | "nusmods";
+          start_minute: number;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          day_of_week?: number;
+          end_minute?: number;
+          id?: string;
+          semester?: string;
+          source?: "manual" | "nusmods";
+          start_minute?: number;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      connection_requests: {
+        Row: {
+          created_at: string;
+          id: string;
+          recipient_id: string;
+          requester_id: string;
+          responded_at: string | null;
+          status: "pending" | "accepted" | "declined";
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          recipient_id: string;
+          requester_id: string;
+          responded_at?: string | null;
+          status?: "pending" | "accepted" | "declined";
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          recipient_id?: string;
+          requester_id?: string;
+          responded_at?: string | null;
+          status?: "pending" | "accepted" | "declined";
+        };
+        Relationships: [];
+      };
+      connections: {
+        Row: {
+          created_at: string;
+          id: string;
+          user_a_id: string;
+          user_b_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          user_a_id: string;
+          user_b_id: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          user_a_id?: string;
+          user_b_id?: string;
+        };
+        Relationships: [];
+      };
       groups: {
         Row: {
           created_at: string;

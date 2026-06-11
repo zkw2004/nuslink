@@ -61,7 +61,9 @@ def get_people_matches(
         module_codes=scoped_modules,
         exclude_user_id=current_user.id,
     )
-    candidate_ids = sorted({registration.user_id for registration in candidate_registrations})
+    candidate_ids = sorted(
+        {registration.user_id for registration in candidate_registrations}
+    )
     candidate_profiles = repository.list_profiles(candidate_ids)
     timetable_slots = repository.list_timetable_slots(
         user_ids=[current_user.id, *candidate_ids],

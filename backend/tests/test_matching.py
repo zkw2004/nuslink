@@ -3,8 +3,8 @@ from fastapi.testclient import TestClient
 from app.auth import AuthenticatedUser
 from app.main import app
 from app.matching.models import ModuleRegistration, ProfileSummary, TimetableSlot
-from app.routers.matches import get_match_repository
 from app.routers.matches import get_current_user as get_matches_current_user
+from app.routers.matches import get_match_repository
 
 
 class FakeMatchRepository:
@@ -144,7 +144,10 @@ def test_people_matches_returns_ranked_candidates():
     assert body["available_modules"] == ["CS2030S", "CS2040S"]
     assert len(body["candidates"]) == 2
     assert body["candidates"][0]["user_id"] == "user-2"
-    assert body["candidates"][0]["compatibility_percentage"] > body["candidates"][1]["compatibility_percentage"]
+    assert (
+        body["candidates"][0]["compatibility_percentage"]
+        > body["candidates"][1]["compatibility_percentage"]
+    )
     assert body["candidates"][0]["shared_modules"] == ["CS2040S"]
 
 

@@ -27,10 +27,16 @@ import { saveProfileSetup, uploadProfileImage } from "@features/onboarding/onboa
 import { toSelectedModule, type SelectedModule } from "@features/onboarding/types";
 import { searchNusmodsModules } from "@lib/nusmods";
 import {
+  fetchCurrentSemesterTimetableSlots,
+  formatDayOfWeek,
+  formatMinuteOfDay,
   fetchCurrentSemesterModules,
   fetchProfileViewModel,
+  importTimetableFromNusmodsShareUrl,
+  parseManualTimeInput,
   updateEditableProfile,
 } from "@services/index";
+import type { TimetableSlot } from "@appTypes/index";
 import { useAuthStore } from "@store/index";
 
 const YEAR_OPTIONS = [1, 2, 3, 4, 5, 6];
@@ -57,6 +63,16 @@ const INTENT_OPTIONS = [
   { id: "internship_networking", label: "Internship networking" },
 ] as const;
 
+const DAY_OPTIONS = [
+  { value: 1, label: "Mon" },
+  { value: 2, label: "Tue" },
+  { value: 3, label: "Wed" },
+  { value: 4, label: "Thu" },
+  { value: 5, label: "Fri" },
+  { value: 6, label: "Sat" },
+  { value: 7, label: "Sun" },
+] as const;
+
 export default function ProfileScreen() {
   const profile = useAuthStore((state) => state.profile);
   const refreshProfile = useAuthStore((state) => state.refreshProfile);
@@ -64,8 +80,10 @@ export default function ProfileScreen() {
   const signOut = useAuthStore((state) => state.signOut);
 
   const [moduleCodes, setModuleCodes] = useState<string[]>([]);
+  const [savedTimetableSlots, setSavedTimetableSlots] = useState<TimetableSlot[]>([]);
   const [completion, setCompletion] = useState(0);
   const [editableModules, setEditableModules] = useState<SelectedModule[]>([]);
+  const [timetableSlotsDraft, setTimetableSlotsDraft] = useState<TimetableSlot[]>([]);
   const [displayNameDraft, setDisplayNameDraft] = useState("");
   const [bioDraft, setBioDraft] = useState("");
   const [facultyDraft, setFacultyDraft] = useState("");
@@ -75,9 +93,14 @@ export default function ProfileScreen() {
   const [intentsDraft, setIntentsDraft] = useState<NonNullable<typeof profile>["intents"]>([]);
   const [moduleQuery, setModuleQuery] = useState("");
   const [moduleResults, setModuleResults] = useState<SelectedModule[]>([]);
+  const [timetableShareUrlDraft, setTimetableShareUrlDraft] = useState("");
+  const [manualDayDraft, setManualDayDraft] = useState(1);
+  const [manualStartDraft, setManualStartDraft] = useState("09:00");
+  const [manualEndDraft, setManualEndDraft] = useState("11:00");
   const [customInterestInput, setCustomInterestInput] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isImportingTimetable, setIsImportingTimetable] = useState(false);
   const [isUpdatingPhoto, setIsUpdatingPhoto] = useState(false);
   const [isSearchingModules, setIsSearchingModules] = useState(false);
   const [avatarPreviewUri, setAvatarPreviewUri] = useState<string | null>(null);
@@ -100,18 +123,22 @@ export default function ProfileScreen() {
       if (!profile) {
         setModuleCodes([]);
         setEditableModules([]);
+        setSavedTimetableSlots([]);
+        setTimetableSlotsDraft([]);
         setCompletion(0);
         return;
       }
 
       try {
-        const [viewModel, modules] = await Promise.all([
+        const [viewModel, modules, timetableSlots] = await Promise.all([
           fetchProfileViewModel(profile.id, profile),
           fetchCurrentSemesterModules(profile.id),
+          fetchCurrentSemesterTimetableSlots(profile.id),
         ]);
 
         setModuleCodes(viewModel.modules);
         setEditableModules(modules);
+        setSavedTimetableSlots(timetableSlots);
         setCompletion(viewModel.completion);
 
         if (!isEditing) {
@@ -122,6 +149,7 @@ export default function ProfileScreen() {
           setYearOfStudyDraft(profile.year_of_study ?? 1);
           setInterestsDraft(profile.interests);
           setIntentsDraft(profile.intents);
+          setTimetableSlotsDraft(timetableSlots);
         }
 
         if (!isEditing) {
@@ -130,6 +158,8 @@ export default function ProfileScreen() {
       } catch {
         setModuleCodes([]);
         setEditableModules([]);
+        setSavedTimetableSlots([]);
+        setTimetableSlotsDraft([]);
         setCompletion(0);
       }
     }
@@ -198,6 +228,11 @@ export default function ProfileScreen() {
     setIntentsDraft(profile.intents);
     setModuleQuery("");
     setModuleResults([]);
+    setTimetableShareUrlDraft("");
+    setManualDayDraft(1);
+    setManualStartDraft("09:00");
+    setManualEndDraft("11:00");
+    setTimetableSlotsDraft(savedTimetableSlots);
     setCustomInterestInput("");
   }
 
@@ -394,6 +429,93 @@ export default function ProfileScreen() {
     );
   }
 
+  async function handleImportTimetable() {
+    const trimmedUrl = timetableShareUrlDraft.trim();
+
+    if (!trimmedUrl) {
+      Alert.alert("Paste a share link", "Add your NUSMods timetable share URL first.");
+      return;
+    }
+
+    setIsImportingTimetable(true);
+
+    try {
+      const importedSlots = await importTimetableFromNusmodsShareUrl(trimmedUrl);
+      setTimetableSlotsDraft(importedSlots);
+      setTimetableShareUrlDraft("");
+      Alert.alert(
+        "Timetable imported",
+        `Imported ${importedSlots.length} free blocks from your NUSMods timetable. You can still add or remove blocks manually before saving.`,
+      );
+    } catch (error) {
+      Alert.alert(
+        "Could not import timetable",
+        error instanceof Error ? error.message : "Please try again.",
+      );
+    } finally {
+      setIsImportingTimetable(false);
+    }
+  }
+
+  function handleAddManualTimetableBlock() {
+    try {
+      const startMinute = parseManualTimeInput(manualStartDraft);
+      const endMinute = parseManualTimeInput(manualEndDraft);
+
+      if (endMinute <= startMinute) {
+        Alert.alert("Invalid time range", "End time must be later than start time.");
+        return;
+      }
+
+      const nextSlot: TimetableSlot = {
+        day_of_week: manualDayDraft,
+        start_minute: startMinute,
+        end_minute: endMinute,
+        source: "manual",
+      };
+
+      const duplicateExists = timetableSlotsDraft.some(
+        (slot) =>
+          slot.day_of_week === nextSlot.day_of_week &&
+          slot.start_minute === nextSlot.start_minute &&
+          slot.end_minute === nextSlot.end_minute,
+      );
+
+      if (duplicateExists) {
+        Alert.alert("Block already added", "That availability block is already in your timetable.");
+        return;
+      }
+
+      setTimetableSlotsDraft((current) =>
+        [...current, nextSlot].sort(
+          (left, right) =>
+            left.day_of_week - right.day_of_week ||
+            left.start_minute - right.start_minute,
+        ),
+      );
+      setManualStartDraft("09:00");
+      setManualEndDraft("11:00");
+    } catch (error) {
+      Alert.alert(
+        "Invalid time format",
+        error instanceof Error ? error.message : "Use HH:MM format.",
+      );
+    }
+  }
+
+  function removeTimetableSlot(slotToRemove: TimetableSlot) {
+    setTimetableSlotsDraft((current) =>
+      current.filter((slot) => {
+        return !(
+          slot.day_of_week === slotToRemove.day_of_week &&
+          slot.start_minute === slotToRemove.start_minute &&
+          slot.end_minute === slotToRemove.end_minute &&
+          slot.source === slotToRemove.source
+        );
+      }),
+    );
+  }
+
   async function handleSaveDetails() {
     if (!profile) {
       return;
@@ -437,6 +559,7 @@ export default function ProfileScreen() {
         interests: interestsDraft,
         intents: intentsDraft,
         modules: editableModules,
+        timetableSlots: timetableSlotsDraft,
       });
 
       await refreshProfile(profile.id);
@@ -476,6 +599,7 @@ export default function ProfileScreen() {
   const visibleModules = isEditing
     ? editableModules.map((module) => module.moduleCode)
     : moduleCodes;
+  const visibleTimetableSlots = isEditing ? timetableSlotsDraft : savedTimetableSlots;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#EEF3F9" }}>
@@ -850,6 +974,151 @@ export default function ProfileScreen() {
         </SectionCard>
 
         <SectionCard className="mb-3">
+          <SectionHeader title={`Timetable Availability · ${visibleTimetableSlots.length}`} />
+          {isEditing ? (
+            <View className="gap-4">
+              <View className="rounded-2xl bg-[#F7F9FC] p-3">
+                <Text className="text-[13px] font-semibold text-[#0F1115]">
+                  Import from NUSMods
+                </Text>
+                <Text className="mt-1 text-[13px] leading-5 text-[#5C6370]">
+                  Paste your NUSMods timetable share URL. We will turn your class schedule into weekday free blocks for matching.
+                </Text>
+                <TextInput
+                  value={timetableShareUrlDraft}
+                  onChangeText={setTimetableShareUrlDraft}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  className="mt-3 rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-4 text-[14px] text-[#0F1115]"
+                  placeholder="https://nusmods.com/timetable/sem-1/share?..."
+                  placeholderTextColor="#9AA0AB"
+                />
+                <View className="mt-3">
+                  <AppButton
+                    label={isImportingTimetable ? "Importing..." : "Import share URL"}
+                    disabled={isImportingTimetable}
+                    onPress={() => {
+                      void handleImportTimetable();
+                    }}
+                  />
+                </View>
+              </View>
+
+              <View className="rounded-2xl bg-[#F7F9FC] p-3">
+                <Text className="text-[13px] font-semibold text-[#0F1115]">
+                  Manual fallback
+                </Text>
+                <Text className="mt-1 text-[13px] leading-5 text-[#5C6370]">
+                  Add extra free blocks manually if you prefer certain study windows or if your share link is incomplete.
+                </Text>
+
+                <View className="mt-3 flex-row flex-wrap gap-2">
+                  {DAY_OPTIONS.map((day) => {
+                    const isSelected = manualDayDraft === day.value;
+                    return (
+                      <Pressable
+                        key={day.value}
+                        className={`rounded-full border px-3 py-2 ${
+                          isSelected
+                            ? "border-[#0F1115] bg-[#0F1115]"
+                            : "border-[#E4E9F1] bg-white"
+                        }`}
+                        onPress={() => setManualDayDraft(day.value)}
+                      >
+                        <Text
+                          className={`text-[13px] font-semibold ${
+                            isSelected ? "text-white" : "text-[#5C6370]"
+                          }`}
+                        >
+                          {day.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+
+                <View className="mt-3 flex-row gap-2">
+                  <TextInput
+                    value={manualStartDraft}
+                    onChangeText={setManualStartDraft}
+                    className="flex-1 rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-4 text-[15px] text-[#0F1115]"
+                    placeholder="09:00"
+                    placeholderTextColor="#9AA0AB"
+                  />
+                  <TextInput
+                    value={manualEndDraft}
+                    onChangeText={setManualEndDraft}
+                    className="flex-1 rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-4 text-[15px] text-[#0F1115]"
+                    placeholder="11:00"
+                    placeholderTextColor="#9AA0AB"
+                  />
+                </View>
+
+                <View className="mt-3">
+                  <AppButton
+                    label="Add manual block"
+                    variant="secondary"
+                    onPress={handleAddManualTimetableBlock}
+                  />
+                </View>
+              </View>
+
+              <View className="gap-2">
+                {timetableSlotsDraft.length > 0 ? (
+                  timetableSlotsDraft.map((slot) => (
+                    <Pressable
+                      key={`${slot.day_of_week}-${slot.start_minute}-${slot.end_minute}-${slot.source}`}
+                      className="flex-row items-center justify-between rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-3"
+                      onPress={() => removeTimetableSlot(slot)}
+                    >
+                      <View className="flex-1">
+                        <Text className="text-[14px] font-semibold text-[#0F1115]">
+                          {formatDayOfWeek(slot.day_of_week)} · {formatMinuteOfDay(slot.start_minute)} -{" "}
+                          {formatMinuteOfDay(slot.end_minute)}
+                        </Text>
+                        <Text className="mt-1 text-[12px] text-[#5C6370]">
+                          {slot.source === "nusmods" ? "Imported from NUSMods" : "Manual free block"}
+                        </Text>
+                      </View>
+                      <Text className="text-[13px] font-semibold text-[#5B7BA3]">
+                        Remove
+                      </Text>
+                    </Pressable>
+                  ))
+                ) : (
+                  <Text className="text-[13px] leading-5 text-[#5C6370]">
+                    No timetable availability saved yet. Import a NUSMods link or add manual blocks for better schedule-overlap matches.
+                  </Text>
+                )}
+              </View>
+            </View>
+          ) : (
+            <View className="gap-2">
+              {savedTimetableSlots.length > 0 ? (
+                savedTimetableSlots.map((slot) => (
+                  <View
+                    key={`${slot.day_of_week}-${slot.start_minute}-${slot.end_minute}-${slot.source}`}
+                    className="rounded-[14px] bg-[#F7F9FC] px-4 py-3"
+                  >
+                    <Text className="text-[14px] font-semibold text-[#0F1115]">
+                      {formatDayOfWeek(slot.day_of_week)} · {formatMinuteOfDay(slot.start_minute)} -{" "}
+                      {formatMinuteOfDay(slot.end_minute)}
+                    </Text>
+                    <Text className="mt-1 text-[12px] text-[#5C6370]">
+                      {slot.source === "nusmods" ? "Imported from NUSMods" : "Manual free block"}
+                    </Text>
+                  </View>
+                ))
+              ) : (
+                <Text className="text-[13px] leading-5 text-[#5C6370]">
+                  Add timetable availability to improve schedule-overlap matching in the People tab.
+                </Text>
+              )}
+            </View>
+          )}
+        </SectionCard>
+
+        <SectionCard className="mb-3">
           <SectionHeader title="Skills" />
           <View className="flex-row flex-wrap gap-2">
             {profile.skills.length > 0 ? (
@@ -883,10 +1152,10 @@ export default function ProfileScreen() {
         ) : (
           <View className="mt-1 rounded-2xl bg-[#E1EAF5] px-[14px] py-3">
             <Text className="text-[13px] font-semibold text-[#5B7BA3]">
-              Milestone 2 preview
+              Milestone 2 status
             </Text>
             <Text className="mt-1 text-[13px] leading-5 text-[#5B7BA3]">
-              People matching, timetable-driven recommendations, and richer profile editing come after the M1 core flow is solid.
+              People matching is now live. Add timetable availability here to improve schedule overlap, and target-grade controls can follow in the next matching pass.
             </Text>
           </View>
         )}
