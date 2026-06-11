@@ -21,6 +21,32 @@ function formatCommunityTypeLabel(type: "official" | "user_created") {
   return type === "official" ? "Official" : "Community";
 }
 
+function formatPrivacyLabel(privacy: "public" | "semi_private" | "private") {
+  switch (privacy) {
+    case "semi_private":
+      return "Semi-private";
+    case "private":
+      return "Private";
+    default:
+      return "Public";
+  }
+}
+
+function formatRestrictionLabel(
+  restriction: "same_module" | "same_year" | "same_faculty" | null,
+) {
+  switch (restriction) {
+    case "same_module":
+      return "Same module";
+    case "same_year":
+      return "Same year";
+    case "same_faculty":
+      return "Same faculty";
+    default:
+      return null;
+  }
+}
+
 type DiscoverMode = "groups" | "communities";
 
 export default function DiscoverScreen() {
@@ -29,6 +55,7 @@ export default function DiscoverScreen() {
   const isGroupsLoading = useGroupsStore((state) => state.isLoading);
   const groupsError = useGroupsStore((state) => state.error);
   const joinGroup = useGroupsStore((state) => state.joinGroup);
+  const joinGroupWithInvite = useGroupsStore((state) => state.joinGroupWithInvite);
   const deleteGroup = useGroupsStore((state) => state.deleteGroup);
   const refreshGroups = useGroupsStore((state) => state.refreshGroups);
   const communities = useCommunitiesStore((state) => state.communities);
@@ -38,6 +65,7 @@ export default function DiscoverScreen() {
   const refreshCommunities = useCommunitiesStore((state) => state.refreshCommunities);
   const [mode, setMode] = useState<DiscoverMode>("groups");
   const [query, setQuery] = useState("");
+  const [inviteCodes, setInviteCodes] = useState<Record<string, string>>({});
 
   useEffect(() => {
     void refreshGroups(session?.user.id ?? null);
@@ -55,7 +83,8 @@ export default function DiscoverScreen() {
       return (
         group.name.toLowerCase().includes(normalizedQuery) ||
         group.module_code?.toLowerCase().includes(normalizedQuery) ||
-        group.description?.toLowerCase().includes(normalizedQuery)
+        group.description?.toLowerCase().includes(normalizedQuery) ||
+        group.join_note.toLowerCase().includes(normalizedQuery)
       );
     });
   }, [groups, normalizedQuery]);
@@ -76,14 +105,14 @@ export default function DiscoverScreen() {
   const titleCopy = useMemo(() => {
     if (mode === "groups") {
       if (isGroupsLoading) {
-        return "Loading public groups...";
+        return "Loading groups...";
       }
 
       if (filteredGroups.length === 0) {
-        return normalizedQuery ? "No groups match your search" : "No public groups yet";
+        return normalizedQuery ? "No groups match your search" : "No groups yet";
       }
 
-      return `${filteredGroups.length} public group${filteredGroups.length === 1 ? "" : "s"} this semester`;
+      return `${filteredGroups.length} group${filteredGroups.length === 1 ? "" : "s"} this semester`;
     }
 
     if (isCommunitiesLoading) {
@@ -112,6 +141,33 @@ export default function DiscoverScreen() {
 
     try {
       await joinGroup(groupId, session.user.id);
+    } catch (joinError) {
+      Alert.alert(
+        "Could not join group",
+        joinError instanceof Error ? joinError.message : "Please try again.",
+      );
+    }
+  }
+
+  async function handleJoinGroupWithInvite(groupId: string) {
+    if (!session?.user) {
+      Alert.alert("Sign in required", "Please sign in again before joining a group.");
+      return;
+    }
+
+    const inviteCode = inviteCodes[groupId]?.trim();
+
+    if (!inviteCode) {
+      Alert.alert("Invite code required", "Enter the private group invite code.");
+      return;
+    }
+
+    try {
+      await joinGroupWithInvite(inviteCode, session.user.id);
+      setInviteCodes((current) => ({
+        ...current,
+        [groupId]: "",
+      }));
     } catch (joinError) {
       Alert.alert(
         "Could not join group",
@@ -233,12 +289,12 @@ export default function DiscoverScreen() {
         {mode === "groups" && filteredGroups.length === 0 && !isGroupsLoading ? (
           <SectionCard className="mb-4">
             <Text className="text-[17px] font-bold text-[#0F1115]">
-              {normalizedQuery ? "No groups match your search" : "No public groups yet"}
+              {normalizedQuery ? "No groups match your search" : "No groups yet"}
             </Text>
             <Text className="mt-2 text-[14px] leading-6 text-[#5C6370]">
               {normalizedQuery
                 ? "Try a module code, group name, or shorter keyword."
-                : "Create the first public group for your modules, project team, or revision circle."}
+                : "Create the first public, restricted, or invite-only group for this semester."}
             </Text>
           </SectionCard>
         ) : null}
@@ -262,6 +318,14 @@ export default function DiscoverScreen() {
               <SectionCard key={group.id} className="overflow-hidden rounded-[20px] p-0">
                 {(() => {
                   const isOwner = session?.user.id === group.creator_id;
+                  const restrictionLabel = formatRestrictionLabel(group.restriction);
+                  const needsInvite = group.privacy === "private" && !group.joined && !isOwner;
+                  const canJoinVisibleGroup = group.can_join && !group.joined && !isOwner;
+                  const actionLabel = group.joined
+                    ? "Joined"
+                    : group.privacy === "semi_private" && !group.can_join
+                      ? "Locked"
+                      : "Join group";
 
                   return (
                     <>
@@ -272,7 +336,10 @@ export default function DiscoverScreen() {
                               {group.name}
                             </Text>
                             <Text className="mt-1 text-[13px] leading-5 text-[#5C6370]">
-                              {group.description?.trim() || "Public group open to module-mates and peers this semester."}
+                              {group.description?.trim() ||
+                                (group.privacy === "private"
+                                  ? "Private group. Ask the creator for an invite code to join."
+                                  : "Group open to eligible students this semester.")}
                             </Text>
                           </View>
                           <AppChip label={formatGroupTypeLabel(group.type)} variant="module" />
@@ -282,38 +349,66 @@ export default function DiscoverScreen() {
                           {group.module_code ? (
                             <AppChip label={group.module_code} variant="outline" />
                           ) : null}
-                          <AppChip label="Public group" variant="outline" />
+                          <AppChip label={formatPrivacyLabel(group.privacy)} variant="outline" />
+                          {restrictionLabel ? (
+                            <AppChip label={restrictionLabel} variant="outline" />
+                          ) : null}
                           {isOwner ? <AppChip label="Owner" variant="solid" /> : null}
                           {group.joined ? <AppChip label="Joined" variant="solid" /> : null}
+                          {isOwner && group.invite_code ? (
+                            <AppChip label={`Invite ${group.invite_code}`} variant="solid" />
+                          ) : null}
                         </View>
                       </View>
 
-                      <View className="flex-row items-center gap-[10px] border-t border-[#E4E9F1] bg-[#EEF2F7] px-[16px] py-[12px]">
-                        <Text className="flex-1 text-[12px] text-[#5C6370]">
-                          {isOwner
-                            ? "You created this group."
-                            : group.joined
-                              ? "You are already in this group."
-                              : "Open for students in the same semester."}
-                        </Text>
+                      <View className="border-t border-[#E4E9F1] bg-[#EEF2F7] px-[16px] py-[12px]">
+                        <View className="flex-row items-center gap-[10px]">
+                          <Text className="flex-1 text-[12px] text-[#5C6370]">
+                            {group.join_note}
+                          </Text>
 
-                        <View className="min-w-[104px] flex-row gap-2">
-                          {isOwner ? (
-                            <AppButton
-                              label="Delete"
-                              variant="secondary"
-                              onPress={() => handleDeleteGroup(group.id, group.name)}
+                          <View className="min-w-[104px] flex-row gap-2">
+                            {isOwner ? (
+                              <AppButton
+                                label="Delete"
+                                variant="secondary"
+                                onPress={() => handleDeleteGroup(group.id, group.name)}
+                              />
+                            ) : needsInvite ? null : (
+                              <AppButton
+                                label={actionLabel}
+                                disabled={!canJoinVisibleGroup}
+                                onPress={() => {
+                                  void handleJoinGroup(group.id);
+                                }}
+                              />
+                            )}
+                          </View>
+                        </View>
+
+                        {needsInvite ? (
+                          <View className="mt-3 flex-row items-center gap-2">
+                            <TextInput
+                              value={inviteCodes[group.id] ?? ""}
+                              onChangeText={(value) =>
+                                setInviteCodes((current) => ({
+                                  ...current,
+                                  [group.id]: value.toUpperCase(),
+                                }))
+                              }
+                              autoCapitalize="characters"
+                              placeholder="Invite code"
+                              placeholderTextColor="#9AA0AB"
+                              className="flex-1 rounded-[14px] border border-[#D7DEE9] bg-white px-4 py-3 text-[14px] uppercase text-[#0F1115]"
                             />
-                          ) : (
                             <AppButton
-                              label={group.joined ? "Joined" : "Join group"}
-                              disabled={group.joined}
+                              label="Join"
                               onPress={() => {
-                                void handleJoinGroup(group.id);
+                                void handleJoinGroupWithInvite(group.id);
                               }}
                             />
-                          )}
-                        </View>
+                          </View>
+                        ) : null}
                       </View>
                     </>
                   );
