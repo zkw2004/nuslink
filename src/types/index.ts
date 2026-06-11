@@ -24,6 +24,12 @@ export type JoinPolicy = "open" | "request_approval";
 
 export type UserRole = "member" | "co_admin" | "admin";
 export type TimetableSource = "manual" | "nusmods";
+export type ConnectionRequestStatus = "pending" | "accepted" | "declined";
+export type ConnectionRelationshipStatus =
+  | "none"
+  | "incoming_request"
+  | "outgoing_request"
+  | "connected";
 
 export interface UserProfile {
   id: string;
@@ -112,4 +118,22 @@ export interface PeopleMatchesResponse {
   semester: string;
   available_modules: string[];
   candidates: PeopleMatch[];
+}
+
+export interface ConnectionPreviewProfile {
+  id: string;
+  display_name: string;
+  avatar_url: string | null;
+  major: string | null;
+  year_of_study: number | null;
+  badge_tier: BadgeTier | null;
+}
+
+export interface IncomingConnectionRequest {
+  id: string;
+  requester_id: string;
+  recipient_id: string;
+  status: ConnectionRequestStatus;
+  created_at: string;
+  requester_profile: ConnectionPreviewProfile;
 }
