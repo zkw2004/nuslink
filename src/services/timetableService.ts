@@ -1,6 +1,6 @@
 import { fetchNusmodsModuleDetail, getCurrentSemester } from "@lib/nusmods";
 import { supabase } from "@lib/supabase";
-import type { TimetableSlot } from "@appTypes/index";
+import type { TimetableClassSlot, TimetableSlot } from "@appTypes/index";
 
 const WEEKDAY_START_MINUTE = 8 * 60;
 const WEEKDAY_END_MINUTE = 22 * 60;
@@ -27,14 +27,16 @@ const NUSMODS_DAY_INDEX: Record<string, number> = {
 };
 
 type LessonSelection = {
-  classNo: string;
   lessonType: string;
+  lessonIndexes: number[];
 };
 
 type ImportPayload = {
   semesterNumber: number;
   moduleSelections: Map<string, LessonSelection[]>;
 };
+
+type OccupiedClassSlot = TimetableClassSlot;
 
 function parseTimeDigits(value: string) {
   const normalized = value.replace(":", "").trim();
@@ -68,14 +70,58 @@ function expandLessonTypeToken(value: string) {
     case "LAB":
       return ["LAB", "LABORATORY"];
     case "REC":
-      return ["REC", "RECITATION"];
+      return ["REC", "RECITATION", "SECTIONALTEACHING"];
     case "SEC":
-      return ["SEC", "SECTIONALTEACHING"];
+      return ["SEC", "SECTIONALTEACHING", "RECITATION"];
     case "SEM":
       return ["SEM", "SEMINAR", "SEMINARSTYLEMODULECLASS"];
     default:
       return [normalizedValue];
   }
+}
+
+function matchesLessonSelection(selection: LessonSelection, lessonType: string) {
+  const normalizedLessonType = normalizeLessonToken(lessonType);
+  const allowedLessonTypes = expandLessonTypeToken(selection.lessonType);
+
+  return allowedLessonTypes.some((allowedType) => {
+    return (
+      normalizedLessonType === allowedType ||
+      normalizedLessonType.startsWith(allowedType) ||
+      allowedType.startsWith(normalizedLessonType)
+    );
+  });
+}
+
+function parseLessonSelections(rawSelection: string) {
+  return rawSelection
+    .split(";")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .flatMap((part) => {
+      const match = part.match(/^([^:=]+)[:=]\(?([^)]+)\)?$/);
+
+      if (!match) {
+        return [];
+      }
+
+      const lessonType = match[1].trim();
+      const lessonIndexes = match[2]
+        .split(",")
+        .map((lessonIndex) => Number.parseInt(lessonIndex.trim(), 10))
+        .filter((lessonIndex) => Number.isFinite(lessonIndex));
+
+      if (lessonIndexes.length === 0) {
+        return [];
+      }
+
+      return [
+        {
+          lessonType,
+          lessonIndexes,
+        },
+      ];
+    });
 }
 
 function extractShareQueryParts(url: URL) {
@@ -126,23 +172,7 @@ function parseNusmodsShareUrl(rawUrl: string): ImportPayload {
       continue;
     }
 
-    const selections = rawSelection
-      .split(",")
-      .map((part) => part.trim())
-      .filter(Boolean)
-      .map((part) => {
-        const match = part.match(/^([^:=]+)[:=](.+)$/);
-
-        if (!match) {
-          return null;
-        }
-
-        return {
-          lessonType: match[1].trim(),
-          classNo: match[2].trim().toUpperCase(),
-        };
-      })
-      .filter((selection): selection is LessonSelection => selection !== null);
+    const selections = parseLessonSelections(rawSelection);
 
     if (selections.length > 0) {
       moduleSelections.set(moduleCode, selections);
@@ -164,7 +194,7 @@ function parseNusmodsShareUrl(rawUrl: string): ImportPayload {
 function buildOccupiedLessonSlots(
   moduleSelections: Map<string, LessonSelection[]>,
   semesterNumber: number,
-) {
+) : Promise<OccupiedClassSlot[]> {
   return Promise.all(
     Array.from(moduleSelections.entries()).map(async ([moduleCode, selections]) => {
       const detail = await fetchNusmodsModuleDetail(moduleCode);
@@ -177,15 +207,11 @@ function buildOccupiedLessonSlots(
       }
 
       return semesterData.timetable
-        .filter((lesson) => {
-          const normalizedLessonType = normalizeLessonToken(lesson.lessonType);
-          const classNo = lesson.classNo.trim().toUpperCase();
-
+        .filter((lesson, lessonIndex) => {
           return selections.some((selection) => {
-            const allowedLessonTypes = expandLessonTypeToken(selection.lessonType);
             return (
-              classNo === selection.classNo &&
-              allowedLessonTypes.includes(normalizedLessonType)
+              matchesLessonSelection(selection, lesson.lessonType) &&
+              selection.lessonIndexes.includes(lessonIndex)
             );
           });
         })
@@ -197,6 +223,9 @@ function buildOccupiedLessonSlots(
           }
 
           return {
+            module_code: moduleCode,
+            lesson_type: lesson.lessonType,
+            class_no: lesson.classNo,
             dayOfWeek,
             startMinute: parseTimeDigits(lesson.startTime),
             endMinute: parseTimeDigits(lesson.endTime),
@@ -206,13 +235,33 @@ function buildOccupiedLessonSlots(
           (
             lesson,
           ): lesson is {
+            module_code: string;
+            lesson_type: string;
+            class_no: string;
             dayOfWeek: number;
             startMinute: number;
             endMinute: number;
           } => lesson !== null,
-        );
+        )
+        .map((lesson) => ({
+          module_code: lesson.module_code,
+          lesson_type: lesson.lesson_type,
+          class_no: lesson.class_no,
+          day_of_week: lesson.dayOfWeek,
+          start_minute: lesson.startMinute,
+          end_minute: lesson.endMinute,
+        }));
     }),
-  ).then((occupiedByModule) => occupiedByModule.flat());
+  ).then((occupiedByModule) =>
+    occupiedByModule
+      .flat()
+      .sort(
+        (left, right) =>
+          left.day_of_week - right.day_of_week ||
+          left.start_minute - right.start_minute ||
+          left.module_code.localeCompare(right.module_code),
+      ),
+  );
 }
 
 function mergeIntervals(
@@ -242,17 +291,17 @@ function mergeIntervals(
 }
 
 function deriveFreeBlocksFromOccupiedSlots(
-  occupiedSlots: { dayOfWeek: number; startMinute: number; endMinute: number }[],
+  occupiedSlots: OccupiedClassSlot[],
 ) {
   const byDay = new Map<number, { startMinute: number; endMinute: number }[]>();
 
   for (const slot of occupiedSlots) {
-    const current = byDay.get(slot.dayOfWeek) ?? [];
+    const current = byDay.get(slot.day_of_week) ?? [];
     current.push({
-      startMinute: Math.max(slot.startMinute, WEEKDAY_START_MINUTE),
-      endMinute: Math.min(slot.endMinute, WEEKDAY_END_MINUTE),
+      startMinute: Math.max(slot.start_minute, WEEKDAY_START_MINUTE),
+      endMinute: Math.min(slot.end_minute, WEEKDAY_END_MINUTE),
     });
-    byDay.set(slot.dayOfWeek, current);
+    byDay.set(slot.day_of_week, current);
   }
 
   const freeBlocks: TimetableSlot[] = [];
@@ -304,7 +353,10 @@ export async function importTimetableFromNusmodsShareUrl(rawUrl: string) {
     );
   }
 
-  return deriveFreeBlocksFromOccupiedSlots(occupiedSlots);
+  return {
+    occupiedSlots,
+    availabilitySlots: deriveFreeBlocksFromOccupiedSlots(occupiedSlots),
+  };
 }
 
 export async function fetchCurrentSemesterTimetableSlots(userId: string) {
@@ -377,6 +429,10 @@ export function formatMinuteOfDay(value: number) {
 
 export function formatDayOfWeek(dayOfWeek: number) {
   return DAY_LABELS[dayOfWeek] ?? `Day ${dayOfWeek}`;
+}
+
+export function formatClassSlotLabel(slot: TimetableClassSlot) {
+  return `${slot.module_code} · ${slot.lesson_type} ${slot.class_no}`;
 }
 
 export function parseManualTimeInput(value: string) {

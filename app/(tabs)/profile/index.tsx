@@ -28,6 +28,7 @@ import { toSelectedModule, type SelectedModule } from "@features/onboarding/type
 import { searchNusmodsModules } from "@lib/nusmods";
 import {
   fetchCurrentSemesterTimetableSlots,
+  formatClassSlotLabel,
   formatDayOfWeek,
   formatMinuteOfDay,
   fetchCurrentSemesterModules,
@@ -36,7 +37,7 @@ import {
   parseManualTimeInput,
   updateEditableProfile,
 } from "@services/index";
-import type { TimetableSlot } from "@appTypes/index";
+import type { TimetableClassSlot, TimetableSlot } from "@appTypes/index";
 import { useAuthStore } from "@store/index";
 
 const YEAR_OPTIONS = [1, 2, 3, 4, 5, 6];
@@ -84,6 +85,12 @@ export default function ProfileScreen() {
   const [completion, setCompletion] = useState(0);
   const [editableModules, setEditableModules] = useState<SelectedModule[]>([]);
   const [timetableSlotsDraft, setTimetableSlotsDraft] = useState<TimetableSlot[]>([]);
+  const [importedClassSlotsPreview, setImportedClassSlotsPreview] = useState<
+    TimetableClassSlot[]
+  >([]);
+  const [importedAvailabilityPreview, setImportedAvailabilityPreview] = useState<
+    TimetableSlot[]
+  >([]);
   const [displayNameDraft, setDisplayNameDraft] = useState("");
   const [bioDraft, setBioDraft] = useState("");
   const [facultyDraft, setFacultyDraft] = useState("");
@@ -233,6 +240,8 @@ export default function ProfileScreen() {
     setManualStartDraft("09:00");
     setManualEndDraft("11:00");
     setTimetableSlotsDraft(savedTimetableSlots);
+    setImportedClassSlotsPreview([]);
+    setImportedAvailabilityPreview([]);
     setCustomInterestInput("");
   }
 
@@ -440,13 +449,9 @@ export default function ProfileScreen() {
     setIsImportingTimetable(true);
 
     try {
-      const importedSlots = await importTimetableFromNusmodsShareUrl(trimmedUrl);
-      setTimetableSlotsDraft(importedSlots);
-      setTimetableShareUrlDraft("");
-      Alert.alert(
-        "Timetable imported",
-        `Imported ${importedSlots.length} free blocks from your NUSMods timetable. You can still add or remove blocks manually before saving.`,
-      );
+      const importedTimetable = await importTimetableFromNusmodsShareUrl(trimmedUrl);
+      setImportedClassSlotsPreview(importedTimetable.occupiedSlots);
+      setImportedAvailabilityPreview(importedTimetable.availabilitySlots);
     } catch (error) {
       Alert.alert(
         "Could not import timetable",
@@ -455,6 +460,19 @@ export default function ProfileScreen() {
     } finally {
       setIsImportingTimetable(false);
     }
+  }
+
+  function handleApplyImportedAvailability() {
+    if (importedAvailabilityPreview.length === 0) {
+      return;
+    }
+
+    setTimetableSlotsDraft(importedAvailabilityPreview);
+    setTimetableShareUrlDraft("");
+    Alert.alert(
+      "Availability applied",
+      `Matched ${importedClassSlotsPreview.length} class slots and converted them into ${importedAvailabilityPreview.length} free blocks. Review them before saving.`,
+    );
   }
 
   function handleAddManualTimetableBlock() {
@@ -982,7 +1000,7 @@ export default function ProfileScreen() {
                   Import from NUSMods
                 </Text>
                 <Text className="mt-1 text-[13px] leading-5 text-[#5C6370]">
-                  Paste your NUSMods timetable share URL. We will turn your class schedule into weekday free blocks for matching.
+                  Paste your NUSMods timetable share URL. We will first show the class slots we matched, then let you apply the derived free blocks for matching.
                 </Text>
                 <TextInput
                   value={timetableShareUrlDraft}
@@ -1003,6 +1021,41 @@ export default function ProfileScreen() {
                   />
                 </View>
               </View>
+
+              {importedClassSlotsPreview.length > 0 ? (
+                <View className="rounded-2xl bg-[#F7F9FC] p-3">
+                  <Text className="text-[13px] font-semibold text-[#0F1115]">
+                    Matched class slots from NUSMods
+                  </Text>
+                  <Text className="mt-1 text-[13px] leading-5 text-[#5C6370]">
+                    Review these first. If they do not reflect your real timetable, do not apply the derived availability yet.
+                  </Text>
+
+                  <View className="mt-3 gap-2">
+                    {importedClassSlotsPreview.map((slot) => (
+                      <View
+                        key={`${slot.module_code}-${slot.lesson_type}-${slot.class_no}-${slot.day_of_week}-${slot.start_minute}`}
+                        className="rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-3"
+                      >
+                        <Text className="text-[14px] font-semibold text-[#0F1115]">
+                          {formatDayOfWeek(slot.day_of_week)} · {formatMinuteOfDay(slot.start_minute)} -{" "}
+                          {formatMinuteOfDay(slot.end_minute)}
+                        </Text>
+                        <Text className="mt-1 text-[12px] text-[#5C6370]">
+                          {formatClassSlotLabel(slot)}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+
+                  <View className="mt-3">
+                    <AppButton
+                      label="Apply derived free blocks"
+                      onPress={handleApplyImportedAvailability}
+                    />
+                  </View>
+                </View>
+              ) : null}
 
               <View className="rounded-2xl bg-[#F7F9FC] p-3">
                 <Text className="text-[13px] font-semibold text-[#0F1115]">

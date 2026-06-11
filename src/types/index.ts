@@ -88,6 +88,15 @@ export interface TimetableSlot {
   source: TimetableSource;
 }
 
+export interface TimetableClassSlot {
+  module_code: string;
+  lesson_type: string;
+  class_no: string;
+  day_of_week: number;
+  start_minute: number;
+  end_minute: number;
+}
+
 export interface MatchBreakdown {
   schedule_overlap: number | null;
   target_grade: number | null;
