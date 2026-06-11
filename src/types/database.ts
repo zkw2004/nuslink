@@ -142,6 +142,54 @@ export type Database = {
         };
         Relationships: [];
       };
+      connection_requests: {
+        Row: {
+          created_at: string;
+          id: string;
+          recipient_id: string;
+          requester_id: string;
+          responded_at: string | null;
+          status: "pending" | "accepted" | "declined";
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          recipient_id: string;
+          requester_id: string;
+          responded_at?: string | null;
+          status?: "pending" | "accepted" | "declined";
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          recipient_id?: string;
+          requester_id?: string;
+          responded_at?: string | null;
+          status?: "pending" | "accepted" | "declined";
+        };
+        Relationships: [];
+      };
+      connections: {
+        Row: {
+          created_at: string;
+          id: string;
+          user_a_id: string;
+          user_b_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          user_a_id: string;
+          user_b_id: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          user_a_id?: string;
+          user_b_id?: string;
+        };
+        Relationships: [];
+      };
       groups: {
         Row: {
           created_at: string;
@@ -297,6 +345,19 @@ export type Database = {
         };
         Returns: string;
       };
+      create_connection_request: {
+        Args: {
+          recipient_id_input: string;
+        };
+        Returns: string;
+      };
+      respond_to_connection_request: {
+        Args: {
+          decision_input: string;
+          request_id_input: string;
+        };
+        Returns: void;
+      };
       upsert_user_module: {
         Args: {
           module_code_input: string;
@@ -310,6 +371,7 @@ export type Database = {
     };
     Enums: {
       badge_tier: "bronze" | "silver" | "gold";
+      connection_request_status: "pending" | "accepted" | "declined";
       intent: "study_group" | "hackathon" | "tutoring" | "internship_networking";
       group_type: "study_group" | "hackathon_team" | "project_team" | "tutoring_session";
       privacy_setting: "public" | "semi_private" | "private";
