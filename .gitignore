@@ -45,3 +45,6 @@ __pycache__/
 *.py[cod]
 .venv/
 backend/.env
+FEATURES.md
+AGENTS.md
+DEVELOPMENT_PLAN.md
