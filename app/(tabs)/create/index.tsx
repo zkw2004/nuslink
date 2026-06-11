@@ -18,9 +18,14 @@ import {
   SectionCard,
   SectionHeader,
 } from "@components/shared";
-import { searchNusmodsModules } from "@lib/nusmods";
+import { getCurrentSemester, searchNusmodsModules } from "@lib/nusmods";
 import { useAuthStore, useGroupsStore } from "@store/index";
 import { toSelectedModule, type SelectedModule } from "@features/onboarding/types";
+import type { Database } from "@appTypes/database";
+
+type GroupType = Database["public"]["Tables"]["groups"]["Row"]["type"];
+type PrivacySetting = Database["public"]["Tables"]["groups"]["Row"]["privacy"];
+type SemiPrivateRestriction = Database["public"]["Tables"]["groups"]["Row"]["restriction"];
 
 const groupTypes = [
   { label: "Study group", value: "study_group" },
@@ -29,18 +34,65 @@ const groupTypes = [
   { label: "Tutoring session", value: "tutoring_session" },
 ] as const;
 
+const privacyOptions: { label: string; value: PrivacySetting; helper: string }[] = [
+  {
+    label: "Public",
+    value: "public",
+    helper: "Visible and joinable by any signed-in user.",
+  },
+  {
+    label: "Semi-private",
+    value: "semi_private",
+    helper: "Visible to everyone, joinable only by students who meet a rule.",
+  },
+  {
+    label: "Private",
+    value: "private",
+    helper: "Visible as a limited card. Joining requires an invite code.",
+  },
+];
+
+const restrictionOptions: {
+  label: string;
+  value: NonNullable<SemiPrivateRestriction>;
+}[] = [
+  { label: "Same module", value: "same_module" },
+  { label: "Same year", value: "same_year" },
+  { label: "Same faculty", value: "same_faculty" },
+];
+
+function parseOptionalSize(value: string) {
+  const trimmedValue = value.trim();
+
+  if (!trimmedValue) {
+    return null;
+  }
+
+  const parsedValue = Number.parseInt(trimmedValue, 10);
+
+  return Number.isNaN(parsedValue) ? null : parsedValue;
+}
+
 export default function CreateScreen() {
   const session = useAuthStore((state) => state.session);
   const createGroup = useGroupsStore((state) => state.createGroup);
   const [groupName, setGroupName] = useState("");
-  const [selectedGroupType, setSelectedGroupType] = useState<string | null>(
-    "study_group",
-  );
+  const [description, setDescription] = useState("");
+  const [venue, setVenue] = useState("");
+  const [minSize, setMinSize] = useState("");
+  const [maxSize, setMaxSize] = useState("");
+  const [selectedGroupType, setSelectedGroupType] =
+    useState<GroupType>("study_group");
+  const [selectedPrivacy, setSelectedPrivacy] =
+    useState<PrivacySetting>("public");
+  const [selectedRestriction, setSelectedRestriction] =
+    useState<NonNullable<SemiPrivateRestriction>>("same_module");
   const [moduleQuery, setModuleQuery] = useState("");
   const [selectedModule, setSelectedModule] = useState<SelectedModule | null>(null);
   const [moduleResults, setModuleResults] = useState<SelectedModule[]>([]);
   const [isSearchingModules, setIsSearchingModules] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const currentSemester = useMemo(() => getCurrentSemester(), []);
 
   useEffect(() => {
     let isActive = true;
@@ -92,10 +144,9 @@ export default function CreateScreen() {
   const canCreate = useMemo(() => {
     return (
       groupName.trim().length > 0 &&
-      selectedGroupType !== null &&
       selectedModule !== null
     );
-  }, [groupName, selectedGroupType, selectedModule]);
+  }, [groupName, selectedModule]);
 
   function handleSelectModule(module: SelectedModule) {
     setSelectedModule(module);
@@ -104,7 +155,7 @@ export default function CreateScreen() {
   }
 
   async function handleCreateGroup() {
-    if (!session?.user || !selectedGroupType) {
+    if (!session?.user) {
       Alert.alert("Sign in required", "Please sign in again before creating a group.");
       return;
     }
@@ -114,10 +165,30 @@ export default function CreateScreen() {
       return;
     }
 
+    const parsedMinSize = parseOptionalSize(minSize);
+    const parsedMaxSize = parseOptionalSize(maxSize);
+
+    if (
+      (minSize.trim() && parsedMinSize === null) ||
+      (maxSize.trim() && parsedMaxSize === null)
+    ) {
+      Alert.alert("Check group size", "Minimum and maximum size must be whole numbers.");
+      return;
+    }
+
+    if (
+      parsedMinSize !== null &&
+      parsedMaxSize !== null &&
+      parsedMinSize > parsedMaxSize
+    ) {
+      Alert.alert("Check group size", "Minimum size cannot be greater than maximum size.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
-      await createGroup({
+      const result = await createGroup({
         creatorId: session.user.id,
         module: {
           code: selectedModule.moduleCode,
@@ -126,15 +197,38 @@ export default function CreateScreen() {
           department: selectedModule.department,
         },
         name: groupName,
-        type: selectedGroupType as
-          | "study_group"
-          | "hackathon_team"
-          | "project_team"
-          | "tutoring_session",
+        type: selectedGroupType,
+        privacy: selectedPrivacy,
+        restriction:
+          selectedPrivacy === "semi_private" ? selectedRestriction : null,
+        semester: currentSemester.semester,
+        description,
+        minSize: parsedMinSize,
+        maxSize: parsedMaxSize,
+        venue,
       });
       setGroupName("");
+      setDescription("");
+      setVenue("");
+      setMinSize("");
+      setMaxSize("");
       setModuleQuery("");
       setSelectedModule(null);
+
+      if (result.inviteCode) {
+        Alert.alert(
+          "Private group created",
+          `Share invite code ${result.inviteCode} with students you want to add.`,
+          [
+            {
+              text: "View Discover",
+              onPress: () => router.replace("/(tabs)/discover"),
+            },
+          ],
+        );
+        return;
+      }
+
       router.replace("/(tabs)/discover");
     } catch (error) {
       Alert.alert(
@@ -150,7 +244,7 @@ export default function CreateScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: "#EEF3F9" }}>
       <AppScreenHeader
         title="Create Group"
-        subtitle="Create a public study or project group. Search real modules from NUSMods for the current semester."
+        subtitle="Create a group for the current semester with public, restricted, or invite-only access."
       />
 
       <ScrollView
@@ -170,6 +264,17 @@ export default function CreateScreen() {
           <Text className="mt-2 text-[12px] text-[#9AA0AB]">
             Keep it clear and easy to scan in Discover.
           </Text>
+
+          <TextInput
+            value={description}
+            onChangeText={setDescription}
+            multiline
+            textAlignVertical="top"
+            maxLength={500}
+            placeholder="Optional description"
+            placeholderTextColor="#9B8C7D"
+            className="mt-3 min-h-[94px] rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-3 text-[15px] leading-6 text-[#0F1115]"
+          />
         </SectionCard>
 
         <SectionCard className="mb-4">
@@ -256,25 +361,107 @@ export default function CreateScreen() {
 
         <SectionCard className="mb-5">
           <SectionHeader title="Privacy" />
-          <View className="rounded-[14px] bg-[#E7EEF7] px-4 py-4">
-            <Text className="text-[14px] font-semibold text-[#0F1115]">
-              Public groups only in M1
-            </Text>
-            <Text className="mt-1 text-[12px] leading-5 text-[#5C6370]">
-              Anyone using the app can discover and join this group. Semi-private
-              and private flows are intentionally deferred to a later milestone.
-            </Text>
+          <View className="gap-2">
+            {privacyOptions.map((option) => {
+              const isSelected = selectedPrivacy === option.value;
+
+              return (
+                <Pressable
+                  key={option.value}
+                  className={`rounded-[16px] border px-4 py-3 ${
+                    isSelected
+                      ? "border-[#0F1115] bg-[#E7EEF7]"
+                      : "border-[#E4E9F1] bg-white"
+                  }`}
+                  onPress={() => setSelectedPrivacy(option.value)}
+                >
+                  <Text className="text-[14px] font-bold text-[#0F1115]">
+                    {option.label}
+                  </Text>
+                  <Text className="mt-1 text-[12px] leading-5 text-[#5C6370]">
+                    {option.helper}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {selectedPrivacy === "semi_private" ? (
+            <View className="mt-4">
+              <Text className="mb-2 text-[13px] font-semibold text-[#5C6370]">
+                Join rule
+              </Text>
+              <View className="flex-row flex-wrap gap-2">
+                {restrictionOptions.map((restriction) => {
+                  const isSelected = selectedRestriction === restriction.value;
+
+                  return (
+                    <Pressable
+                      key={restriction.value}
+                      className={`rounded-full border px-4 py-2 ${
+                        isSelected
+                          ? "border-[#0F1115] bg-[#0F1115]"
+                          : "border-[#E4E9F1] bg-white"
+                      }`}
+                      onPress={() => setSelectedRestriction(restriction.value)}
+                    >
+                      <Text
+                        className={`text-[13px] font-semibold ${
+                          isSelected ? "text-white" : "text-[#5C6370]"
+                        }`}
+                      >
+                        {restriction.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          ) : null}
+        </SectionCard>
+
+        <SectionCard className="mb-5">
+          <SectionHeader title="Optional Details" />
+          <View className="gap-3">
+            <TextInput
+              value={venue}
+              onChangeText={setVenue}
+              placeholder="Venue e.g. COM3 level 2"
+              placeholderTextColor="#9B8C7D"
+              className="rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-4 text-[15px] text-[#0F1115]"
+            />
+
+            <View className="flex-row gap-3">
+              <TextInput
+                value={minSize}
+                onChangeText={setMinSize}
+                inputMode="numeric"
+                keyboardType="number-pad"
+                placeholder="Min size"
+                placeholderTextColor="#9B8C7D"
+                className="flex-1 rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-4 text-[15px] text-[#0F1115]"
+              />
+              <TextInput
+                value={maxSize}
+                onChangeText={setMaxSize}
+                inputMode="numeric"
+                keyboardType="number-pad"
+                placeholder="Max size"
+                placeholderTextColor="#9B8C7D"
+                className="flex-1 rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-4 text-[15px] text-[#0F1115]"
+              />
+            </View>
           </View>
         </SectionCard>
 
         <View className="mb-3 flex-row flex-wrap gap-2">
           <AppChip label="Manual flow" />
           <AppChip label="NUSMods search" variant="outline" />
-          <AppChip label="No AI autofill yet" variant="outline" />
+          <AppChip label={currentSemester.semester} variant="outline" />
         </View>
 
         <AppButton
-          label={isSubmitting ? "Creating..." : "Create public group"}
+          label={isSubmitting ? "Creating..." : "Create group"}
           disabled={!canCreate || isSubmitting}
           onPress={() => {
             void handleCreateGroup();

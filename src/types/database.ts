@@ -120,10 +120,12 @@ export type Database = {
           privacy: "public" | "semi_private" | "private";
           restriction: "same_module" | "same_year" | "same_faculty" | null;
           scheduled_time: string | null;
+          semester: string;
           tags: string[];
           type: "study_group" | "hackathon_team" | "project_team" | "tutoring_session";
           updated_at: string;
           venue: string | null;
+          invite_code: string | null;
         };
         Insert: {
           created_at?: string;
@@ -138,10 +140,12 @@ export type Database = {
           privacy?: "public" | "semi_private" | "private";
           restriction?: "same_module" | "same_year" | "same_faculty" | null;
           scheduled_time?: string | null;
+          semester: string;
           tags?: string[];
           type: "study_group" | "hackathon_team" | "project_team" | "tutoring_session";
           updated_at?: string;
           venue?: string | null;
+          invite_code?: string | null;
         };
         Update: {
           created_at?: string;
@@ -156,10 +160,12 @@ export type Database = {
           privacy?: "public" | "semi_private" | "private";
           restriction?: "same_module" | "same_year" | "same_faculty" | null;
           scheduled_time?: string | null;
+          semester?: string;
           tags?: string[];
           type?: "study_group" | "hackathon_team" | "project_team" | "tutoring_session";
           updated_at?: string;
           venue?: string | null;
+          invite_code?: string | null;
         };
         Relationships: [];
       };
@@ -250,6 +256,27 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      create_group: {
+        Args: {
+          module_code_input: string;
+          module_name_input: string;
+          module_department_input: string | null;
+          module_faculty_input: string | null;
+          group_name_input: string;
+          group_type_input: "study_group" | "hackathon_team" | "project_team" | "tutoring_session";
+          privacy_input: "public" | "semi_private" | "private";
+          restriction_input: "same_module" | "same_year" | "same_faculty" | null;
+          semester_input: string;
+          description_input: string;
+          min_size_input: number | null;
+          max_size_input: number | null;
+          venue_input: string;
+        };
+        Returns: {
+          group_id: string;
+          invite_code: string | null;
+        }[];
+      };
       create_public_group: {
         Args: {
           module_code_input: string;
@@ -260,6 +287,51 @@ export type Database = {
           group_type_input: "study_group" | "hackathon_team" | "project_team" | "tutoring_session";
         };
         Returns: string;
+      };
+      create_connection_request: {
+        Args: {
+          recipient_id_input: string;
+        };
+        Returns: string;
+      };
+      get_discover_groups: {
+        Args: {
+          semester_input: string;
+        };
+        Returns: {
+          id: string;
+          name: string;
+          type: "study_group" | "hackathon_team" | "project_team" | "tutoring_session";
+          module_code: string | null;
+          description: string | null;
+          creator_id: string;
+          privacy: "public" | "semi_private" | "private";
+          restriction: "same_module" | "same_year" | "same_faculty" | null;
+          semester: string;
+          joined: boolean;
+          can_join: boolean;
+          join_note: string;
+          invite_code: string | null;
+        }[];
+      };
+      join_group_with_invite: {
+        Args: {
+          invite_code_input: string;
+        };
+        Returns: string;
+      };
+      join_visible_group: {
+        Args: {
+          group_id_input: string;
+        };
+        Returns: void;
+      };
+      respond_to_connection_request: {
+        Args: {
+          decision_input: string;
+          request_id_input: string;
+        };
+        Returns: void;
       };
       upsert_user_module: {
         Args: {
@@ -274,6 +346,7 @@ export type Database = {
     };
     Enums: {
       badge_tier: "bronze" | "silver" | "gold";
+      connection_request_status: "pending" | "accepted" | "declined";
       intent: "study_group" | "hackathon" | "tutoring" | "internship_networking";
       group_type: "study_group" | "hackathon_team" | "project_team" | "tutoring_session";
       privacy_setting: "public" | "semi_private" | "private";
