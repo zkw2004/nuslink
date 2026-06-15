@@ -146,3 +146,28 @@ export interface IncomingConnectionRequest {
   created_at: string;
   requester_profile: ConnectionPreviewProfile;
 }
+
+export interface ConnectedProfilePreview {
+  id: string;
+  display_name: string;
+  avatar_url: string | null;
+  major: string | null;
+  year_of_study: number | null;
+  badge_tier: BadgeTier | null;
+}
+
+export interface DirectConversationSummary {
+  id: string;
+  other_user: ConnectedProfilePreview;
+  last_message_preview: string | null;
+  last_message_at: string | null;
+  updated_at: string;
+}
+
+export interface DirectMessage {
+  id: string;
+  conversation_id: string;
+  sender_id: string;
+  body: string;
+  created_at: string;
+}

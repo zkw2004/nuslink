@@ -190,6 +190,69 @@ export type Database = {
         };
         Relationships: [];
       };
+      direct_conversations: {
+        Row: {
+          created_at: string;
+          id: string;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      direct_conversation_members: {
+        Row: {
+          conversation_id: string;
+          id: string;
+          joined_at: string;
+          user_id: string;
+        };
+        Insert: {
+          conversation_id: string;
+          id?: string;
+          joined_at?: string;
+          user_id: string;
+        };
+        Update: {
+          conversation_id?: string;
+          id?: string;
+          joined_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      direct_messages: {
+        Row: {
+          body: string;
+          conversation_id: string;
+          created_at: string;
+          id: string;
+          sender_id: string;
+        };
+        Insert: {
+          body: string;
+          conversation_id: string;
+          created_at?: string;
+          id?: string;
+          sender_id: string;
+        };
+        Update: {
+          body?: string;
+          conversation_id?: string;
+          created_at?: string;
+          id?: string;
+          sender_id?: string;
+        };
+        Relationships: [];
+      };
       groups: {
         Row: {
           created_at: string;
@@ -378,6 +441,12 @@ export type Database = {
         };
         Returns: string;
       };
+      get_or_create_direct_conversation: {
+        Args: {
+          other_user_id_input: string;
+        };
+        Returns: string;
+      };
       get_discover_groups: {
         Args: {
           semester_input: string;
@@ -416,6 +485,13 @@ export type Database = {
           request_id_input: string;
         };
         Returns: void;
+      };
+      send_direct_message: {
+        Args: {
+          body_input: string;
+          conversation_id_input: string;
+        };
+        Returns: string;
       };
       upsert_user_module: {
         Args: {
