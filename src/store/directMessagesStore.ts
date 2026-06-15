@@ -49,15 +49,10 @@ export const useDirectMessagesStore = create<DirectMessagesState>((set, get) => 
         fetchConnectedProfiles(userId),
         fetchDirectConversations(userId),
       ]);
-      const activeConversationUserIds = new Set(
-        conversations.map((conversation) => conversation.other_user.id),
-      );
 
       set({
         conversations,
-        connectedProfiles: connectedProfiles.filter(
-          (profile) => !activeConversationUserIds.has(profile.id),
-        ),
+        connectedProfiles,
         isInboxLoading: false,
         error: null,
       });
