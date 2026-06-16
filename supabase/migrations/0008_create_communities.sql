@@ -51,6 +51,23 @@ CREATE TRIGGER on_community_created
 ALTER TABLE public.communities ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.community_members ENABLE ROW LEVEL SECURITY;
 
+CREATE OR REPLACE FUNCTION public.is_community_member(
+  community_id_input UUID,
+  user_id_input UUID DEFAULT auth.uid()
+)
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.community_members member
+    WHERE member.community_id = community_id_input
+      AND member.user_id = user_id_input
+  );
+$$;
+
 CREATE POLICY "communities_select_authenticated" ON public.communities
   FOR SELECT USING (
     auth.role() = 'authenticated'
@@ -66,11 +83,7 @@ CREATE POLICY "communities_update_creator" ON public.communities
 CREATE POLICY "community_members_select" ON public.community_members
   FOR SELECT USING (
     auth.uid() = user_id
-    OR EXISTS (
-      SELECT 1 FROM public.community_members cm
-      WHERE cm.community_id = community_members.community_id
-        AND cm.user_id = auth.uid()
-    )
+    OR public.is_community_member(community_id)
   );
 
 CREATE POLICY "community_members_insert_open" ON public.community_members
@@ -91,3 +104,5 @@ CREATE INDEX idx_communities_creator ON public.communities (creator_id);
 CREATE INDEX idx_communities_active ON public.communities (is_active) WHERE is_active = TRUE;
 CREATE INDEX idx_community_members_community ON public.community_members (community_id);
 CREATE INDEX idx_community_members_user ON public.community_members (user_id);
+
+GRANT EXECUTE ON FUNCTION public.is_community_member(UUID, UUID) TO authenticated;
