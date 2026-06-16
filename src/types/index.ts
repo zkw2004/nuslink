@@ -72,6 +72,7 @@ export interface Community {
   description: string;
   type: CommunityType;
   join_policy: JoinPolicy;
+  tags: string[];
   creator_id: string;
   is_active: boolean;
   created_at: string;

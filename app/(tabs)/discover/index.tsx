@@ -97,7 +97,8 @@ export default function DiscoverScreen() {
     return communities.filter((community) => {
       return (
         community.name.toLowerCase().includes(normalizedQuery) ||
-        community.description.toLowerCase().includes(normalizedQuery)
+        community.description.toLowerCase().includes(normalizedQuery) ||
+        community.tags.some((tag) => tag.toLowerCase().includes(normalizedQuery))
       );
     });
   }, [communities, normalizedQuery]);
@@ -441,6 +442,9 @@ export default function DiscoverScreen() {
                         label={community.join_policy === "open" ? "Open join" : "Approval later"}
                         variant="outline"
                       />
+                      {community.tags.map((tag) => (
+                        <AppChip key={tag} label={tag} variant="outline" />
+                      ))}
                       {isOwner ? <AppChip label="Owner" variant="solid" /> : null}
                       {community.joined ? <AppChip label="Joined" variant="solid" /> : null}
                     </View>

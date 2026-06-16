@@ -349,6 +349,7 @@ export type Database = {
           is_active: boolean;
           join_policy: "open" | "request_approval";
           name: string;
+          tags: string[];
           type: "official" | "user_created";
           updated_at: string;
         };
@@ -360,6 +361,7 @@ export type Database = {
           is_active?: boolean;
           join_policy?: "open" | "request_approval";
           name: string;
+          tags?: string[];
           type?: "official" | "user_created";
           updated_at?: string;
         };
@@ -371,6 +373,7 @@ export type Database = {
           is_active?: boolean;
           join_policy?: "open" | "request_approval";
           name?: string;
+          tags?: string[];
           type?: "official" | "user_created";
           updated_at?: string;
         };

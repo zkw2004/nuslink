@@ -2,6 +2,7 @@ import { create } from "zustand";
 
 import { supabase } from "@lib/supabase";
 import type { Database } from "@appTypes/database";
+import { createCommunity as createCommunityRequest } from "@services/communitiesService";
 
 type CommunityRow = Database["public"]["Tables"]["communities"]["Row"];
 
@@ -11,15 +12,25 @@ export interface DiscoverCommunity {
   description: string;
   type: CommunityRow["type"];
   join_policy: CommunityRow["join_policy"];
+  tags: string[];
   creator_id: string;
   joined: boolean;
 }
+
+type CreateCommunityInput = {
+  userId: string;
+  name: string;
+  description: string;
+  tags: string[];
+  privacy: "open" | "request_approval";
+};
 
 interface CommunitiesState {
   communities: DiscoverCommunity[];
   isLoading: boolean;
   error: string | null;
   refreshCommunities: (userId?: string | null) => Promise<void>;
+  createCommunity: (input: CreateCommunityInput) => Promise<string>;
   joinCommunity: (communityId: string, userId: string) => Promise<void>;
   reset: () => void;
 }
@@ -34,6 +45,7 @@ function mapCommunities(
     description: community.description,
     type: community.type,
     join_policy: community.join_policy,
+    tags: community.tags ?? [],
     creator_id: community.creator_id,
     joined: joinedCommunityIds.has(community.id),
   }));
@@ -113,6 +125,18 @@ export const useCommunitiesStore = create<CommunitiesState>((set, get) => ({
     }
 
     await get().refreshCommunities(userId);
+  },
+
+  async createCommunity(input) {
+    const createdCommunity = await createCommunityRequest({
+      name: input.name,
+      description: input.description,
+      tags: input.tags,
+      privacy: input.privacy,
+    });
+
+    await get().refreshCommunities(input.userId);
+    return createdCommunity.id;
   },
 
   reset() {
