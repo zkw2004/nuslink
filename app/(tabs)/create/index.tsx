@@ -19,13 +19,22 @@ import {
   SectionHeader,
 } from "@components/shared";
 import { getCurrentSemester, searchNusmodsModules } from "@lib/nusmods";
-import { useAuthStore, useGroupsStore } from "@store/index";
+import { useAuthStore, useCommunitiesStore, useGroupsStore } from "@store/index";
 import { toSelectedModule, type SelectedModule } from "@features/onboarding/types";
 import type { Database } from "@appTypes/database";
 
+type CreateMode = "group" | "community";
 type GroupType = Database["public"]["Tables"]["groups"]["Row"]["type"];
 type PrivacySetting = Database["public"]["Tables"]["groups"]["Row"]["privacy"];
-type SemiPrivateRestriction = Database["public"]["Tables"]["groups"]["Row"]["restriction"];
+type SemiPrivateRestriction =
+  Database["public"]["Tables"]["groups"]["Row"]["restriction"];
+type CommunityJoinPolicy =
+  Database["public"]["Tables"]["communities"]["Row"]["join_policy"];
+
+const createModes: { label: string; value: CreateMode }[] = [
+  { label: "Group", value: "group" },
+  { label: "Community", value: "community" },
+];
 
 const groupTypes = [
   { label: "Study group", value: "study_group" },
@@ -61,6 +70,23 @@ const restrictionOptions: {
   { label: "Same faculty", value: "same_faculty" },
 ];
 
+const communityPrivacyOptions: {
+  label: string;
+  value: CommunityJoinPolicy;
+  helper: string;
+}[] = [
+  {
+    label: "Open join",
+    value: "open",
+    helper: "Any signed-in student can join immediately from Discover.",
+  },
+  {
+    label: "Approval required",
+    value: "request_approval",
+    helper: "Visible in Discover now, with a moderation step supported later.",
+  },
+];
+
 function parseOptionalSize(value: string) {
   const trimmedValue = value.trim();
 
@@ -73,9 +99,16 @@ function parseOptionalSize(value: string) {
   return Number.isNaN(parsedValue) ? null : parsedValue;
 }
 
+function normalizeTag(tag: string) {
+  return tag.trim().replace(/\s+/g, " ");
+}
+
 export default function CreateScreen() {
   const session = useAuthStore((state) => state.session);
   const createGroup = useGroupsStore((state) => state.createGroup);
+  const createCommunity = useCommunitiesStore((state) => state.createCommunity);
+  const [createMode, setCreateMode] = useState<CreateMode>("group");
+
   const [groupName, setGroupName] = useState("");
   const [description, setDescription] = useState("");
   const [venue, setVenue] = useState("");
@@ -91,12 +124,25 @@ export default function CreateScreen() {
   const [selectedModule, setSelectedModule] = useState<SelectedModule | null>(null);
   const [moduleResults, setModuleResults] = useState<SelectedModule[]>([]);
   const [isSearchingModules, setIsSearchingModules] = useState(false);
+
+  const [communityName, setCommunityName] = useState("");
+  const [communityDescription, setCommunityDescription] = useState("");
+  const [communityTags, setCommunityTags] = useState<string[]>([]);
+  const [communityTagInput, setCommunityTagInput] = useState("");
+  const [communityPrivacy, setCommunityPrivacy] =
+    useState<CommunityJoinPolicy>("open");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const currentSemester = useMemo(() => getCurrentSemester(), []);
 
   useEffect(() => {
     let isActive = true;
     const query = moduleQuery.trim();
+
+    if (createMode !== "group") {
+      setModuleResults([]);
+      setIsSearchingModules(false);
+      return;
+    }
 
     if (selectedModule && query.toUpperCase() === selectedModule.moduleCode) {
       setModuleResults([]);
@@ -139,19 +185,45 @@ export default function CreateScreen() {
       isActive = false;
       clearTimeout(timeoutId);
     };
-  }, [moduleQuery, selectedModule]);
+  }, [createMode, moduleQuery, selectedModule]);
 
-  const canCreate = useMemo(() => {
-    return (
-      groupName.trim().length > 0 &&
-      selectedModule !== null
-    );
+  const canCreateGroup = useMemo(() => {
+    return groupName.trim().length > 0 && selectedModule !== null;
   }, [groupName, selectedModule]);
+
+  const canCreateCommunity = useMemo(() => {
+    return communityName.trim().length > 0;
+  }, [communityName]);
 
   function handleSelectModule(module: SelectedModule) {
     setSelectedModule(module);
     setModuleQuery(module.moduleCode);
     setModuleResults([]);
+  }
+
+  function handleAddCommunityTag() {
+    const normalizedTag = normalizeTag(communityTagInput);
+
+    if (!normalizedTag) {
+      return;
+    }
+
+    if (communityTags.some((tag) => tag.toLowerCase() === normalizedTag.toLowerCase())) {
+      Alert.alert("Tag already added", "Choose a different tag for this community.");
+      return;
+    }
+
+    if (communityTags.length >= 6) {
+      Alert.alert("Tag limit reached", "Keep communities to at most 6 tags.");
+      return;
+    }
+
+    setCommunityTags((current) => [...current, normalizedTag.slice(0, 24)]);
+    setCommunityTagInput("");
+  }
+
+  function removeCommunityTag(tagToRemove: string) {
+    setCommunityTags((current) => current.filter((tag) => tag !== tagToRemove));
   }
 
   async function handleCreateGroup() {
@@ -161,7 +233,10 @@ export default function CreateScreen() {
     }
 
     if (!selectedModule) {
-      Alert.alert("Choose a module", "Search NUSMods and choose a module before creating the group.");
+      Alert.alert(
+        "Choose a module",
+        "Search NUSMods and choose a module before creating the group.",
+      );
       return;
     }
 
@@ -172,7 +247,10 @@ export default function CreateScreen() {
       (minSize.trim() && parsedMinSize === null) ||
       (maxSize.trim() && parsedMaxSize === null)
     ) {
-      Alert.alert("Check group size", "Minimum and maximum size must be whole numbers.");
+      Alert.alert(
+        "Check group size",
+        "Minimum and maximum size must be whole numbers.",
+      );
       return;
     }
 
@@ -181,7 +259,10 @@ export default function CreateScreen() {
       parsedMaxSize !== null &&
       parsedMinSize > parsedMaxSize
     ) {
-      Alert.alert("Check group size", "Minimum size cannot be greater than maximum size.");
+      Alert.alert(
+        "Check group size",
+        "Minimum size cannot be greater than maximum size.",
+      );
       return;
     }
 
@@ -207,6 +288,7 @@ export default function CreateScreen() {
         maxSize: parsedMaxSize,
         venue,
       });
+
       setGroupName("");
       setDescription("");
       setVenue("");
@@ -240,11 +322,53 @@ export default function CreateScreen() {
     }
   }
 
+  async function handleCreateCommunity() {
+    if (!session?.user) {
+      Alert.alert(
+        "Sign in required",
+        "Please sign in again before creating a community.",
+      );
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      await createCommunity({
+        userId: session.user.id,
+        name: communityName.trim(),
+        description: communityDescription.trim(),
+        tags: communityTags,
+        privacy: communityPrivacy,
+      });
+
+      setCommunityName("");
+      setCommunityDescription("");
+      setCommunityTagInput("");
+      setCommunityTags([]);
+      setCommunityPrivacy("open");
+      router.replace("/(tabs)/discover");
+    } catch (error) {
+      Alert.alert(
+        "Could not create community",
+        error instanceof Error ? error.message : "Please try again.",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  const isGroupMode = createMode === "group";
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#EEF3F9" }}>
       <AppScreenHeader
-        title="Create Group"
-        subtitle="Create a group for the current semester with public, restricted, or invite-only access."
+        title={isGroupMode ? "Create Group" : "Create Community"}
+        subtitle={
+          isGroupMode
+            ? "Create a group for the current semester with public, restricted, or invite-only access."
+            : "Create a persistent community space for clubs, interests, and semester-spanning collaboration."
+        }
       />
 
       <ScrollView
@@ -253,52 +377,24 @@ export default function CreateScreen() {
         showsVerticalScrollIndicator={false}
       >
         <SectionCard className="mb-4">
-          <SectionHeader title="Group Name" />
-          <TextInput
-            value={groupName}
-            onChangeText={setGroupName}
-            placeholder="e.g. CS2040S Midterm Prep"
-            placeholderTextColor="#9B8C7D"
-            className="rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-4 text-[15px] text-[#0F1115]"
-          />
-          <Text className="mt-2 text-[12px] text-[#9AA0AB]">
-            Keep it clear and easy to scan in Discover.
-          </Text>
-
-          <TextInput
-            value={description}
-            onChangeText={setDescription}
-            multiline
-            textAlignVertical="top"
-            maxLength={500}
-            placeholder="Optional description"
-            placeholderTextColor="#9B8C7D"
-            className="mt-3 min-h-[94px] rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-3 text-[15px] leading-6 text-[#0F1115]"
-          />
-        </SectionCard>
-
-        <SectionCard className="mb-4">
-          <SectionHeader title="Group Type" />
-          <View className="flex-row flex-wrap gap-2">
-            {groupTypes.map((groupType) => {
-              const isSelected = selectedGroupType === groupType.value;
+          <View className="flex-row rounded-full bg-[#EEF2F7] p-1">
+            {createModes.map((mode) => {
+              const isSelected = createMode === mode.value;
 
               return (
                 <Pressable
-                  key={groupType.value}
-                  onPress={() => setSelectedGroupType(groupType.value)}
-                  className={`rounded-full border px-4 py-3 ${
-                    isSelected
-                      ? "border-[#0F1115] bg-[#0F1115]"
-                      : "border-[#E4E9F1] bg-white"
+                  key={mode.value}
+                  onPress={() => setCreateMode(mode.value)}
+                  className={`flex-1 rounded-full px-4 py-3 ${
+                    isSelected ? "bg-[#0F1115]" : "bg-transparent"
                   }`}
                 >
                   <Text
-                    className={`text-[13px] font-semibold ${
+                    className={`text-center text-[13px] font-semibold ${
                       isSelected ? "text-white" : "text-[#5C6370]"
                     }`}
                   >
-                    {groupType.label}
+                    {mode.label}
                   </Text>
                 </Pressable>
               );
@@ -306,167 +402,330 @@ export default function CreateScreen() {
           </View>
         </SectionCard>
 
-        <SectionCard className="mb-4">
-          <SectionHeader title="Module" />
-          <TextInput
-            value={moduleQuery}
-            onChangeText={(nextValue) => {
-              setModuleQuery(nextValue.toUpperCase());
-              if (selectedModule && nextValue.toUpperCase() !== selectedModule.moduleCode) {
-                setSelectedModule(null);
-              }
-            }}
-            autoCapitalize="characters"
-            placeholder="Search NUSMods e.g. CS2040S"
-            placeholderTextColor="#9B8C7D"
-            className="rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-4 text-[15px] uppercase text-[#0F1115]"
-          />
-
-          <Text className="mt-2 text-[12px] text-[#9AA0AB]">
-            Search live NUSMods data and pick the exact module before creating the group.
-          </Text>
-
-          {isSearchingModules ? (
-            <View className="mt-3 items-start">
-              <ActivityIndicator color="#5B7BA3" />
-            </View>
-          ) : null}
-
-          {moduleResults.length > 0 ? (
-            <View className="mt-3 overflow-hidden rounded-2xl border border-[#E4E9F1]">
-              {moduleResults.map((module) => (
-                <Pressable
-                  key={module.moduleCode}
-                  className="border-b border-[#EEF2F7] bg-white px-4 py-3"
-                  onPress={() => handleSelectModule(module)}
-                >
-                  <Text className="text-sm font-bold text-[#0F1115]">
-                    {module.moduleCode}
-                  </Text>
-                  <Text className="mt-1 text-xs leading-4 text-[#5C6370]">
-                    {module.title}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          ) : null}
-
-          {selectedModule ? (
-            <View className="mt-3 flex-row flex-wrap gap-2">
-              <AppChip label={selectedModule.moduleCode} variant="module" />
-              <AppChip label={selectedModule.title} variant="outline" />
-            </View>
-          ) : null}
-        </SectionCard>
-
-        <SectionCard className="mb-5">
-          <SectionHeader title="Privacy" />
-          <View className="gap-2">
-            {privacyOptions.map((option) => {
-              const isSelected = selectedPrivacy === option.value;
-
-              return (
-                <Pressable
-                  key={option.value}
-                  className={`rounded-[16px] border px-4 py-3 ${
-                    isSelected
-                      ? "border-[#0F1115] bg-[#E7EEF7]"
-                      : "border-[#E4E9F1] bg-white"
-                  }`}
-                  onPress={() => setSelectedPrivacy(option.value)}
-                >
-                  <Text className="text-[14px] font-bold text-[#0F1115]">
-                    {option.label}
-                  </Text>
-                  <Text className="mt-1 text-[12px] leading-5 text-[#5C6370]">
-                    {option.helper}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          {selectedPrivacy === "semi_private" ? (
-            <View className="mt-4">
-              <Text className="mb-2 text-[13px] font-semibold text-[#5C6370]">
-                Join rule
+        {isGroupMode ? (
+          <>
+            <SectionCard className="mb-4">
+              <SectionHeader title="Group Name" />
+              <TextInput
+                value={groupName}
+                onChangeText={setGroupName}
+                placeholder="e.g. CS2040S Midterm Prep"
+                placeholderTextColor="#9B8C7D"
+                className="rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-4 text-[15px] text-[#0F1115]"
+              />
+              <Text className="mt-2 text-[12px] text-[#9AA0AB]">
+                Keep it clear and easy to scan in Discover.
               </Text>
+
+              <TextInput
+                value={description}
+                onChangeText={setDescription}
+                multiline
+                textAlignVertical="top"
+                maxLength={500}
+                placeholder="Optional description"
+                placeholderTextColor="#9B8C7D"
+                className="mt-3 min-h-[94px] rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-3 text-[15px] leading-6 text-[#0F1115]"
+              />
+            </SectionCard>
+
+            <SectionCard className="mb-4">
+              <SectionHeader title="Group Type" />
               <View className="flex-row flex-wrap gap-2">
-                {restrictionOptions.map((restriction) => {
-                  const isSelected = selectedRestriction === restriction.value;
+                {groupTypes.map((groupType) => {
+                  const isSelected = selectedGroupType === groupType.value;
 
                   return (
                     <Pressable
-                      key={restriction.value}
-                      className={`rounded-full border px-4 py-2 ${
+                      key={groupType.value}
+                      onPress={() => setSelectedGroupType(groupType.value)}
+                      className={`rounded-full border px-4 py-3 ${
                         isSelected
                           ? "border-[#0F1115] bg-[#0F1115]"
                           : "border-[#E4E9F1] bg-white"
                       }`}
-                      onPress={() => setSelectedRestriction(restriction.value)}
                     >
                       <Text
                         className={`text-[13px] font-semibold ${
                           isSelected ? "text-white" : "text-[#5C6370]"
                         }`}
                       >
-                        {restriction.label}
+                        {groupType.label}
                       </Text>
                     </Pressable>
                   );
                 })}
               </View>
-            </View>
-          ) : null}
-        </SectionCard>
+            </SectionCard>
 
-        <SectionCard className="mb-5">
-          <SectionHeader title="Optional Details" />
-          <View className="gap-3">
-            <TextInput
-              value={venue}
-              onChangeText={setVenue}
-              placeholder="Venue e.g. COM3 level 2"
-              placeholderTextColor="#9B8C7D"
-              className="rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-4 text-[15px] text-[#0F1115]"
+            <SectionCard className="mb-4">
+              <SectionHeader title="Module" />
+              <TextInput
+                value={moduleQuery}
+                onChangeText={(nextValue) => {
+                  setModuleQuery(nextValue.toUpperCase());
+                  if (
+                    selectedModule &&
+                    nextValue.toUpperCase() !== selectedModule.moduleCode
+                  ) {
+                    setSelectedModule(null);
+                  }
+                }}
+                autoCapitalize="characters"
+                placeholder="Search NUSMods e.g. CS2040S"
+                placeholderTextColor="#9B8C7D"
+                className="rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-4 text-[15px] uppercase text-[#0F1115]"
+              />
+
+              <Text className="mt-2 text-[12px] text-[#9AA0AB]">
+                Search live NUSMods data and pick the exact module before creating the group.
+              </Text>
+
+              {isSearchingModules ? (
+                <View className="mt-3 items-start">
+                  <ActivityIndicator color="#5B7BA3" />
+                </View>
+              ) : null}
+
+              {moduleResults.length > 0 ? (
+                <View className="mt-3 overflow-hidden rounded-2xl border border-[#E4E9F1]">
+                  {moduleResults.map((module) => (
+                    <Pressable
+                      key={module.moduleCode}
+                      className="border-b border-[#EEF2F7] bg-white px-4 py-3"
+                      onPress={() => handleSelectModule(module)}
+                    >
+                      <Text className="text-sm font-bold text-[#0F1115]">
+                        {module.moduleCode}
+                      </Text>
+                      <Text className="mt-1 text-xs leading-4 text-[#5C6370]">
+                        {module.title}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : null}
+
+              {selectedModule ? (
+                <View className="mt-3 flex-row flex-wrap gap-2">
+                  <AppChip label={selectedModule.moduleCode} variant="module" />
+                  <AppChip label={selectedModule.title} variant="outline" />
+                </View>
+              ) : null}
+            </SectionCard>
+
+            <SectionCard className="mb-5">
+              <SectionHeader title="Privacy" />
+              <View className="gap-2">
+                {privacyOptions.map((option) => {
+                  const isSelected = selectedPrivacy === option.value;
+
+                  return (
+                    <Pressable
+                      key={option.value}
+                      className={`rounded-[16px] border px-4 py-3 ${
+                        isSelected
+                          ? "border-[#0F1115] bg-[#E7EEF7]"
+                          : "border-[#E4E9F1] bg-white"
+                      }`}
+                      onPress={() => setSelectedPrivacy(option.value)}
+                    >
+                      <Text className="text-[14px] font-bold text-[#0F1115]">
+                        {option.label}
+                      </Text>
+                      <Text className="mt-1 text-[12px] leading-5 text-[#5C6370]">
+                        {option.helper}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              {selectedPrivacy === "semi_private" ? (
+                <View className="mt-4">
+                  <Text className="mb-2 text-[13px] font-semibold text-[#5C6370]">
+                    Join rule
+                  </Text>
+                  <View className="flex-row flex-wrap gap-2">
+                    {restrictionOptions.map((restriction) => {
+                      const isSelected = selectedRestriction === restriction.value;
+
+                      return (
+                        <Pressable
+                          key={restriction.value}
+                          className={`rounded-full border px-4 py-2 ${
+                            isSelected
+                              ? "border-[#0F1115] bg-[#0F1115]"
+                              : "border-[#E4E9F1] bg-white"
+                          }`}
+                          onPress={() => setSelectedRestriction(restriction.value)}
+                        >
+                          <Text
+                            className={`text-[13px] font-semibold ${
+                              isSelected ? "text-white" : "text-[#5C6370]"
+                            }`}
+                          >
+                            {restriction.label}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+              ) : null}
+            </SectionCard>
+
+            <SectionCard className="mb-5">
+              <SectionHeader title="Optional Details" />
+              <View className="gap-3">
+                <TextInput
+                  value={venue}
+                  onChangeText={setVenue}
+                  placeholder="Venue e.g. COM3 level 2"
+                  placeholderTextColor="#9B8C7D"
+                  className="rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-4 text-[15px] text-[#0F1115]"
+                />
+
+                <View className="flex-row gap-3">
+                  <TextInput
+                    value={minSize}
+                    onChangeText={setMinSize}
+                    inputMode="numeric"
+                    keyboardType="number-pad"
+                    placeholder="Min size"
+                    placeholderTextColor="#9B8C7D"
+                    className="flex-1 rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-4 text-[15px] text-[#0F1115]"
+                  />
+                  <TextInput
+                    value={maxSize}
+                    onChangeText={setMaxSize}
+                    inputMode="numeric"
+                    keyboardType="number-pad"
+                    placeholder="Max size"
+                    placeholderTextColor="#9B8C7D"
+                    className="flex-1 rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-4 text-[15px] text-[#0F1115]"
+                  />
+                </View>
+              </View>
+            </SectionCard>
+
+            <View className="mb-3 flex-row flex-wrap gap-2">
+              <AppChip label="Manual flow" />
+              <AppChip label="NUSMods search" variant="outline" />
+              <AppChip label={currentSemester.semester} variant="outline" />
+            </View>
+
+            <AppButton
+              label={isSubmitting ? "Creating..." : "Create group"}
+              disabled={!canCreateGroup || isSubmitting}
+              onPress={() => {
+                void handleCreateGroup();
+              }}
             />
+          </>
+        ) : (
+          <>
+            <SectionCard className="mb-4">
+              <SectionHeader title="Community Name" />
+              <TextInput
+                value={communityName}
+                onChangeText={setCommunityName}
+                placeholder="e.g. Product Builders @ NUS"
+                placeholderTextColor="#9B8C7D"
+                className="rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-4 text-[15px] text-[#0F1115]"
+              />
+              <Text className="mt-2 text-[12px] text-[#9AA0AB]">
+                Choose a clear name people will recognise in Discover.
+              </Text>
 
-            <View className="flex-row gap-3">
               <TextInput
-                value={minSize}
-                onChangeText={setMinSize}
-                inputMode="numeric"
-                keyboardType="number-pad"
-                placeholder="Min size"
+                value={communityDescription}
+                onChangeText={setCommunityDescription}
+                multiline
+                textAlignVertical="top"
+                maxLength={500}
+                placeholder="What is this community for?"
                 placeholderTextColor="#9B8C7D"
-                className="flex-1 rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-4 text-[15px] text-[#0F1115]"
+                className="mt-3 min-h-[94px] rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-3 text-[15px] leading-6 text-[#0F1115]"
               />
-              <TextInput
-                value={maxSize}
-                onChangeText={setMaxSize}
-                inputMode="numeric"
-                keyboardType="number-pad"
-                placeholder="Max size"
-                placeholderTextColor="#9B8C7D"
-                className="flex-1 rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-4 text-[15px] text-[#0F1115]"
-              />
+            </SectionCard>
+
+            <SectionCard className="mb-4">
+              <SectionHeader title="Tags" />
+              <View className="flex-row gap-3">
+                <TextInput
+                  value={communityTagInput}
+                  onChangeText={setCommunityTagInput}
+                  placeholder="e.g. startups"
+                  placeholderTextColor="#9B8C7D"
+                  className="flex-1 rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-4 text-[15px] text-[#0F1115]"
+                />
+                <Pressable
+                  onPress={handleAddCommunityTag}
+                  className="items-center justify-center rounded-[14px] bg-[#0F1115] px-5"
+                >
+                  <Text className="text-[13px] font-semibold text-white">Add</Text>
+                </Pressable>
+              </View>
+
+              <Text className="mt-2 text-[12px] text-[#9AA0AB]">
+                Add up to 6 tags so students can discover this space faster.
+              </Text>
+
+              {communityTags.length > 0 ? (
+                <View className="mt-3 flex-row flex-wrap gap-2">
+                  {communityTags.map((tag) => (
+                    <Pressable key={tag} onPress={() => removeCommunityTag(tag)}>
+                      <AppChip label={`${tag} ×`} variant="outline" />
+                    </Pressable>
+                  ))}
+                </View>
+              ) : null}
+            </SectionCard>
+
+            <SectionCard className="mb-5">
+              <SectionHeader title="Privacy" />
+              <View className="gap-2">
+                {communityPrivacyOptions.map((option) => {
+                  const isSelected = communityPrivacy === option.value;
+
+                  return (
+                    <Pressable
+                      key={option.value}
+                      className={`rounded-[16px] border px-4 py-3 ${
+                        isSelected
+                          ? "border-[#0F1115] bg-[#E7EEF7]"
+                          : "border-[#E4E9F1] bg-white"
+                      }`}
+                      onPress={() => setCommunityPrivacy(option.value)}
+                    >
+                      <Text className="text-[14px] font-bold text-[#0F1115]">
+                        {option.label}
+                      </Text>
+                      <Text className="mt-1 text-[12px] leading-5 text-[#5C6370]">
+                        {option.helper}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </SectionCard>
+
+            <View className="mb-3 flex-row flex-wrap gap-2">
+              <AppChip label="Persistent space" />
+              <AppChip label="Discover community" variant="outline" />
+              <AppChip label="Creator becomes admin" variant="outline" />
             </View>
-          </View>
-        </SectionCard>
 
-        <View className="mb-3 flex-row flex-wrap gap-2">
-          <AppChip label="Manual flow" />
-          <AppChip label="NUSMods search" variant="outline" />
-          <AppChip label={currentSemester.semester} variant="outline" />
-        </View>
-
-        <AppButton
-          label={isSubmitting ? "Creating..." : "Create group"}
-          disabled={!canCreate || isSubmitting}
-          onPress={() => {
-            void handleCreateGroup();
-          }}
-        />
+            <AppButton
+              label={isSubmitting ? "Creating..." : "Create community"}
+              disabled={!canCreateCommunity || isSubmitting}
+              onPress={() => {
+                void handleCreateCommunity();
+              }}
+            />
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );

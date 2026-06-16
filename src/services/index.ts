@@ -1,3 +1,4 @@
+export * from "./communitiesService";
 export * from "./connectionsService";
 export * from "./directMessagesService";
 export * from "./matchingService";
