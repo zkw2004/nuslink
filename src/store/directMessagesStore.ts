@@ -3,6 +3,7 @@ import { create } from "zustand";
 import type {
   ConnectedProfilePreview,
   DirectConversationSummary,
+  DirectMessageAttachmentInput,
   DirectMessage,
 } from "@appTypes/index";
 import {
@@ -11,6 +12,7 @@ import {
   fetchDirectMessages,
   getOrCreateDirectConversation,
   sendDirectMessage,
+  subscribeToDirectMessages,
 } from "@services/directMessagesService";
 
 interface DirectMessagesState {
@@ -28,7 +30,10 @@ interface DirectMessagesState {
     conversationId: string,
     body: string,
     userId: string,
+    attachment?: DirectMessageAttachmentInput | null,
   ) => Promise<void>;
+  appendMessage: (message: DirectMessage) => void;
+  subscribeToConversation: (conversationId: string, userId: string) => () => void;
   reset: () => void;
 }
 
@@ -108,11 +113,11 @@ export const useDirectMessagesStore = create<DirectMessagesState>((set, get) => 
     }
   },
 
-  async sendMessage(conversationId, body, userId) {
+  async sendMessage(conversationId, body, userId, attachment) {
     set({ isSending: true, error: null });
 
     try {
-      await sendDirectMessage(conversationId, body);
+      await sendDirectMessage(conversationId, body, attachment);
       const [messages] = await Promise.all([
         fetchDirectMessages(conversationId),
         get().refreshInbox(userId),
@@ -136,6 +141,35 @@ export const useDirectMessagesStore = create<DirectMessagesState>((set, get) => 
       });
       throw error;
     }
+  },
+
+  appendMessage(message) {
+    set((state) => {
+      const existingMessages = state.messagesByConversation[message.conversation_id] ?? [];
+
+      if (existingMessages.some((existingMessage) => existingMessage.id === message.id)) {
+        return state;
+      }
+
+      const nextMessages = [...existingMessages, message].sort(
+        (left, right) =>
+          new Date(left.created_at).getTime() - new Date(right.created_at).getTime(),
+      );
+
+      return {
+        messagesByConversation: {
+          ...state.messagesByConversation,
+          [message.conversation_id]: nextMessages,
+        },
+      };
+    });
+  },
+
+  subscribeToConversation(conversationId, userId) {
+    return subscribeToDirectMessages(conversationId, (message) => {
+      get().appendMessage(message);
+      void get().refreshInbox(userId);
+    });
   },
 
   reset() {

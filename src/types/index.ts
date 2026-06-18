@@ -169,6 +169,19 @@ export interface DirectMessage {
   id: string;
   conversation_id: string;
   sender_id: string;
-  body: string;
+  body: string | null;
+  attachment_url: string | null;
+  attachment_name: string | null;
+  attachment_mime_type: string | null;
+  attachment_size: number | null;
+  attachment_kind: "image" | "file" | null;
   created_at: string;
+}
+
+export interface DirectMessageAttachmentInput {
+  url: string;
+  name: string;
+  mime_type: string;
+  size: number | null;
+  kind: "image" | "file";
 }

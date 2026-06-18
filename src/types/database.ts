@@ -231,21 +231,36 @@ export type Database = {
       };
       direct_messages: {
         Row: {
-          body: string;
+          attachment_kind: "image" | "file" | null;
+          attachment_mime_type: string | null;
+          attachment_name: string | null;
+          attachment_size: number | null;
+          attachment_url: string | null;
+          body: string | null;
           conversation_id: string;
           created_at: string;
           id: string;
           sender_id: string;
         };
         Insert: {
-          body: string;
+          attachment_kind?: "image" | "file" | null;
+          attachment_mime_type?: string | null;
+          attachment_name?: string | null;
+          attachment_size?: number | null;
+          attachment_url?: string | null;
+          body?: string | null;
           conversation_id: string;
           created_at?: string;
           id?: string;
           sender_id: string;
         };
         Update: {
-          body?: string;
+          attachment_kind?: "image" | "file" | null;
+          attachment_mime_type?: string | null;
+          attachment_name?: string | null;
+          attachment_size?: number | null;
+          attachment_url?: string | null;
+          body?: string | null;
           conversation_id?: string;
           created_at?: string;
           id?: string;
@@ -491,7 +506,12 @@ export type Database = {
       };
       send_direct_message: {
         Args: {
-          body_input: string;
+          attachment_kind_input?: "image" | "file" | null;
+          attachment_mime_type_input?: string | null;
+          attachment_name_input?: string | null;
+          attachment_size_input?: number | null;
+          attachment_url_input?: string | null;
+          body_input?: string | null;
           conversation_id_input: string;
         };
         Returns: string;
