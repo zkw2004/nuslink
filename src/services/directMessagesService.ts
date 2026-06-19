@@ -2,6 +2,7 @@ import { supabase } from "@lib/supabase";
 import type {
   ConnectedProfilePreview,
   DirectConversationSummary,
+  DirectMessageAttachmentInput,
   DirectMessage,
 } from "@appTypes/index";
 import type { Database } from "@appTypes/database";
@@ -14,6 +15,17 @@ type DirectConversationMemberRow =
   Database["public"]["Tables"]["direct_conversation_members"]["Row"];
 type DirectMessageRow = Database["public"]["Tables"]["direct_messages"]["Row"];
 
+type ChatAttachmentUpload = {
+  bytes: ArrayBuffer;
+  uri: string;
+  name: string;
+  mimeType: string;
+  size: number | null;
+  kind: "image" | "file";
+};
+
+const CHAT_ATTACHMENTS_BUCKET = "chat-attachments";
+
 function mapProfileToPreview(profile: ProfileRow): ConnectedProfilePreview {
   return {
     id: profile.id,
@@ -23,6 +35,74 @@ function mapProfileToPreview(profile: ProfileRow): ConnectedProfilePreview {
     year_of_study: profile.year_of_study,
     badge_tier: profile.badge_tier,
   };
+}
+
+function getFileExtension(uri: string, mimeType: string, name: string) {
+  const source = name || uri;
+  const match = source.match(/\.([a-zA-Z0-9]+)(?:\?|#|$)/);
+
+  if (match?.[1]) {
+    return match[1].toLowerCase();
+  }
+
+  switch (mimeType) {
+    case "image/jpeg":
+      return "jpg";
+    case "image/png":
+      return "png";
+    case "image/webp":
+      return "webp";
+    case "image/gif":
+      return "gif";
+    case "application/pdf":
+      return "pdf";
+    case "text/plain":
+      return "txt";
+    default:
+      return "bin";
+  }
+}
+
+function sanitizeFileName(name: string) {
+  const trimmedName = name.trim() || "attachment";
+  return trimmedName.replace(/[^a-zA-Z0-9._-]/g, "-").slice(0, 80);
+}
+
+function stripFileExtension(name: string) {
+  return name.replace(/\.[a-zA-Z0-9]+$/, "") || "attachment";
+}
+
+function mapDirectMessage(message: DirectMessageRow): DirectMessage {
+  return {
+    id: message.id,
+    conversation_id: message.conversation_id,
+    sender_id: message.sender_id,
+    body: message.body,
+    attachment_url: message.attachment_url,
+    attachment_name: message.attachment_name,
+    attachment_mime_type: message.attachment_mime_type,
+    attachment_size: message.attachment_size,
+    attachment_kind: message.attachment_kind,
+    created_at: message.created_at,
+  };
+}
+
+function getMessagePreview(message: DirectMessageRow) {
+  if (message.body?.trim()) {
+    return message.body;
+  }
+
+  if (message.attachment_kind === "image") {
+    return "Photo attachment";
+  }
+
+  if (message.attachment_url) {
+    return message.attachment_name
+      ? `File: ${message.attachment_name}`
+      : "File attachment";
+  }
+
+  return null;
 }
 
 function buildConnectedUserIds(userId: string, connections: ConnectionRow[]) {
@@ -185,7 +265,7 @@ export async function fetchDirectConversations(userId: string) {
       return {
         id: conversation.id,
         other_user: otherUser,
-        last_message_preview: lastMessage?.body ?? null,
+        last_message_preview: lastMessage ? getMessagePreview(lastMessage) : null,
         last_message_at: lastMessage?.created_at ?? null,
         updated_at: conversation.updated_at,
       };
@@ -265,24 +345,73 @@ export async function fetchDirectMessages(conversationId: string) {
   }
 
   return ((data ?? []) as DirectMessageRow[]).map(
-    (message): DirectMessage => ({
-      id: message.id,
-      conversation_id: message.conversation_id,
-      sender_id: message.sender_id,
-      body: message.body,
-      created_at: message.created_at,
-    }),
+    (message): DirectMessage => mapDirectMessage(message),
   );
 }
 
-export async function sendDirectMessage(conversationId: string, body: string) {
+export async function uploadChatAttachment(
+  attachment: ChatAttachmentUpload,
+): Promise<DirectMessageAttachmentInput> {
+  if (!supabase) {
+    throw new Error("Supabase is not configured.");
+  }
+
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+
+  if (userError || !userData.user) {
+    throw new Error(userError?.message ?? "Please sign in again.");
+  }
+
+  const safeName = sanitizeFileName(attachment.name);
+  const safeBaseName = stripFileExtension(safeName);
+  const extension = getFileExtension(
+    attachment.uri,
+    attachment.mimeType,
+    safeName,
+  );
+  const filePath = `${userData.user.id}/${Date.now()}-${safeBaseName}.${extension}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from(CHAT_ATTACHMENTS_BUCKET)
+    .upload(filePath, attachment.bytes, {
+      contentType: attachment.mimeType,
+      upsert: false,
+    });
+
+  if (uploadError) {
+    throw new Error(uploadError.message);
+  }
+
+  const { data } = supabase.storage
+    .from(CHAT_ATTACHMENTS_BUCKET)
+    .getPublicUrl(filePath);
+
+  return {
+    url: data.publicUrl,
+    name: safeName,
+    mime_type: attachment.mimeType,
+    size: attachment.size,
+    kind: attachment.kind,
+  };
+}
+
+export async function sendDirectMessage(
+  conversationId: string,
+  body: string,
+  attachment?: DirectMessageAttachmentInput | null,
+) {
   if (!supabase) {
     throw new Error("Supabase is not configured.");
   }
 
   const { data, error } = await supabase.rpc("send_direct_message", {
     conversation_id_input: conversationId,
-    body_input: body,
+    body_input: body.trim() || null,
+    attachment_url_input: attachment?.url ?? null,
+    attachment_name_input: attachment?.name ?? null,
+    attachment_mime_type_input: attachment?.mime_type ?? null,
+    attachment_size_input: attachment?.size ?? null,
+    attachment_kind_input: attachment?.kind ?? null,
   });
 
   if (error) {
@@ -290,4 +419,34 @@ export async function sendDirectMessage(conversationId: string, body: string) {
   }
 
   return data;
+}
+
+export function subscribeToDirectMessages(
+  conversationId: string,
+  onMessage: (message: DirectMessage) => void,
+) {
+  if (!supabase) {
+    throw new Error("Supabase is not configured.");
+  }
+
+  const supabaseClient = supabase;
+  const channel = supabaseClient
+    .channel(`direct-messages:${conversationId}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "INSERT",
+        schema: "public",
+        table: "direct_messages",
+        filter: `conversation_id=eq.${conversationId}`,
+      },
+      (payload) => {
+        onMessage(mapDirectMessage(payload.new as DirectMessageRow));
+      },
+    )
+    .subscribe();
+
+  return () => {
+    void supabaseClient.removeChannel(channel);
+  };
 }
