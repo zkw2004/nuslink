@@ -11,7 +11,6 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
-import * as DocumentPicker from "expo-document-picker";
 import { File as ExpoFile } from "expo-file-system";
 import * as ImagePicker from "expo-image-picker";
 import { SymbolView } from "expo-symbols";
@@ -27,6 +26,25 @@ type PendingAttachment = {
   mimeType: string;
   size: number | null;
   kind: "image" | "file";
+};
+
+type DocumentPickerModule = {
+  getDocumentAsync: (options: {
+    copyToCacheDirectory: boolean;
+    multiple: boolean;
+    type: string[];
+  }) => Promise<
+    | { canceled: true }
+    | {
+        canceled: false;
+        assets: {
+          uri: string;
+          name: string;
+          mimeType?: string;
+          size?: number;
+        }[];
+      }
+  >;
 };
 
 function toBadgeTierLabel(tier: "bronze" | "silver" | "gold" | null) {
@@ -217,8 +235,21 @@ export default function ConversationThreadScreen() {
     });
   }
 
-  async function handlePickFile() {
-    const result = await DocumentPicker.getDocumentAsync({
+async function handlePickFile() {
+    let documentPicker: DocumentPickerModule;
+
+    try {
+      // eslint-disable-next-line import/no-unresolved
+      documentPicker = (await import("expo-document-picker")) as DocumentPickerModule;
+    } catch {
+      Alert.alert(
+        "File picker unavailable",
+        "Install project dependencies again on this machine before sending file attachments.",
+      );
+      return;
+    }
+
+    const result = await documentPicker.getDocumentAsync({
       copyToCacheDirectory: true,
       multiple: false,
       type: [
