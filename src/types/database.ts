@@ -442,6 +442,45 @@ export type Database = {
         };
         Relationships: [];
       };
+      shared_resources: {
+        Row: {
+          community_id: string | null;
+          created_at: string;
+          file_path: string;
+          file_url: string;
+          group_id: string | null;
+          id: string;
+          mime_type: string;
+          name: string;
+          owner_id: string;
+          size_bytes: number;
+        };
+        Insert: {
+          community_id?: string | null;
+          created_at?: string;
+          file_path: string;
+          file_url: string;
+          group_id?: string | null;
+          id?: string;
+          mime_type: string;
+          name: string;
+          owner_id: string;
+          size_bytes: number;
+        };
+        Update: {
+          community_id?: string | null;
+          created_at?: string;
+          file_path?: string;
+          file_url?: string;
+          group_id?: string | null;
+          id?: string;
+          mime_type?: string;
+          name?: string;
+          owner_id?: string;
+          size_bytes?: number;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {

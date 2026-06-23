@@ -206,3 +206,16 @@ export interface CommunityChatMessage {
   created_at: string;
   sender_profile: ConnectedProfilePreview;
 }
+
+export interface SharedResource {
+  id: string;
+  owner_id: string;
+  group_id: string | null;
+  community_id: string | null;
+  name: string;
+  file_url: string;
+  file_path: string;
+  mime_type: string;
+  size_bytes: number;
+  created_at: string;
+}

@@ -371,19 +371,43 @@ export default function DiscoverScreen() {
 
                           <View className="min-w-[104px] flex-row gap-2">
                             {isOwner ? (
-                              <AppButton
-                                label="Delete"
-                                variant="secondary"
-                                onPress={() => handleDeleteGroup(group.id, group.name)}
-                              />
+                              <>
+                                <AppButton
+                                  label="Resources"
+                                  variant="secondary"
+                                  onPress={() => {
+                                    router.push(
+                                      `/discover/group/${group.id}/resources` as never,
+                                    );
+                                  }}
+                                />
+                                <AppButton
+                                  label="Delete"
+                                  variant="secondary"
+                                  onPress={() => handleDeleteGroup(group.id, group.name)}
+                                />
+                              </>
                             ) : needsInvite ? null : (
-                              <AppButton
-                                label={actionLabel}
-                                disabled={!canJoinVisibleGroup}
-                                onPress={() => {
-                                  void handleJoinGroup(group.id);
-                                }}
-                              />
+                              <>
+                                {group.joined ? (
+                                  <AppButton
+                                    label="Resources"
+                                    variant="secondary"
+                                    onPress={() => {
+                                      router.push(
+                                        `/discover/group/${group.id}/resources` as never,
+                                      );
+                                    }}
+                                  />
+                                ) : null}
+                                <AppButton
+                                  label={actionLabel}
+                                  disabled={!canJoinVisibleGroup}
+                                  onPress={() => {
+                                    void handleJoinGroup(group.id);
+                                  }}
+                                />
+                              </>
                             )}
                           </View>
                         </View>
