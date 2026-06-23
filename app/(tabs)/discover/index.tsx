@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import {
@@ -460,13 +461,23 @@ export default function DiscoverScreen() {
                     </Text>
 
                     <View className="min-w-[104px] flex-row gap-2">
-                      <AppButton
-                        label={community.joined ? "Joined" : "Join"}
-                        disabled={community.joined || community.join_policy !== "open"}
-                        onPress={() => {
-                          void handleJoinCommunity(community.id);
-                        }}
-                      />
+                      {community.joined || isOwner ? (
+                        <AppButton
+                          label="Open chat"
+                          variant="secondary"
+                          onPress={() => {
+                            router.push(`/chats/community/${community.id}` as never);
+                          }}
+                        />
+                      ) : (
+                        <AppButton
+                          label="Join"
+                          disabled={community.join_policy !== "open"}
+                          onPress={() => {
+                            void handleJoinCommunity(community.id);
+                          }}
+                        />
+                      )}
                     </View>
                   </View>
                 </SectionCard>

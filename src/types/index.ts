@@ -185,3 +185,24 @@ export interface DirectMessageAttachmentInput {
   size: number | null;
   kind: "image" | "file";
 }
+
+export interface CommunityChatSummary {
+  id: string;
+  name: string;
+  description: string;
+  type: CommunityType;
+  join_policy: JoinPolicy;
+  tags: string[];
+  creator_id: string;
+  last_message_preview: string | null;
+  last_message_at: string | null;
+}
+
+export interface CommunityChatMessage {
+  id: string;
+  community_id: string;
+  sender_id: string;
+  body: string;
+  created_at: string;
+  sender_profile: ConnectedProfilePreview;
+}

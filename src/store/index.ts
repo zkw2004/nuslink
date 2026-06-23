@@ -1,4 +1,5 @@
 export * from "./authStore";
+export * from "./communityMessagesStore";
 export * from "./communitiesStore";
 export * from "./connectionsStore";
 export * from "./directMessagesStore";

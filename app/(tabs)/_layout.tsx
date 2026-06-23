@@ -78,6 +78,7 @@ export default function TabLayout() {
         name="chats"
         options={{
           title: "Chats",
+          popToTopOnBlur: true,
           tabBarIcon: ({ color }) => (
             <SymbolView
               name={{
