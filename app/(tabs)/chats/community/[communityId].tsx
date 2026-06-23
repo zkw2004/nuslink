@@ -108,7 +108,7 @@ export default function CommunityChatThreadScreen() {
       <View className="px-5 pb-4 pt-3">
         <View className="flex-row items-center gap-3">
           <Pressable
-            onPress={() => router.back()}
+            onPress={() => router.replace("/(tabs)/chats")}
             className="rounded-full bg-white px-4 py-3"
           >
             <Text className="text-[13px] font-semibold text-[#0F1115]">Back</Text>
