@@ -7,3 +7,4 @@ export * from "./directMessagesStore";
 export * from "./groupsStore";
 export * from "./matchesStore";
 export * from "./onboardingStore";
+export * from "./sharedResourcesStore";

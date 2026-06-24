@@ -21,6 +21,7 @@ export type BadgeTier = "bronze" | "silver" | "gold";
 export type CommunityType = "official" | "user_created";
 
 export type JoinPolicy = "open" | "request_approval";
+export type ChatAttachmentKind = "image" | "file" | "audio" | "video";
 
 export type UserRole = "member" | "co_admin" | "admin";
 export type TimetableSource = "manual" | "nusmods";
@@ -174,7 +175,7 @@ export interface DirectMessage {
   attachment_name: string | null;
   attachment_mime_type: string | null;
   attachment_size: number | null;
-  attachment_kind: "image" | "file" | null;
+  attachment_kind: ChatAttachmentKind | null;
   created_at: string;
 }
 
@@ -183,7 +184,7 @@ export interface DirectMessageAttachmentInput {
   name: string;
   mime_type: string;
   size: number | null;
-  kind: "image" | "file";
+  kind: ChatAttachmentKind;
 }
 
 export type ChatKind = "direct" | "community";
@@ -230,7 +231,25 @@ export interface CommunityChatMessage {
   id: string;
   community_id: string;
   sender_id: string;
-  body: string;
+  body: string | null;
+  attachment_url: string | null;
+  attachment_name: string | null;
+  attachment_mime_type: string | null;
+  attachment_size: number | null;
+  attachment_kind: ChatAttachmentKind | null;
   created_at: string;
   sender_profile: ConnectedProfilePreview;
+}
+
+export interface SharedResource {
+  id: string;
+  owner_id: string;
+  group_id: string | null;
+  community_id: string | null;
+  name: string;
+  file_url: string;
+  file_path: string;
+  mime_type: string;
+  size_bytes: number;
+  created_at: string;
 }
