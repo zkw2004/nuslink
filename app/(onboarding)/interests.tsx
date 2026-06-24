@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Pressable,
   View,
@@ -10,13 +10,10 @@ import {
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import {
-  INTEREST_TAG_OPTIONS,
-  MAX_CUSTOM_INTEREST_TAGS,
-} from "@constants/index";
+import { INTEREST_TAG_OPTIONS } from "@constants/index";
+import { searchInterestTagSuggestions } from "@services/index";
 import { useAuthStore, useOnboardingStore } from "@store/index";
 import {
-  canAddCustomInterest,
   normalizeInterestTag,
   normalizeInterestTags,
   splitInterestTags,
@@ -40,6 +37,30 @@ export default function InterestsScreen() {
   const [customTags, setCustomTags] = useState<string[]>(initialCustomTags);
   const [customInput, setCustomInput] = useState("");
   const [showCustomInput, setShowCustomInput] = useState(false);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+
+  useEffect(() => {
+    const trimmedInput = customInput.trim();
+
+    if (trimmedInput.length < 2) {
+      setSuggestions([]);
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      void searchInterestTagSuggestions(trimmedInput)
+        .then((nextSuggestions) => {
+          setSuggestions(
+            nextSuggestions.filter((suggestion) => !selected.has(suggestion)),
+          );
+        })
+        .catch(() => {
+          setSuggestions([]);
+        });
+    }, 200);
+
+    return () => clearTimeout(timeoutId);
+  }, [customInput, selected]);
 
   function toggleInterest(interest: string) {
     setSelected((prev) => {
@@ -52,13 +73,8 @@ export default function InterestsScreen() {
 
   function addCustomTag() {
     const tag = normalizeInterestTag(customInput);
-    const currentSelected = Array.from(selected);
 
-    if (!tag || currentSelected.includes(tag)) {
-      return;
-    }
-
-    if (!canAddCustomInterest(currentSelected)) {
+    if (!tag || selected.has(tag)) {
       return;
     }
 
@@ -68,6 +84,19 @@ export default function InterestsScreen() {
 
     setSelected((prev) => new Set([...prev, tag]));
     setCustomInput("");
+    setShowCustomInput(false);
+    setSuggestions([]);
+  }
+
+  function applySuggestion(tag: string) {
+    setSelected((prev) => new Set([...prev, tag]));
+
+    if (!INTEREST_TAG_OPTIONS.includes(tag as (typeof INTEREST_TAG_OPTIONS)[number])) {
+      setCustomTags((prev) => (prev.includes(tag) ? prev : [...prev, tag]));
+    }
+
+    setCustomInput("");
+    setSuggestions([]);
     setShowCustomInput(false);
   }
 
@@ -167,11 +196,33 @@ export default function InterestsScreen() {
               Use the shared tag bank first
             </Text>
             <Text className="text-xs text-gray-500 mt-1 leading-relaxed">
-              Choose the canonical interest tags where possible, then add up to{" "}
-              {MAX_CUSTOM_INTEREST_TAGS} niche custom tags if you need them.
+              The built-in tags give the best match quality, but you can still add
+              custom ones for niche interests.
             </Text>
           </View>
         </View>
+
+        {showCustomInput && suggestions.length > 0 ? (
+          <View className="mt-4">
+            <Text className="mb-2 text-[12px] font-semibold uppercase tracking-[0.5px] text-[#7A8594]">
+              Similar existing tags
+            </Text>
+            <View className="flex-row flex-wrap gap-2">
+              {suggestions.map((suggestion) => (
+                <TouchableOpacity
+                  key={suggestion}
+                  onPress={() => applySuggestion(suggestion)}
+                  activeOpacity={0.75}
+                  className="rounded-full border border-[#D0D7E2] bg-white px-4 py-2"
+                >
+                  <Text className="text-sm font-semibold text-[#415A77]">
+                    {suggestion}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        ) : null}
       </ScrollView>
 
       {/* Footer */}

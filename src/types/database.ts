@@ -667,6 +667,14 @@ export type Database = {
         };
         Returns: void;
       };
+      search_interest_tags: {
+        Args: {
+          search_input: string;
+        };
+        Returns: {
+          tag: string;
+        }[];
+      };
       send_direct_message: {
         Args: {
           attachment_kind_input?: "image" | "file" | null;

@@ -35,6 +35,16 @@ CANONICAL_INTEREST_ALIASES = {
         "artificial_intelligence",
         "machine_learning",
     ),
+    "software engineering": ("software_engineering",),
+    "software eng": ("software_engineering",),
+    "swe": ("software_engineering",),
+    "data science": ("data_science",),
+    "data sci": ("data_science",),
+    "cybersecurity": ("cybersecurity",),
+    "cyber security": ("cybersecurity",),
+    "product management": ("product_management",),
+    "product": ("product_management",),
+    "public policy": ("public_policy",),
 }
 
 

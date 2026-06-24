@@ -13,10 +13,7 @@ import { router } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { SymbolView } from "expo-symbols";
 
-import {
-  INTEREST_TAG_OPTIONS,
-  MAX_CUSTOM_INTEREST_TAGS,
-} from "@constants/index";
+import { INTEREST_TAG_OPTIONS } from "@constants/index";
 import {
   AppAvatar,
   AppButton,
@@ -39,12 +36,12 @@ import {
   fetchProfileViewModel,
   importTimetableFromNusmodsShareUrl,
   parseManualTimeInput,
+  searchInterestTagSuggestions,
   updateEditableProfile,
 } from "@services/index";
 import type { StudyStyle, TimetableClassSlot, TimetableSlot } from "@appTypes/index";
 import { useAuthStore } from "@store/index";
 import {
-  canAddCustomInterest,
   normalizeInterestTag,
   normalizeInterestTags,
   splitInterestTags,
@@ -112,6 +109,7 @@ export default function ProfileScreen() {
   const [manualStartDraft, setManualStartDraft] = useState("09:00");
   const [manualEndDraft, setManualEndDraft] = useState("11:00");
   const [customInterestInput, setCustomInterestInput] = useState("");
+  const [interestSuggestions, setInterestSuggestions] = useState<string[]>([]);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isImportingTimetable, setIsImportingTimetable] = useState(false);
@@ -230,6 +228,31 @@ export default function ProfileScreen() {
       clearTimeout(timeoutId);
     };
   }, [editableModules, isEditing, moduleQuery]);
+
+  useEffect(() => {
+    const trimmedInput = customInterestInput.trim();
+
+    if (!isEditing || trimmedInput.length < 2) {
+      setInterestSuggestions([]);
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      void searchInterestTagSuggestions(trimmedInput)
+        .then((nextSuggestions) => {
+          setInterestSuggestions(
+            nextSuggestions.filter(
+              (suggestion) => !interestsDraft.includes(suggestion),
+            ),
+          );
+        })
+        .catch(() => {
+          setInterestSuggestions([]);
+        });
+    }, 200);
+
+    return () => clearTimeout(timeoutId);
+  }, [customInterestInput, interestsDraft, isEditing]);
 
   function resetDrafts() {
     if (!profile) {
@@ -421,20 +444,19 @@ export default function ProfileScreen() {
       return;
     }
 
-    if (!canAddCustomInterest(interestsDraft)) {
-      Alert.alert(
-        "Custom tag limit reached",
-        `Keep custom interests to ${MAX_CUSTOM_INTEREST_TAGS} niche tags so matching stays structured.`,
-      );
-      return;
-    }
-
     setInterestsDraft((current) => normalizeInterestTags([...current, trimmedInterest]));
     setCustomInterestInput("");
+    setInterestSuggestions([]);
   }
 
   function removeInterest(interest: string) {
     setInterestsDraft((current) => current.filter((item) => item !== interest));
+  }
+
+  function applyInterestSuggestion(interest: string) {
+    setInterestsDraft((current) => normalizeInterestTags([...current, interest]));
+    setCustomInterestInput("");
+    setInterestSuggestions([]);
   }
 
   function toggleIntent(
@@ -1052,7 +1074,7 @@ export default function ProfileScreen() {
                   value={customInterestInput}
                   onChangeText={setCustomInterestInput}
                   className="flex-1 rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-4 text-[15px] text-[#0F1115]"
-                  placeholder={`Add a niche custom tag (${MAX_CUSTOM_INTEREST_TAGS} max)`}
+                  placeholder="Add a niche custom interest"
                   placeholderTextColor="#9AA0AB"
                 />
                 <Pressable
@@ -1077,6 +1099,27 @@ export default function ProfileScreen() {
                         </Text>
                       </Pressable>
                     ))}
+                </View>
+              ) : null}
+
+              {interestSuggestions.length > 0 ? (
+                <View className="mt-3">
+                  <Text className="mb-2 text-[12px] font-semibold uppercase tracking-[0.5px] text-[#7A8594]">
+                    Similar existing tags
+                  </Text>
+                  <View className="flex-row flex-wrap gap-2">
+                    {interestSuggestions.map((suggestion) => (
+                      <Pressable
+                        key={suggestion}
+                        className="rounded-full border border-[#D0D7E2] bg-white px-4 py-2"
+                        onPress={() => applyInterestSuggestion(suggestion)}
+                      >
+                        <Text className="text-[13px] font-semibold text-[#415A77]">
+                          {suggestion}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
                 </View>
               ) : null}
             </View>

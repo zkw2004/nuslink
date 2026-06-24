@@ -3,7 +3,10 @@ from fastapi.testclient import TestClient
 from app.auth import AuthenticatedUser
 from app.main import app
 from app.matching.models import ModuleRegistration, ProfileSummary, TimetableSlot
-from app.matching.scoring import calculate_interest_overlap_score
+from app.matching.scoring import (
+    calculate_interest_overlap_score,
+    normalize_interest_tags,
+)
 from app.routers.matches import get_current_user as get_matches_current_user
 from app.routers.matches import get_match_repository
 
@@ -195,6 +198,46 @@ def test_interest_overlap_handles_case_and_common_aliases():
     score = calculate_interest_overlap_score(
         ["AI / ML", "Backend"],
         ["artificial intelligence", "BACKEND"],
+    )
+
+    assert score is not None
+    assert round(score, 2) == 0.67
+
+
+def test_normalize_interest_tags_supports_broader_canonical_tag_bank():
+    normalized = normalize_interest_tags(
+        [
+            "AI / ML",
+            "software eng",
+            "Cyber Security",
+            "product",
+            "PUBLIC POLICY",
+            "backend",
+        ]
+    )
+
+    assert "artificial_intelligence" in normalized
+    assert "machine_learning" in normalized
+    assert "software_engineering" in normalized
+    assert "cybersecurity" in normalized
+    assert "product_management" in normalized
+    assert "public_policy" in normalized
+    assert "backend" in normalized
+
+
+def test_interest_overlap_handles_multiple_canonical_aliases_together():
+    score = calculate_interest_overlap_score(
+        ["software engineering", "Cybersecurity", "Product Management"],
+        ["SWE", "cyber security", "product"],
+    )
+
+    assert score == 1.0
+
+
+def test_interest_overlap_keeps_unknown_custom_tags_as_exact_matches_only():
+    score = calculate_interest_overlap_score(
+        ["quant trading", "AI / ML"],
+        ["Quant Trading", "machine learning"],
     )
 
     assert score is not None

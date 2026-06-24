@@ -1,7 +1,7 @@
 import { supabase } from "@lib/supabase";
 import { getCurrentSemester } from "@lib/nusmods";
 import type { StudyStyle, TimetableSlot, UserProfile } from "@appTypes/index";
-import { normalizeInterestTags } from "@utils/interestTags";
+import { normalizeInterestTag, normalizeInterestTags } from "@utils/interestTags";
 import type { SelectedModule } from "@features/onboarding/types";
 import { replaceCurrentSemesterTimetableSlots } from "./timetableService";
 
@@ -152,6 +152,43 @@ export async function fetchCurrentSemesterModules(userId: string): Promise<Selec
         department: null,
       },
   );
+}
+
+export async function searchInterestTagSuggestions(query: string): Promise<string[]> {
+  if (!supabase) {
+    throw new Error("Supabase is not configured.");
+  }
+
+  const trimmedQuery = query.trim();
+
+  if (trimmedQuery.length < 2) {
+    return [];
+  }
+
+  const normalizedSuggestion = normalizeInterestTag(trimmedQuery);
+  const suggestions = new Set<string>();
+
+  if (normalizedSuggestion) {
+    suggestions.add(normalizedSuggestion);
+  }
+
+  const { data, error } = await supabase.rpc("search_interest_tags", {
+    search_input: trimmedQuery,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  (data ?? []).forEach((row) => {
+    const suggestion = normalizeInterestTag(row.tag);
+
+    if (suggestion) {
+      suggestions.add(suggestion);
+    }
+  });
+
+  return Array.from(suggestions);
 }
 
 export async function updateEditableProfile(

@@ -16,5 +16,3 @@ export const INTEREST_TAG_OPTIONS = [
   "Operations",
   "Public Policy",
 ] as const;
-
-export const MAX_CUSTOM_INTEREST_TAGS = 3;

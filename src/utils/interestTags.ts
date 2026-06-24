@@ -1,7 +1,4 @@
-import {
-  INTEREST_TAG_OPTIONS,
-  MAX_CUSTOM_INTEREST_TAGS,
-} from "@constants/index";
+import { INTEREST_TAG_OPTIONS } from "@constants/index";
 
 function normalizeInterestKey(value: string) {
   return value.trim().toLowerCase().replace(/\s+/g, " ");
@@ -100,8 +97,4 @@ export function splitInterestTags(interests: string[]) {
     canonical: normalized.filter(isCanonicalInterestTag),
     custom: normalized.filter((interest) => !isCanonicalInterestTag(interest)),
   };
-}
-
-export function canAddCustomInterest(interests: string[]) {
-  return splitInterestTags(interests).custom.length < MAX_CUSTOM_INTEREST_TAGS;
 }
