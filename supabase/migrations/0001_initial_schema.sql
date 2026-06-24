@@ -58,7 +58,7 @@ CREATE TABLE public.profiles (
   avatar_url       TEXT,
   faculty          TEXT,
   major            TEXT,
-  year_of_study    SMALLINT CHECK (year_of_study BETWEEN 1 AND 5),
+  year_of_study    SMALLINT CHECK (year_of_study BETWEEN 1 AND 6),
   graduation_date  DATE,
   is_sso_verified  BOOLEAN NOT NULL DEFAULT FALSE,
   intents          intent[]     NOT NULL DEFAULT '{}',

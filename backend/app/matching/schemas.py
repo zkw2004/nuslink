@@ -4,13 +4,8 @@ from pydantic import BaseModel
 
 
 class MatchBreakdownResponse(BaseModel):
-    module_overlap: int | None = None
+    target_grade: int | None
     schedule_overlap: int | None
-    faculty_major: int | None = None
-    year_proximity: int | None = None
-    interest_overlap: int | None = None
-    study_style: int | None = None
-    preferred_group_size: int | None = None
 
 
 class PeopleMatchResponseItem(BaseModel):
@@ -27,7 +22,7 @@ class PeopleMatchResponseItem(BaseModel):
     shared_modules: list[str]
     compatibility_percentage: int
     breakdown: MatchBreakdownResponse
-    match_reasons: list[str] = []
+    target_grade_summary: str
     schedule_summary: str
 
 

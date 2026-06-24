@@ -16,9 +16,7 @@ export type Database = {
           is_sso_verified: boolean;
           major: string | null;
           onboarding_completed: boolean;
-          preferred_group_size: number | null;
           skills: string[];
-          study_style: string | null;
           updated_at: string;
           year_of_study: number | null;
         };
@@ -36,9 +34,7 @@ export type Database = {
           is_sso_verified?: boolean;
           major?: string | null;
           onboarding_completed?: boolean;
-          preferred_group_size?: number | null;
           skills?: string[];
-          study_style?: string | null;
           updated_at?: string;
           year_of_study?: number | null;
         };
@@ -56,9 +52,7 @@ export type Database = {
           is_sso_verified?: boolean;
           major?: string | null;
           onboarding_completed?: boolean;
-          preferred_group_size?: number | null;
           skills?: string[];
-          study_style?: string | null;
           updated_at?: string;
           year_of_study?: number | null;
         };
@@ -91,6 +85,7 @@ export type Database = {
           id: string;
           module_code: string;
           semester: string;
+          target_grade: string | null;
           user_id: string;
         };
         Insert: {
@@ -98,6 +93,7 @@ export type Database = {
           id?: string;
           module_code: string;
           semester: string;
+          target_grade?: string | null;
           user_id: string;
         };
         Update: {
@@ -105,6 +101,7 @@ export type Database = {
           id?: string;
           module_code?: string;
           semester?: string;
+          target_grade?: string | null;
           user_id?: string;
         };
         Relationships: [];
@@ -717,14 +714,6 @@ export type Database = {
           request_id_input: string;
         };
         Returns: void;
-      };
-      search_interest_tags: {
-        Args: {
-          search_input: string;
-        };
-        Returns: {
-          tag: string;
-        }[];
       };
       send_direct_message: {
         Args: {
