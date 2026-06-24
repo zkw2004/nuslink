@@ -4,20 +4,59 @@ from dataclasses import dataclass
 
 from app.matching.models import ModuleRegistration, ProfileSummary, TimetableSlot
 
-GRADE_POINTS = {
-    "A+": 12,
-    "A": 11,
-    "A-": 10,
-    "B+": 9,
-    "B": 8,
-    "B-": 7,
-    "C+": 6,
-    "C": 5,
-    "C-": 4,
-    "D+": 3,
-    "D": 2,
-    "F": 0,
+MATCH_WEIGHTS = {
+    "module_overlap": 0.24,
+    "schedule_overlap": 0.20,
+    "faculty_major": 0.14,
+    "year_proximity": 0.08,
+    "interest_overlap": 0.12,
+    "study_style": 0.11,
+    "preferred_group_size": 0.08,
 }
+
+CANONICAL_INTEREST_ALIASES = {
+    "ai": ("artificial_intelligence",),
+    "a i": ("artificial_intelligence",),
+    "a.i": ("artificial_intelligence",),
+    "artificial intelligence": ("artificial_intelligence",),
+    "machine learning": ("machine_learning",),
+    "ml": ("machine_learning",),
+    "m l": ("machine_learning",),
+    "a i m l": ("artificial_intelligence", "machine_learning"),
+    "ai ml": ("artificial_intelligence", "machine_learning"),
+    "ai / ml": ("artificial_intelligence", "machine_learning"),
+    "ai/ml": ("artificial_intelligence", "machine_learning"),
+    "artificial intelligence / machine learning": (
+        "artificial_intelligence",
+        "machine_learning",
+    ),
+    "artificial intelligence and machine learning": (
+        "artificial_intelligence",
+        "machine_learning",
+    ),
+    "software engineering": ("software_engineering",),
+    "software eng": ("software_engineering",),
+    "swe": ("software_engineering",),
+    "data science": ("data_science",),
+    "data sci": ("data_science",),
+    "cybersecurity": ("cybersecurity",),
+    "cyber security": ("cybersecurity",),
+    "product management": ("product_management",),
+    "product": ("product_management",),
+    "public policy": ("public_policy",),
+}
+
+
+@dataclass(frozen=True)
+class CandidateScore:
+    module_overlap: float | None
+    schedule_overlap: float | None
+    faculty_major: float | None
+    year_proximity: float | None
+    interest_overlap: float | None
+    study_style: float | None
+    preferred_group_size: float | None
+    overlap_minutes: int
 
 
 def get_current_semester_string() -> str:
@@ -36,35 +75,51 @@ def get_current_semester_string() -> str:
     )
 
 
-def _normalize_grade(grade: str | None) -> str | None:
-    if grade is None:
-        return None
-
-    normalized = grade.strip().upper()
-    return normalized if normalized in GRADE_POINTS else None
+def _simplify_tag(raw_tag: str) -> str:
+    return re.sub(r"\s+", " ", raw_tag.strip().lower()).strip()
 
 
-def calculate_target_grade_score(
+def _expand_interest_tag(raw_tag: str) -> set[str]:
+    simplified_tag = _simplify_tag(raw_tag)
+    simplified_tag = simplified_tag.replace("&", "and")
+
+    if simplified_tag in CANONICAL_INTEREST_ALIASES:
+        return set(CANONICAL_INTEREST_ALIASES[simplified_tag])
+
+    normalized_punctuation = re.sub(r"[^a-z0-9/+ ]", " ", simplified_tag)
+    normalized_punctuation = re.sub(r"\s+", " ", normalized_punctuation).strip()
+
+    if normalized_punctuation in CANONICAL_INTEREST_ALIASES:
+        return set(CANONICAL_INTEREST_ALIASES[normalized_punctuation])
+
+    return {normalized_punctuation} if normalized_punctuation else set()
+
+
+def normalize_interest_tags(interests: list[str]) -> set[str]:
+    normalized_tags: set[str] = set()
+
+    for interest in interests:
+        normalized_tags.update(_expand_interest_tag(interest))
+
+    return normalized_tags
+
+
+def calculate_module_overlap_score(
     current_user_modules: dict[str, ModuleRegistration],
     candidate_modules: dict[str, ModuleRegistration],
-    shared_modules: list[str],
-) -> float | None:
-    diffs: list[float] = []
+) -> tuple[float | None, list[str]]:
+    current_module_codes = set(current_user_modules)
+    candidate_module_codes = set(candidate_modules)
+    shared_modules = sorted(current_module_codes.intersection(candidate_module_codes))
 
-    for module_code in shared_modules:
-        current_grade = _normalize_grade(current_user_modules[module_code].target_grade)
-        candidate_grade = _normalize_grade(candidate_modules[module_code].target_grade)
+    if not shared_modules:
+        return None, []
 
-        if current_grade is None or candidate_grade is None:
-            continue
+    union_count = len(current_module_codes.union(candidate_module_codes))
+    if union_count == 0:
+        return None, shared_modules
 
-        diff = abs(GRADE_POINTS[current_grade] - GRADE_POINTS[candidate_grade])
-        diffs.append(1 - (diff / 12))
-
-    if not diffs:
-        return None
-
-    return sum(diffs) / len(diffs)
+    return len(shared_modules) / union_count, shared_modules
 
 
 def calculate_schedule_overlap_score(
@@ -104,6 +159,87 @@ def calculate_schedule_overlap_score(
     return min(overlap_minutes / normalizer, 1.0), overlap_minutes
 
 
+def calculate_faculty_major_score(
+    current_user_profile: ProfileSummary,
+    candidate_profile: ProfileSummary,
+) -> float | None:
+    if (
+        current_user_profile.major
+        and candidate_profile.major
+        and current_user_profile.major.strip().lower()
+        == candidate_profile.major.strip().lower()
+    ):
+        return 1.0
+
+    if (
+        current_user_profile.faculty
+        and candidate_profile.faculty
+        and current_user_profile.faculty.strip().lower()
+        == candidate_profile.faculty.strip().lower()
+    ):
+        return 0.65
+
+    if current_user_profile.faculty or candidate_profile.faculty:
+        return 0.0
+
+    return None
+
+
+def calculate_year_proximity_score(
+    current_year: int | None,
+    candidate_year: int | None,
+) -> float | None:
+    if current_year is None or candidate_year is None:
+        return None
+
+    diff = abs(current_year - candidate_year)
+    return max(0.0, 1.0 - (diff * 0.3))
+
+
+def calculate_interest_overlap_score(
+    current_interests: list[str],
+    candidate_interests: list[str],
+) -> float | None:
+    normalized_current = normalize_interest_tags(current_interests)
+    normalized_candidate = normalize_interest_tags(candidate_interests)
+
+    if not normalized_current or not normalized_candidate:
+        return None
+
+    union_count = len(normalized_current.union(normalized_candidate))
+    if union_count == 0:
+        return None
+
+    return len(normalized_current.intersection(normalized_candidate)) / union_count
+
+
+def calculate_study_style_score(
+    current_style: str | None,
+    candidate_style: str | None,
+) -> float | None:
+    if not current_style or not candidate_style:
+        return None
+
+    normalized_current = current_style.strip().lower()
+    normalized_candidate = candidate_style.strip().lower()
+
+    if normalized_current == "flexible" or normalized_candidate == "flexible":
+        return 1.0
+
+    return 1.0 if normalized_current == normalized_candidate else 0.0
+
+
+def calculate_preferred_group_size_score(
+    current_group_size: int | None,
+    candidate_group_size: int | None,
+) -> float | None:
+    if current_group_size is None or candidate_group_size is None:
+        return None
+
+    diff = abs(current_group_size - candidate_group_size)
+    return max(0.0, 1.0 - (diff * 0.2))
+
+
 def build_module_map(
     registrations: list[ModuleRegistration],
 ) -> dict[str, dict[str, ModuleRegistration]]:
@@ -126,23 +262,44 @@ def build_timetable_map(
     return timetable_map
 
 
-def calculate_overall_score(
-    target_grade_score: float | None,
-    schedule_score: float | None,
-) -> int:
-    available_scores = [
-        score for score in (target_grade_score, schedule_score) if score is not None
-    ]
+def calculate_overall_score(score: CandidateScore) -> int:
+    available_scores = {
+        key: value
+        for key, value in {
+            "module_overlap": score.module_overlap,
+            "schedule_overlap": score.schedule_overlap,
+            "faculty_major": score.faculty_major,
+            "year_proximity": score.year_proximity,
+            "interest_overlap": score.interest_overlap,
+            "study_style": score.study_style,
+            "preferred_group_size": score.preferred_group_size,
+        }.items()
+        if value is not None
+    }
 
     if not available_scores:
         return 0
 
-    return round((sum(available_scores) / len(available_scores)) * 100)
+    total_weight = sum(MATCH_WEIGHTS[key] for key in available_scores)
+    weighted_total = sum(
+        available_scores[key] * MATCH_WEIGHTS[key] for key in available_scores
+    )
+
+    if total_weight <= 0:
+        return 0
+
+    percentage = (weighted_total / total_weight) * 100
+    rounded_percentage = round(percentage)
+
+    if weighted_total > 0 and rounded_percentage == 0:
+        return 1
+
+    return rounded_percentage
 
 
 def summarize_schedule(schedule_score: float | None, overlap_minutes: int) -> str:
     if schedule_score is None:
-        return "Add timetable data to include schedule overlap."
+        return "Add timetable data to compare weekly availability."
 
     if overlap_minutes <= 0:
         return "No overlapping free blocks saved yet."
@@ -154,22 +311,49 @@ def summarize_schedule(schedule_score: float | None, overlap_minutes: int) -> st
     return f"{duration_label} of overlapping availability this week."
 
 
-def summarize_target_grade(target_grade_score: float | None) -> str:
-    if target_grade_score is None:
-        return "Add target grades to compare academic goals."
+def build_match_reasons(
+    *,
+    shared_modules: list[str],
+    score: CandidateScore,
+    candidate_profile: ProfileSummary,
+) -> list[str]:
+    reasons: list[str] = []
 
-    percentage = round(target_grade_score * 100)
+    if shared_modules:
+        if len(shared_modules) == 1:
+            reasons.append(f"Share {shared_modules[0]} this semester.")
+        else:
+            reasons.append(
+                f"Share {len(shared_modules)} current-semester modules."
+            )
 
-    if percentage >= 85:
-        return "Target grades are closely aligned."
-    if percentage >= 65:
-        return "Target grades are reasonably aligned."
-    return "Target grades differ, but the module overlap is still relevant."
+    if score.schedule_overlap is not None and score.schedule_overlap >= 0.5:
+        reasons.append("Timetable overlap makes coordination easier.")
+
+    if score.faculty_major == 1.0 and candidate_profile.major:
+        reasons.append(f"Same major: {candidate_profile.major}.")
+    elif score.faculty_major is not None and score.faculty_major >= 0.65:
+        reasons.append("Same faculty academic context.")
+
+    if score.year_proximity is not None and score.year_proximity >= 0.7:
+        reasons.append("Close year-of-study progression.")
+
+    if score.interest_overlap is not None and score.interest_overlap >= 0.34:
+        reasons.append("Shared academic interests.")
+
+    if score.study_style is not None and score.study_style >= 0.7:
+        reasons.append("Compatible study mode preferences.")
+
+    if score.preferred_group_size is not None and score.preferred_group_size >= 0.8:
+        reasons.append("Prefer a similar group size.")
+
+    return reasons[:3]
 
 
 def rank_candidates(
     *,
     current_user_id: str,
+    current_user_profile: ProfileSummary,
     profiles: list[ProfileSummary],
     current_user_registrations: list[ModuleRegistration],
     candidate_registrations: list[ModuleRegistration],
@@ -186,26 +370,50 @@ def rank_candidates(
 
     for profile in profiles:
         candidate_modules = candidate_module_map.get(profile.id, {})
-        shared_modules = sorted(
-            set(current_user_modules).intersection(candidate_modules)
+        module_overlap_score, shared_modules = calculate_module_overlap_score(
+            current_user_modules,
+            candidate_modules,
         )
 
         if not shared_modules:
             continue
 
-        target_grade_score = calculate_target_grade_score(
-            current_user_modules,
-            candidate_modules,
-            shared_modules,
-        )
         schedule_score, overlap_minutes = calculate_schedule_overlap_score(
             current_user_slots,
             timetable_map.get(profile.id, []),
         )
-        compatibility_percentage = calculate_overall_score(
-            target_grade_score,
-            schedule_score,
+        faculty_major_score = calculate_faculty_major_score(
+            current_user_profile,
+            profile,
         )
+        year_proximity_score = calculate_year_proximity_score(
+            current_user_profile.year_of_study,
+            profile.year_of_study,
+        )
+        interest_overlap_score = calculate_interest_overlap_score(
+            current_user_profile.interests,
+            profile.interests,
+        )
+        study_style_score = calculate_study_style_score(
+            current_user_profile.study_style,
+            profile.study_style,
+        )
+        preferred_group_size_score = calculate_preferred_group_size_score(
+            current_user_profile.preferred_group_size,
+            profile.preferred_group_size,
+        )
+
+        candidate_score = CandidateScore(
+            module_overlap=module_overlap_score,
+            schedule_overlap=schedule_score,
+            faculty_major=faculty_major_score,
+            year_proximity=year_proximity_score,
+            interest_overlap=interest_overlap_score,
+            study_style=study_style_score,
+            preferred_group_size=preferred_group_size_score,
+            overlap_minutes=overlap_minutes,
+        )
+        compatibility_percentage = calculate_overall_score(candidate_score)
 
         results.append(
             {
@@ -222,15 +430,37 @@ def rank_candidates(
                 "shared_modules": shared_modules,
                 "compatibility_percentage": compatibility_percentage,
                 "breakdown": {
-                    "target_grade": None
-                    if target_grade_score is None
-                    else round(target_grade_score * 100),
+                    "module_overlap": None
+                    if module_overlap_score is None
+                    else round(module_overlap_score * 100),
                     "schedule_overlap": None
                     if schedule_score is None
                     else round(schedule_score * 100),
+                    "faculty_major": None
+                    if faculty_major_score is None
+                    else round(faculty_major_score * 100),
+                    "year_proximity": None
+                    if year_proximity_score is None
+                    else round(year_proximity_score * 100),
+                    "interest_overlap": None
+                    if interest_overlap_score is None
+                    else round(interest_overlap_score * 100),
+                    "study_style": None
+                    if study_style_score is None
+                    else round(study_style_score * 100),
+                    "preferred_group_size": None
+                    if preferred_group_size_score is None
+                    else round(preferred_group_size_score * 100),
                 },
-                "target_grade_summary": summarize_target_grade(target_grade_score),
-                "schedule_summary": summarize_schedule(schedule_score, overlap_minutes),
+                "match_reasons": build_match_reasons(
+                    shared_modules=shared_modules,
+                    score=candidate_score,
+                    candidate_profile=profile,
+                ),
+                "schedule_summary": summarize_schedule(
+                    schedule_score,
+                    overlap_minutes,
+                ),
             }
         )
 

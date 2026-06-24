@@ -1,0 +1,18 @@
+export const INTEREST_TAG_OPTIONS = [
+  "AI / ML",
+  "Software Engineering",
+  "Data Science",
+  "Cybersecurity",
+  "Systems",
+  "Algorithms",
+  "Product Management",
+  "Entrepreneurship",
+  "Design",
+  "Research",
+  "Economics",
+  "Finance",
+  "Consulting",
+  "Marketing",
+  "Operations",
+  "Public Policy",
+] as const;

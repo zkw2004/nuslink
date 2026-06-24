@@ -21,6 +21,7 @@ export type BadgeTier = "bronze" | "silver" | "gold";
 export type CommunityType = "official" | "user_created";
 
 export type JoinPolicy = "open" | "request_approval";
+export type StudyStyle = "online" | "in_person" | "flexible";
 export type ChatAttachmentKind = "image" | "file" | "audio" | "video";
 
 export type UserRole = "member" | "co_admin" | "admin";
@@ -41,6 +42,8 @@ export interface UserProfile {
   major: string | null;
   year_of_study: number | null;
   graduation_date: string | null;
+  study_style: StudyStyle | null;
+  preferred_group_size: number | null;
   is_sso_verified: boolean;
   intents: Intent[];
   interests: string[];
@@ -100,8 +103,13 @@ export interface TimetableClassSlot {
 }
 
 export interface MatchBreakdown {
+  module_overlap: number | null;
   schedule_overlap: number | null;
-  target_grade: number | null;
+  faculty_major: number | null;
+  year_proximity: number | null;
+  interest_overlap: number | null;
+  study_style: number | null;
+  preferred_group_size: number | null;
 }
 
 export interface PeopleMatch {
@@ -117,11 +125,8 @@ export interface PeopleMatch {
   intents: string[];
   shared_modules: string[];
   compatibility_percentage: number;
-  breakdown: {
-    schedule_overlap: number | null;
-    target_grade: number | null;
-  };
-  target_grade_summary: string;
+  breakdown: MatchBreakdown;
+  match_reasons: string[];
   schedule_summary: string;
 }
 

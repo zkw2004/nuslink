@@ -3,7 +3,8 @@ import type { Session } from "@supabase/supabase-js";
 
 import { supabase } from "@lib/supabase";
 import type { Database } from "@appTypes/database";
-import type { UserProfile } from "@appTypes/index";
+import type { StudyStyle, UserProfile } from "@appTypes/index";
+import { normalizeInterestTags } from "@utils/interestTags";
 
 type ProfileUpdate = Database["public"]["Tables"]["profiles"]["Update"];
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
@@ -30,11 +31,19 @@ interface AuthState {
 function mapProfileRowToUserProfile(
   row: ProfileRow,
 ): UserProfile {
+  const studyStyle =
+    row.study_style === "online" ||
+    row.study_style === "in_person" ||
+    row.study_style === "flexible"
+      ? (row.study_style as StudyStyle)
+      : null;
+
   return {
     ...row,
     intents: row.intents ?? [],
-    interests: row.interests ?? [],
+    interests: normalizeInterestTags(row.interests ?? []),
     skills: row.skills ?? [],
+    study_style: studyStyle,
   };
 }
 
@@ -168,7 +177,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ isProfileLoading: true });
 
     const updates: ProfileUpdate = {
-      interests: payload.interests,
+      interests: normalizeInterestTags(payload.interests),
       intents: payload.intents,
       onboarding_completed: true,
     };

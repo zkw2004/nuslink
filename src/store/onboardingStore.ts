@@ -2,6 +2,7 @@ import { create } from "zustand";
 
 import type { Intent } from "@appTypes/index";
 import type { SelectedModule } from "@features/onboarding/types";
+import { normalizeInterestTags } from "@utils/interestTags";
 
 type AcademicDraft = {
   faculty: string;
@@ -67,7 +68,7 @@ export const useOnboardingStore = create<OnboardingState>((set) => ({
     }));
   },
   setInterests(interests) {
-    set({ interests });
+    set({ interests: normalizeInterestTags(interests) });
   },
   setIntents(intents) {
     set({ intents });
