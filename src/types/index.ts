@@ -186,6 +186,34 @@ export interface DirectMessageAttachmentInput {
   kind: "image" | "file";
 }
 
+export type ChatKind = "direct" | "community";
+
+export interface ChatPollOption {
+  id: string;
+  poll_id: string;
+  body: string;
+  position: number;
+  vote_count: number;
+  is_selected_by_current_user: boolean;
+}
+
+export interface ChatPoll {
+  id: string;
+  message_id: string;
+  question: string;
+  created_by: string;
+  created_at: string;
+  options: ChatPollOption[];
+  total_votes: number;
+}
+
+export interface ChatPinnedMessage {
+  id: string;
+  message_id: string;
+  pinned_by: string;
+  created_at: string;
+}
+
 export interface CommunityChatSummary {
   id: string;
   name: string;

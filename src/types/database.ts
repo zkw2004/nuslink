@@ -268,6 +268,105 @@ export type Database = {
         };
         Relationships: [];
       };
+      chat_polls: {
+        Row: {
+          community_message_id: string | null;
+          created_at: string;
+          created_by: string;
+          direct_message_id: string | null;
+          id: string;
+          question: string;
+        };
+        Insert: {
+          community_message_id?: string | null;
+          created_at?: string;
+          created_by: string;
+          direct_message_id?: string | null;
+          id?: string;
+          question: string;
+        };
+        Update: {
+          community_message_id?: string | null;
+          created_at?: string;
+          created_by?: string;
+          direct_message_id?: string | null;
+          id?: string;
+          question?: string;
+        };
+        Relationships: [];
+      };
+      chat_poll_options: {
+        Row: {
+          body: string;
+          created_at: string;
+          id: string;
+          poll_id: string;
+          position: number;
+        };
+        Insert: {
+          body: string;
+          created_at?: string;
+          id?: string;
+          poll_id: string;
+          position: number;
+        };
+        Update: {
+          body?: string;
+          created_at?: string;
+          id?: string;
+          poll_id?: string;
+          position?: number;
+        };
+        Relationships: [];
+      };
+      chat_poll_votes: {
+        Row: {
+          created_at: string;
+          id: string;
+          option_id: string;
+          poll_id: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          option_id: string;
+          poll_id: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          option_id?: string;
+          poll_id?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      chat_pinned_messages: {
+        Row: {
+          community_message_id: string | null;
+          created_at: string;
+          direct_message_id: string | null;
+          id: string;
+          pinned_by: string;
+        };
+        Insert: {
+          community_message_id?: string | null;
+          created_at?: string;
+          direct_message_id?: string | null;
+          id?: string;
+          pinned_by: string;
+        };
+        Update: {
+          community_message_id?: string | null;
+          created_at?: string;
+          direct_message_id?: string | null;
+          id?: string;
+          pinned_by?: string;
+        };
+        Relationships: [];
+      };
       groups: {
         Row: {
           created_at: string;
@@ -445,6 +544,28 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      can_access_chat_poll: {
+        Args: {
+          poll_id_input: string;
+        };
+        Returns: boolean;
+      };
+      create_community_chat_poll: {
+        Args: {
+          community_id_input: string;
+          option_inputs: string[];
+          question_input: string;
+        };
+        Returns: string;
+      };
+      create_direct_chat_poll: {
+        Args: {
+          conversation_id_input: string;
+          option_inputs: string[];
+          question_input: string;
+        };
+        Returns: string;
+      };
       create_group: {
         Args: {
           module_code_input: string;
@@ -521,6 +642,18 @@ export type Database = {
         };
         Returns: void;
       };
+      pin_community_chat_message: {
+        Args: {
+          message_id_input: string;
+        };
+        Returns: void;
+      };
+      pin_direct_chat_message: {
+        Args: {
+          message_id_input: string;
+        };
+        Returns: void;
+      };
       respond_to_connection_request: {
         Args: {
           decision_input: string;
@@ -540,6 +673,18 @@ export type Database = {
         };
         Returns: string;
       };
+      unpin_community_chat_message: {
+        Args: {
+          message_id_input: string;
+        };
+        Returns: void;
+      };
+      unpin_direct_chat_message: {
+        Args: {
+          message_id_input: string;
+        };
+        Returns: void;
+      };
       upsert_user_module: {
         Args: {
           module_code_input: string;
@@ -547,6 +692,13 @@ export type Database = {
           module_faculty_input: string | null;
           module_name_input: string;
           semester_input: string;
+        };
+        Returns: void;
+      };
+      vote_chat_poll: {
+        Args: {
+          option_id_input: string;
+          poll_id_input: string;
         };
         Returns: void;
       };
