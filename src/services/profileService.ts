@@ -1,6 +1,7 @@
 import { supabase } from "@lib/supabase";
 import { getCurrentSemester } from "@lib/nusmods";
-import type { TimetableSlot, UserProfile } from "@appTypes/index";
+import type { StudyStyle, TimetableSlot, UserProfile } from "@appTypes/index";
+import { normalizeInterestTag, normalizeInterestTags } from "@utils/interestTags";
 import type { SelectedModule } from "@features/onboarding/types";
 import { replaceCurrentSemesterTimetableSlots } from "./timetableService";
 
@@ -18,6 +19,8 @@ type EditableProfileInput = {
   faculty: string;
   major: string;
   yearOfStudy: number;
+  studyStyle: StudyStyle;
+  preferredGroupSize: number;
   interests: string[];
   intents: UserProfile["intents"];
   modules: SelectedModule[];
@@ -150,6 +153,30 @@ export async function fetchCurrentSemesterModules(userId: string): Promise<Selec
   );
 }
 
+export async function searchInterestTagSuggestions(query: string): Promise<string[]> {
+  if (!supabase) {
+    throw new Error("Supabase is not configured.");
+  }
+
+  const trimmedQuery = query.trim();
+
+  if (trimmedQuery.length < 2) {
+    return [];
+  }
+
+  const { data, error } = await supabase.rpc("search_interest_tags", {
+    search_input: trimmedQuery,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? [])
+    .map((row) => normalizeInterestTag(row.tag))
+    .filter((suggestion): suggestion is string => Boolean(suggestion));
+}
+
 export async function updateEditableProfile(
   userId: string,
   input: EditableProfileInput,
@@ -168,7 +195,9 @@ export async function updateEditableProfile(
       faculty: input.faculty.trim(),
       major: input.major.trim(),
       year_of_study: input.yearOfStudy,
-      interests: input.interests,
+      study_style: input.studyStyle,
+      preferred_group_size: input.preferredGroupSize,
+      interests: normalizeInterestTags(input.interests),
       intents: input.intents,
     })
     .eq("id", userId);
