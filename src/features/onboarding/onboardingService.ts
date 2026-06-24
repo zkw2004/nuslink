@@ -1,5 +1,5 @@
 import { isSupabaseConfigured, supabase } from "@lib/supabase";
-import type { UserProfile } from "@appTypes/index";
+import type { StudyStyle, UserProfile } from "@appTypes/index";
 import type { SelectedModule } from "./types";
 
 type AcademicProfileInput = {
@@ -156,10 +156,19 @@ export async function saveProfileSetup(input: ProfileSetupInput): Promise<UserPr
     throw new Error(error.message);
   }
 
+  const studyStyle =
+    data.study_style === "library" ||
+    data.study_style === "cafe" ||
+    data.study_style === "home" ||
+    data.study_style === "flexible"
+      ? (data.study_style as StudyStyle)
+      : null;
+
   return {
     ...data,
     intents: data.intents ?? [],
     interests: data.interests ?? [],
     skills: data.skills ?? [],
+    study_style: studyStyle,
   };
 }

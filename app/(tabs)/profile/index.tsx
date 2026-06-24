@@ -37,7 +37,7 @@ import {
   parseManualTimeInput,
   updateEditableProfile,
 } from "@services/index";
-import type { TimetableClassSlot, TimetableSlot } from "@appTypes/index";
+import type { StudyStyle, TimetableClassSlot, TimetableSlot } from "@appTypes/index";
 import { useAuthStore } from "@store/index";
 
 const YEAR_OPTIONS = [1, 2, 3, 4, 5, 6];
@@ -74,6 +74,15 @@ const DAY_OPTIONS = [
   { value: 7, label: "Sun" },
 ] as const;
 
+const STUDY_STYLE_OPTIONS: { value: StudyStyle; label: string }[] = [
+  { value: "library", label: "Library" },
+  { value: "cafe", label: "Cafe" },
+  { value: "home", label: "Home" },
+  { value: "flexible", label: "Flexible" },
+];
+
+const GROUP_SIZE_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8];
+
 export default function ProfileScreen() {
   const profile = useAuthStore((state) => state.profile);
   const refreshProfile = useAuthStore((state) => state.refreshProfile);
@@ -96,6 +105,9 @@ export default function ProfileScreen() {
   const [facultyDraft, setFacultyDraft] = useState("");
   const [majorDraft, setMajorDraft] = useState("");
   const [yearOfStudyDraft, setYearOfStudyDraft] = useState(1);
+  const [hallRcDraft, setHallRcDraft] = useState("");
+  const [studyStyleDraft, setStudyStyleDraft] = useState<StudyStyle>("flexible");
+  const [preferredGroupSizeDraft, setPreferredGroupSizeDraft] = useState(4);
   const [interestsDraft, setInterestsDraft] = useState<string[]>([]);
   const [intentsDraft, setIntentsDraft] = useState<NonNullable<typeof profile>["intents"]>([]);
   const [moduleQuery, setModuleQuery] = useState("");
@@ -154,6 +166,9 @@ export default function ProfileScreen() {
           setFacultyDraft(profile.faculty ?? "");
           setMajorDraft(profile.major ?? "");
           setYearOfStudyDraft(profile.year_of_study ?? 1);
+          setHallRcDraft(profile.hall_rc ?? "");
+          setStudyStyleDraft(profile.study_style ?? "flexible");
+          setPreferredGroupSizeDraft(profile.preferred_group_size ?? 4);
           setInterestsDraft(profile.interests);
           setIntentsDraft(profile.intents);
           setTimetableSlotsDraft(timetableSlots);
@@ -231,6 +246,9 @@ export default function ProfileScreen() {
     setFacultyDraft(profile.faculty ?? "");
     setMajorDraft(profile.major ?? "");
     setYearOfStudyDraft(profile.year_of_study ?? 1);
+    setHallRcDraft(profile.hall_rc ?? "");
+    setStudyStyleDraft(profile.study_style ?? "flexible");
+    setPreferredGroupSizeDraft(profile.preferred_group_size ?? 4);
     setInterestsDraft(profile.interests);
     setIntentsDraft(profile.intents);
     setModuleQuery("");
@@ -574,6 +592,9 @@ export default function ProfileScreen() {
         faculty: facultyDraft,
         major: majorDraft,
         yearOfStudy: yearOfStudyDraft,
+        hallRc: hallRcDraft,
+        studyStyle: studyStyleDraft,
+        preferredGroupSize: preferredGroupSizeDraft,
         interests: interestsDraft,
         intents: intentsDraft,
         modules: editableModules,
@@ -767,6 +788,13 @@ export default function ProfileScreen() {
                 placeholder="Major"
                 placeholderTextColor="#9AA0AB"
               />
+              <TextInput
+                value={hallRcDraft}
+                onChangeText={setHallRcDraft}
+                className="rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-4 text-[15px] text-[#0F1115]"
+                placeholder="Hall / RC (optional)"
+                placeholderTextColor="#9AA0AB"
+              />
               <View className="flex-row gap-1 rounded-2xl bg-[#EEF2F7] p-1">
                 {YEAR_OPTIONS.map((year) => {
                   const isSelected = year === yearOfStudyDraft;
@@ -791,11 +819,83 @@ export default function ProfileScreen() {
               </View>
             </View>
           ) : (
-            <Text className="text-[14px] leading-6 text-[#0F1115]">
-              {[profile.faculty, profile.major, profile.year_of_study ? `Year ${profile.year_of_study}` : null]
-                .filter(Boolean)
-                .join(" · ") || "No academic details saved yet."}
-            </Text>
+            <View className="gap-2">
+              <Text className="text-[14px] leading-6 text-[#0F1115]">
+                {[profile.faculty, profile.major, profile.year_of_study ? `Year ${profile.year_of_study}` : null]
+                  .filter(Boolean)
+                  .join(" · ") || "No academic details saved yet."}
+              </Text>
+              <Text className="text-[14px] leading-6 text-[#5C6370]">
+                {profile.hall_rc ? `Hall / RC: ${profile.hall_rc}` : "Hall / RC not set."}
+              </Text>
+            </View>
+          )}
+        </SectionCard>
+
+        <SectionCard className="mb-3">
+          <SectionHeader title="Study Preferences" />
+          {isEditing ? (
+            <View className="gap-4">
+              <View>
+                <Text className="mb-2 text-[13px] font-semibold text-[#0F1115]">
+                  Study style
+                </Text>
+                <View className="flex-row flex-wrap gap-2">
+                  {STUDY_STYLE_OPTIONS.map((option) => {
+                    const isSelected = option.value === studyStyleDraft;
+
+                    return (
+                      <Pressable
+                        key={option.value}
+                        onPress={() => setStudyStyleDraft(option.value)}
+                      >
+                        <AppChip
+                          label={option.label}
+                          variant={isSelected ? "solid" : "outline"}
+                        />
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+
+              <View>
+                <Text className="mb-2 text-[13px] font-semibold text-[#0F1115]">
+                  Preferred group size
+                </Text>
+                <View className="flex-row flex-wrap gap-2">
+                  {GROUP_SIZE_OPTIONS.map((groupSize) => {
+                    const isSelected = groupSize === preferredGroupSizeDraft;
+
+                    return (
+                      <Pressable
+                        key={groupSize}
+                        onPress={() => setPreferredGroupSizeDraft(groupSize)}
+                      >
+                        <AppChip
+                          label={`${groupSize}`}
+                          variant={isSelected ? "solid" : "outline"}
+                        />
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            </View>
+          ) : (
+            <View className="gap-2">
+              <Text className="text-[14px] leading-6 text-[#0F1115]">
+                {`Study style: ${
+                  profile.study_style
+                    ? STUDY_STYLE_OPTIONS.find((option) => option.value === profile.study_style)?.label ??
+                      profile.study_style
+                    : "Not set"
+                }`}
+              </Text>
+              <Text className="text-[14px] leading-6 text-[#0F1115]">
+                {`Preferred group size: ${profile.preferred_group_size ?? "Not set"}`}
+              </Text>
+            </View>
           )}
         </SectionCard>
 

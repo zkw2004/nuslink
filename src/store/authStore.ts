@@ -3,7 +3,7 @@ import type { Session } from "@supabase/supabase-js";
 
 import { supabase } from "@lib/supabase";
 import type { Database } from "@appTypes/database";
-import type { UserProfile } from "@appTypes/index";
+import type { StudyStyle, UserProfile } from "@appTypes/index";
 
 type ProfileUpdate = Database["public"]["Tables"]["profiles"]["Update"];
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
@@ -30,11 +30,20 @@ interface AuthState {
 function mapProfileRowToUserProfile(
   row: ProfileRow,
 ): UserProfile {
+  const studyStyle =
+    row.study_style === "library" ||
+    row.study_style === "cafe" ||
+    row.study_style === "home" ||
+    row.study_style === "flexible"
+      ? (row.study_style as StudyStyle)
+      : null;
+
   return {
     ...row,
     intents: row.intents ?? [],
     interests: row.interests ?? [],
     skills: row.skills ?? [],
+    study_style: studyStyle,
   };
 }
 

@@ -1,6 +1,6 @@
 import { supabase } from "@lib/supabase";
 import { getCurrentSemester } from "@lib/nusmods";
-import type { TimetableSlot, UserProfile } from "@appTypes/index";
+import type { StudyStyle, TimetableSlot, UserProfile } from "@appTypes/index";
 import type { SelectedModule } from "@features/onboarding/types";
 import { replaceCurrentSemesterTimetableSlots } from "./timetableService";
 
@@ -18,6 +18,9 @@ type EditableProfileInput = {
   faculty: string;
   major: string;
   yearOfStudy: number;
+  hallRc: string;
+  studyStyle: StudyStyle;
+  preferredGroupSize: number;
   interests: string[];
   intents: UserProfile["intents"];
   modules: SelectedModule[];
@@ -168,6 +171,9 @@ export async function updateEditableProfile(
       faculty: input.faculty.trim(),
       major: input.major.trim(),
       year_of_study: input.yearOfStudy,
+      hall_rc: input.hallRc.trim() || null,
+      study_style: input.studyStyle,
+      preferred_group_size: input.preferredGroupSize,
       interests: input.interests,
       intents: input.intents,
     })

@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 from app.auth import AuthenticatedUser
 from app.main import app
 from app.matching.models import ModuleRegistration, ProfileSummary, TimetableSlot
+from app.matching.scoring import calculate_interest_overlap_score
 from app.routers.matches import get_current_user as get_matches_current_user
 from app.routers.matches import get_match_repository
 
@@ -35,7 +36,7 @@ class FakeMatchRepository:
                 major="Computer Science",
                 year_of_study=3,
                 badge_tier="gold",
-                interests=["Algorithms"],
+                interests=["Artificial Intelligence", "Algorithms"],
                 intents=["study_group"],
                 onboarding_completed=True,
             ),
@@ -175,3 +176,13 @@ def test_people_matches_keeps_missing_optional_fields_matchable():
     assert candidate["breakdown"]["schedule_overlap"] == 0
     assert candidate["breakdown"]["target_grade"] is not None
     assert candidate["compatibility_percentage"] > 0
+
+
+def test_interest_overlap_handles_case_and_common_aliases():
+    score = calculate_interest_overlap_score(
+        ["AI / ML", "Backend"],
+        ["artificial intelligence", "BACKEND"],
+    )
+
+    assert score is not None
+    assert round(score, 2) == 0.67

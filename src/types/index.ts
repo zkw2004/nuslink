@@ -21,6 +21,7 @@ export type BadgeTier = "bronze" | "silver" | "gold";
 export type CommunityType = "official" | "user_created";
 
 export type JoinPolicy = "open" | "request_approval";
+export type StudyStyle = "library" | "cafe" | "home" | "flexible";
 
 export type UserRole = "member" | "co_admin" | "admin";
 export type TimetableSource = "manual" | "nusmods";
@@ -40,6 +41,9 @@ export interface UserProfile {
   major: string | null;
   year_of_study: number | null;
   graduation_date: string | null;
+  hall_rc: string | null;
+  study_style: StudyStyle | null;
+  preferred_group_size: number | null;
   is_sso_verified: boolean;
   intents: Intent[];
   interests: string[];

@@ -1,5 +1,6 @@
 from collections import defaultdict
 from dataclasses import dataclass
+import re
 
 from app.matching.models import ModuleRegistration, ProfileSummary, TimetableSlot
 
@@ -25,6 +26,28 @@ MATCH_WEIGHTS = {
     "faculty_major": 0.12,
     "year_proximity": 0.08,
     "interest_overlap": 0.12,
+}
+
+CANONICAL_INTEREST_ALIASES = {
+    "ai": ("artificial_intelligence",),
+    "a i": ("artificial_intelligence",),
+    "a.i": ("artificial_intelligence",),
+    "artificial intelligence": ("artificial_intelligence",),
+    "machine learning": ("machine_learning",),
+    "ml": ("machine_learning",),
+    "m l": ("machine_learning",),
+    "a i m l": ("artificial_intelligence", "machine_learning"),
+    "ai ml": ("artificial_intelligence", "machine_learning"),
+    "ai / ml": ("artificial_intelligence", "machine_learning"),
+    "ai/ml": ("artificial_intelligence", "machine_learning"),
+    "artificial intelligence / machine learning": (
+        "artificial_intelligence",
+        "machine_learning",
+    ),
+    "artificial intelligence and machine learning": (
+        "artificial_intelligence",
+        "machine_learning",
+    ),
 }
 
 
@@ -61,6 +84,35 @@ def _normalize_grade(grade: str | None) -> str | None:
 
     normalized = grade.strip().upper()
     return normalized if normalized in GRADE_POINTS else None
+
+
+def _simplify_tag(raw_tag: str) -> str:
+    return re.sub(r"\s+", " ", raw_tag.strip().lower()).strip()
+
+
+def _expand_interest_tag(raw_tag: str) -> set[str]:
+    simplified_tag = _simplify_tag(raw_tag)
+    simplified_tag = simplified_tag.replace("&", "and")
+
+    if simplified_tag in CANONICAL_INTEREST_ALIASES:
+        return set(CANONICAL_INTEREST_ALIASES[simplified_tag])
+
+    normalized_punctuation = re.sub(r"[^a-z0-9/+ ]", " ", simplified_tag)
+    normalized_punctuation = re.sub(r"\s+", " ", normalized_punctuation).strip()
+
+    if normalized_punctuation in CANONICAL_INTEREST_ALIASES:
+        return set(CANONICAL_INTEREST_ALIASES[normalized_punctuation])
+
+    return {normalized_punctuation} if normalized_punctuation else set()
+
+
+def normalize_interest_tags(interests: list[str]) -> set[str]:
+    normalized_tags: set[str] = set()
+
+    for interest in interests:
+        normalized_tags.update(_expand_interest_tag(interest))
+
+    return normalized_tags
 
 
 def calculate_module_overlap_score(
@@ -182,10 +234,8 @@ def calculate_interest_overlap_score(
     current_interests: list[str],
     candidate_interests: list[str],
 ) -> float | None:
-    normalized_current = {interest.strip().lower() for interest in current_interests if interest.strip()}
-    normalized_candidate = {
-        interest.strip().lower() for interest in candidate_interests if interest.strip()
-    }
+    normalized_current = normalize_interest_tags(current_interests)
+    normalized_candidate = normalize_interest_tags(candidate_interests)
 
     if not normalized_current or not normalized_candidate:
         return None
