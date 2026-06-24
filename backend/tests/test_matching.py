@@ -149,6 +149,11 @@ def test_people_matches_returns_ranked_candidates():
         > body["candidates"][1]["compatibility_percentage"]
     )
     assert body["candidates"][0]["shared_modules"] == ["CS2040S"]
+    assert body["candidates"][0]["breakdown"]["module_overlap"] is not None
+    assert body["candidates"][0]["breakdown"]["faculty_major"] is not None
+    assert body["candidates"][0]["breakdown"]["year_proximity"] is not None
+    assert body["candidates"][0]["breakdown"]["interest_overlap"] is not None
+    assert len(body["candidates"][0]["match_reasons"]) > 0
 
 
 def test_people_matches_can_scope_to_one_module():
@@ -159,3 +164,14 @@ def test_people_matches_can_scope_to_one_module():
 
     assert len(body["candidates"]) == 1
     assert body["candidates"][0]["user_id"] == "user-3"
+
+
+def test_people_matches_keeps_missing_optional_fields_matchable():
+    response = client.get("/v1/matches/people?module_code=CS2030S")
+
+    assert response.status_code == 200
+    candidate = response.json()["candidates"][0]
+
+    assert candidate["breakdown"]["schedule_overlap"] == 0
+    assert candidate["breakdown"]["target_grade"] is not None
+    assert candidate["compatibility_percentage"] > 0

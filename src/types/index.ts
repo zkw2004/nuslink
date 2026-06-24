@@ -99,8 +99,12 @@ export interface TimetableClassSlot {
 }
 
 export interface MatchBreakdown {
+  module_overlap: number | null;
   schedule_overlap: number | null;
   target_grade: number | null;
+  faculty_major: number | null;
+  year_proximity: number | null;
+  interest_overlap: number | null;
 }
 
 export interface PeopleMatch {
@@ -116,10 +120,8 @@ export interface PeopleMatch {
   intents: string[];
   shared_modules: string[];
   compatibility_percentage: number;
-  breakdown: {
-    schedule_overlap: number | null;
-    target_grade: number | null;
-  };
+  breakdown: MatchBreakdown;
+  match_reasons: string[];
   target_grade_summary: string;
   schedule_summary: string;
 }

@@ -156,7 +156,7 @@ export default function PeopleScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: "#EEF3F9" }}>
       <AppScreenHeader
         title="People"
-        subtitle="Discover module-mates for the current semester, ranked by target-grade alignment and timetable overlap when available."
+        subtitle="Discover module-mates for the current semester, ranked by shared modules, academic alignment, availability, and profile fit."
       />
 
       <ScrollView
@@ -347,11 +347,39 @@ export default function PeopleScreen() {
                 ))}
               </View>
 
+              {candidate.match_reasons.length > 0 ? (
+                <View className="mt-4 gap-2 rounded-[16px] border border-[#E4E9F1] bg-white p-3">
+                  <Text className="text-[13px] font-semibold text-[#0F1115]">
+                    Why this match
+                  </Text>
+                  {candidate.match_reasons.map((reason) => (
+                    <Text
+                      key={`${candidate.user_id}-${reason}`}
+                      className="text-[13px] leading-5 text-[#5C6370]"
+                    >
+                      {`\u2022 ${reason}`}
+                    </Text>
+                  ))}
+                </View>
+              ) : null}
+
               <View className="mt-4 items-start">
                 {renderConnectionAction(candidate.user_id)}
               </View>
 
               <View className="mt-4 gap-3 rounded-[16px] bg-[#F7F9FC] p-3">
+                <Text className="text-[13px] font-semibold text-[#0F1115]">
+                  Shared modules
+                  {candidate.breakdown.module_overlap !== null
+                    ? ` · ${candidate.breakdown.module_overlap}%`
+                    : ""}
+                </Text>
+                <Text className="text-[13px] leading-5 text-[#5C6370]">
+                  {candidate.shared_modules.length === 1
+                    ? `You are both taking ${candidate.shared_modules[0]} this semester.`
+                    : `You share ${candidate.shared_modules.length} current-semester modules, which strongly boosts compatibility.`}
+                </Text>
+
                 <Text className="text-[13px] font-semibold text-[#0F1115]">
                   Target grade
                   {candidate.breakdown.target_grade !== null
@@ -370,6 +398,54 @@ export default function PeopleScreen() {
                 </Text>
                 <Text className="text-[13px] leading-5 text-[#5C6370]">
                   {candidate.schedule_summary}
+                </Text>
+
+                <Text className="text-[13px] font-semibold text-[#0F1115]">
+                  Faculty / major
+                  {candidate.breakdown.faculty_major !== null
+                    ? ` · ${candidate.breakdown.faculty_major}%`
+                    : ""}
+                </Text>
+                <Text className="text-[13px] leading-5 text-[#5C6370]">
+                  {candidate.breakdown.faculty_major === null
+                    ? "Add faculty and major details on both profiles to compare academic background."
+                    : candidate.breakdown.faculty_major >= 100
+                      ? "You share the same major, so your academic context is very closely aligned."
+                      : candidate.breakdown.faculty_major >= 65
+                        ? "You are from the same faculty, which may make your academic context more similar."
+                        : "Your match comes from other signals more than faculty or major."}
+                </Text>
+
+                <Text className="text-[13px] font-semibold text-[#0F1115]">
+                  Year proximity
+                  {candidate.breakdown.year_proximity !== null
+                    ? ` · ${candidate.breakdown.year_proximity}%`
+                    : ""}
+                </Text>
+                <Text className="text-[13px] leading-5 text-[#5C6370]">
+                  {candidate.breakdown.year_proximity === null
+                    ? "Add year-of-study data on both profiles to compare progression."
+                    : candidate.breakdown.year_proximity >= 70
+                      ? "You are close in year of study, which usually means similar pacing and module pathways."
+                      : candidate.breakdown.year_proximity >= 40
+                        ? "There is some academic overlap even though you are not in the exact same year."
+                        : "This match is driven more by module and profile similarity than by year of study."}
+                </Text>
+
+                <Text className="text-[13px] font-semibold text-[#0F1115]">
+                  Interest overlap
+                  {candidate.breakdown.interest_overlap !== null
+                    ? ` · ${candidate.breakdown.interest_overlap}%`
+                    : ""}
+                </Text>
+                <Text className="text-[13px] leading-5 text-[#5C6370]">
+                  {candidate.breakdown.interest_overlap === null
+                    ? "Add interests on both profiles to compare academic themes."
+                    : candidate.breakdown.interest_overlap >= 50
+                      ? "Your listed interests overlap strongly."
+                      : candidate.breakdown.interest_overlap > 0
+                        ? "You share some common interests, though this is not the strongest signal."
+                        : "This match is supported more by shared modules and academic fit than by listed interests."}
                 </Text>
               </View>
             </SectionCard>
