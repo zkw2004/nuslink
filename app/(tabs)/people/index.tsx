@@ -437,6 +437,52 @@ export default function PeopleScreen() {
                         ? "You share some common interests, though this is not the strongest signal."
                         : "This match is supported more by shared modules and academic fit than by listed interests."}
                 </Text>
+
+                <Text className="text-[13px] font-semibold text-[#0F1115]">
+                  Study style
+                  {candidate.breakdown.study_style !== null
+                    ? ` · ${candidate.breakdown.study_style}%`
+                    : ""}
+                </Text>
+                <Text className="text-[13px] leading-5 text-[#5C6370]">
+                  {candidate.breakdown.study_style === null
+                    ? "Add study-style preferences on both profiles to compare how you like to work."
+                    : candidate.breakdown.study_style >= 100
+                      ? "You prefer the same study environment."
+                      : candidate.breakdown.study_style >= 70
+                        ? "Your study-style preferences are fairly compatible."
+                        : "You may study differently, but the stronger academic signals still support this match."}
+                </Text>
+
+                <Text className="text-[13px] font-semibold text-[#0F1115]">
+                  Preferred group size
+                  {candidate.breakdown.preferred_group_size !== null
+                    ? ` · ${candidate.breakdown.preferred_group_size}%`
+                    : ""}
+                </Text>
+                <Text className="text-[13px] leading-5 text-[#5C6370]">
+                  {candidate.breakdown.preferred_group_size === null
+                    ? "Add preferred group size on both profiles to compare collaboration preferences."
+                    : candidate.breakdown.preferred_group_size >= 80
+                      ? "You prefer a very similar group size."
+                      : candidate.breakdown.preferred_group_size >= 50
+                        ? "Your group-size preferences are reasonably close."
+                        : "Group-size preference is not the strongest fit here, but the core academic signals still align."}
+                </Text>
+
+                <Text className="text-[13px] font-semibold text-[#0F1115]">
+                  Hall / RC
+                  {candidate.breakdown.hall_rc !== null
+                    ? ` · ${candidate.breakdown.hall_rc}%`
+                    : ""}
+                </Text>
+                <Text className="text-[13px] leading-5 text-[#5C6370]">
+                  {candidate.breakdown.hall_rc === null
+                    ? "Add hall or residential-college details on both profiles for a light proximity boost."
+                    : candidate.breakdown.hall_rc >= 100
+                      ? "You share the same hall / RC, which can make in-person coordination easier."
+                      : "Hall / RC is only a light tie-breaker here, so this match is mostly driven by the stronger academic signals."}
+                </Text>
               </View>
             </SectionCard>
           ))}

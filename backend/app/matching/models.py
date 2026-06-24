@@ -5,7 +5,6 @@ from dataclasses import dataclass
 class ModuleRegistration:
     user_id: str
     module_code: str
-    target_grade: str | None
 
 
 @dataclass(frozen=True)

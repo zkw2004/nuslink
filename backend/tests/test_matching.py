@@ -95,10 +95,10 @@ class FakeMatchRepository:
         exclude_user_id: str | None = None,
     ) -> list[ModuleRegistration]:
         registrations = [
-            ModuleRegistration("user-1", "CS2040S", "A"),
-            ModuleRegistration("user-1", "CS2030S", "A-"),
-            ModuleRegistration("user-2", "CS2040S", "A-"),
-            ModuleRegistration("user-3", "CS2030S", "B+"),
+            ModuleRegistration("user-1", "CS2040S"),
+            ModuleRegistration("user-1", "CS2030S"),
+            ModuleRegistration("user-2", "CS2040S"),
+            ModuleRegistration("user-3", "CS2030S"),
         ]
 
         filtered = [

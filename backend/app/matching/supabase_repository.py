@@ -90,7 +90,7 @@ class SupabaseMatchRepository(MatchRepository):
         rows = self._get(
             "user_modules",
             {
-                "select": "user_id,module_code,target_grade",
+                "select": "user_id,module_code",
                 "user_id": f"eq.{user_id}",
                 "semester": f"eq.{semester}",
             },
@@ -100,7 +100,6 @@ class SupabaseMatchRepository(MatchRepository):
             ModuleRegistration(
                 user_id=row["user_id"],
                 module_code=row["module_code"],
-                target_grade=row.get("target_grade"),
             )
             for row in rows
         ]
@@ -116,7 +115,7 @@ class SupabaseMatchRepository(MatchRepository):
             return []
 
         params = {
-            "select": "user_id,module_code,target_grade",
+            "select": "user_id,module_code",
             "semester": f"eq.{semester}",
             "module_code": _build_in_filter(module_codes),
         }
@@ -129,7 +128,6 @@ class SupabaseMatchRepository(MatchRepository):
             ModuleRegistration(
                 user_id=row["user_id"],
                 module_code=row["module_code"],
-                target_grade=row.get("target_grade"),
             )
             for row in rows
         ]
