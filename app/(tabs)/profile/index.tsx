@@ -13,7 +13,6 @@ import { router } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { SymbolView } from "expo-symbols";
 
-import { INTEREST_TAG_OPTIONS } from "@constants/index";
 import {
   AppAvatar,
   AppButton,
@@ -36,19 +35,28 @@ import {
   fetchProfileViewModel,
   importTimetableFromNusmodsShareUrl,
   parseManualTimeInput,
-  searchInterestTagSuggestions,
   updateEditableProfile,
 } from "@services/index";
 import { WeeklyTimetableView } from "@features/profile/WeeklyTimetableView";
-import type { StudyStyle, TimetableClassSlot, TimetableSlot } from "@appTypes/index";
+import type { TimetableClassSlot, TimetableSlot } from "@appTypes/index";
 import { useAuthStore } from "@store/index";
-import {
-  normalizeInterestTag,
-  normalizeInterestTags,
-  splitInterestTags,
-} from "@utils/interestTags";
 
-const YEAR_OPTIONS = [1, 2, 3, 4, 5];
+const YEAR_OPTIONS = [1, 2, 3, 4, 5, 6];
+
+const INTEREST_OPTIONS = [
+  "AI / ML",
+  "Software Engineering",
+  "Data Science",
+  "Economics",
+  "Finance",
+  "Consulting",
+  "Entrepreneurship",
+  "Design",
+  "Public Policy",
+  "Operations",
+  "Marketing",
+  "Research",
+];
 
 const INTENT_OPTIONS = [
   { id: "study_group", label: "Study groups" },
@@ -66,14 +74,6 @@ const DAY_OPTIONS = [
   { value: 6, label: "Sat" },
   { value: 7, label: "Sun" },
 ] as const;
-
-const STUDY_STYLE_OPTIONS: { value: StudyStyle; label: string }[] = [
-  { value: "in_person", label: "In person" },
-  { value: "online", label: "Online" },
-  { value: "flexible", label: "Open to both" },
-];
-
-const GROUP_SIZE_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8];
 
 export default function ProfileScreen() {
   const profile = useAuthStore((state) => state.profile);
@@ -97,8 +97,6 @@ export default function ProfileScreen() {
   const [facultyDraft, setFacultyDraft] = useState("");
   const [majorDraft, setMajorDraft] = useState("");
   const [yearOfStudyDraft, setYearOfStudyDraft] = useState(1);
-  const [studyStyleDraft, setStudyStyleDraft] = useState<StudyStyle>("in_person");
-  const [preferredGroupSizeDraft, setPreferredGroupSizeDraft] = useState(4);
   const [interestsDraft, setInterestsDraft] = useState<string[]>([]);
   const [intentsDraft, setIntentsDraft] = useState<NonNullable<typeof profile>["intents"]>([]);
   const [moduleQuery, setModuleQuery] = useState("");
@@ -108,7 +106,6 @@ export default function ProfileScreen() {
   const [manualStartDraft, setManualStartDraft] = useState("09:00");
   const [manualEndDraft, setManualEndDraft] = useState("11:00");
   const [customInterestInput, setCustomInterestInput] = useState("");
-  const [interestSuggestions, setInterestSuggestions] = useState<string[]>([]);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isImportingTimetable, setIsImportingTimetable] = useState(false);
@@ -158,9 +155,7 @@ export default function ProfileScreen() {
           setFacultyDraft(profile.faculty ?? "");
           setMajorDraft(profile.major ?? "");
           setYearOfStudyDraft(profile.year_of_study ?? 1);
-          setStudyStyleDraft(profile.study_style ?? "in_person");
-          setPreferredGroupSizeDraft(profile.preferred_group_size ?? 4);
-          setInterestsDraft(normalizeInterestTags(profile.interests));
+          setInterestsDraft(profile.interests);
           setIntentsDraft(profile.intents);
           setTimetableSlotsDraft(timetableSlots);
         }
@@ -227,31 +222,6 @@ export default function ProfileScreen() {
     };
   }, [editableModules, isEditing, moduleQuery]);
 
-  useEffect(() => {
-    const trimmedInput = customInterestInput.trim();
-
-    if (!isEditing || trimmedInput.length < 2) {
-      setInterestSuggestions([]);
-      return;
-    }
-
-    const timeoutId = setTimeout(() => {
-      void searchInterestTagSuggestions(trimmedInput)
-        .then((nextSuggestions) => {
-          setInterestSuggestions(
-            nextSuggestions.filter(
-              (suggestion) => !interestsDraft.includes(suggestion),
-            ),
-          );
-        })
-        .catch(() => {
-          setInterestSuggestions([]);
-        });
-    }, 200);
-
-    return () => clearTimeout(timeoutId);
-  }, [customInterestInput, interestsDraft, isEditing]);
-
   function resetDrafts() {
     if (!profile) {
       return;
@@ -262,9 +232,7 @@ export default function ProfileScreen() {
     setFacultyDraft(profile.faculty ?? "");
     setMajorDraft(profile.major ?? "");
     setYearOfStudyDraft(profile.year_of_study ?? 1);
-    setStudyStyleDraft(profile.study_style ?? "in_person");
-    setPreferredGroupSizeDraft(profile.preferred_group_size ?? 4);
-    setInterestsDraft(normalizeInterestTags(profile.interests));
+    setInterestsDraft(profile.interests);
     setIntentsDraft(profile.intents);
     setModuleQuery("");
     setModuleResults([]);
@@ -435,25 +403,18 @@ export default function ProfileScreen() {
   }
 
   function addCustomInterest() {
-    const trimmedInterest = normalizeInterestTag(customInterestInput);
+    const trimmedInterest = customInterestInput.trim();
 
     if (!trimmedInterest || interestsDraft.includes(trimmedInterest)) {
       return;
     }
 
-    setInterestsDraft((current) => normalizeInterestTags([...current, trimmedInterest]));
+    setInterestsDraft((current) => [...current, trimmedInterest]);
     setCustomInterestInput("");
-    setInterestSuggestions([]);
   }
 
   function removeInterest(interest: string) {
     setInterestsDraft((current) => current.filter((item) => item !== interest));
-  }
-
-  function applyInterestSuggestion(interest: string) {
-    setInterestsDraft((current) => normalizeInterestTags([...current, interest]));
-    setCustomInterestInput("");
-    setInterestSuggestions([]);
   }
 
   function toggleIntent(
@@ -510,18 +471,9 @@ export default function ProfileScreen() {
     setTimetableSlotsDraft(importedAvailabilityPreview);
     setTimetableShareUrlDraft("");
     Alert.alert(
-      "Timetable linked",
-      `Matched ${importedClassSlotsPreview.length} lesson slots. Your availability has been saved behind the scenes for matching.`,
+      "Availability applied",
+      `Matched ${importedClassSlotsPreview.length} class slots and converted them into ${importedAvailabilityPreview.length} free blocks. Review them before saving.`,
     );
-  }
-
-  function handleRemoveImportedTimetable() {
-    setTimetableSlotsDraft((current) =>
-      current.filter((slot) => slot.source !== "nusmods"),
-    );
-    setImportedAvailabilityPreview([]);
-    setImportedClassSlotsPreview([]);
-    setTimetableShareUrlDraft("");
   }
 
   function handleAddManualTimetableBlock() {
@@ -623,8 +575,6 @@ export default function ProfileScreen() {
         faculty: facultyDraft,
         major: majorDraft,
         yearOfStudy: yearOfStudyDraft,
-        studyStyle: studyStyleDraft,
-        preferredGroupSize: preferredGroupSizeDraft,
         interests: interestsDraft,
         intents: intentsDraft,
         modules: editableModules,
@@ -669,12 +619,6 @@ export default function ProfileScreen() {
     ? editableModules.map((module) => module.moduleCode)
     : moduleCodes;
   const visibleTimetableSlots = isEditing ? timetableSlotsDraft : savedTimetableSlots;
-  const visibleManualTimetableSlots = visibleTimetableSlots.filter(
-    (slot) => slot.source === "manual",
-  );
-  const hasImportedTimetable = visibleTimetableSlots.some(
-    (slot) => slot.source === "nusmods",
-  );
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#EEF3F9" }}>
@@ -848,80 +792,11 @@ export default function ProfileScreen() {
               </View>
             </View>
           ) : (
-            <View className="gap-2">
-              <Text className="text-[14px] leading-6 text-[#0F1115]">
-                {[profile.faculty, profile.major, profile.year_of_study ? `Year ${profile.year_of_study}` : null]
-                  .filter(Boolean)
-                  .join(" · ") || "No academic details saved yet."}
-              </Text>
-            </View>
-          )}
-        </SectionCard>
-
-        <SectionCard className="mb-3">
-          <SectionHeader title="Study Preferences" />
-          {isEditing ? (
-            <View className="gap-4">
-              <View>
-                <Text className="mb-2 text-[13px] font-semibold text-[#0F1115]">
-                  Study mode
-                </Text>
-                <View className="flex-row flex-wrap gap-2">
-                  {STUDY_STYLE_OPTIONS.map((option) => {
-                    const isSelected = option.value === studyStyleDraft;
-
-                    return (
-                      <Pressable
-                        key={option.value}
-                        onPress={() => setStudyStyleDraft(option.value)}
-                      >
-                        <AppChip
-                          label={option.label}
-                          variant={isSelected ? "solid" : "outline"}
-                        />
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              </View>
-
-              <View>
-                <Text className="mb-2 text-[13px] font-semibold text-[#0F1115]">
-                  Preferred group size
-                </Text>
-                <View className="flex-row flex-wrap gap-2">
-                  {GROUP_SIZE_OPTIONS.map((groupSize) => {
-                    const isSelected = groupSize === preferredGroupSizeDraft;
-
-                    return (
-                      <Pressable
-                        key={groupSize}
-                        onPress={() => setPreferredGroupSizeDraft(groupSize)}
-                      >
-                        <AppChip
-                          label={`${groupSize}`}
-                          variant={isSelected ? "solid" : "outline"}
-                        />
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              </View>
-            </View>
-          ) : (
-            <View className="gap-2">
-              <Text className="text-[14px] leading-6 text-[#0F1115]">
-                {`Study mode: ${
-                  profile.study_style
-                    ? STUDY_STYLE_OPTIONS.find((option) => option.value === profile.study_style)?.label ??
-                      profile.study_style
-                    : "Not set"
-                }`}
-              </Text>
-              <Text className="text-[14px] leading-6 text-[#0F1115]">
-                {`Preferred group size: ${profile.preferred_group_size ?? "Not set"}`}
-              </Text>
-            </View>
+            <Text className="text-[14px] leading-6 text-[#0F1115]">
+              {[profile.faculty, profile.major, profile.year_of_study ? `Year ${profile.year_of_study}` : null]
+                .filter(Boolean)
+                .join(" · ") || "No academic details saved yet."}
+            </Text>
           )}
         </SectionCard>
 
@@ -1043,7 +918,7 @@ export default function ProfileScreen() {
           {isEditing ? (
             <View>
               <View className="flex-row flex-wrap gap-2">
-                {Array.from(new Set([...INTEREST_TAG_OPTIONS, ...interestsDraft])).map(
+                {Array.from(new Set([...INTEREST_OPTIONS, ...interestsDraft])).map(
                   (interest) => {
                     const isSelected = interestsDraft.includes(interest);
 
@@ -1075,7 +950,7 @@ export default function ProfileScreen() {
                   value={customInterestInput}
                   onChangeText={setCustomInterestInput}
                   className="flex-1 rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-4 text-[15px] text-[#0F1115]"
-                  placeholder="Add a niche custom interest"
+                  placeholder="Add a custom interest"
                   placeholderTextColor="#9AA0AB"
                 />
                 <Pressable
@@ -1088,7 +963,8 @@ export default function ProfileScreen() {
 
               {interestsDraft.length > 0 ? (
                 <View className="mt-3 flex-row flex-wrap gap-2">
-                  {splitInterestTags(interestsDraft).custom
+                  {interestsDraft
+                    .filter((interest) => !INTEREST_OPTIONS.includes(interest))
                     .map((interest) => (
                       <Pressable
                         key={interest}
@@ -1100,27 +976,6 @@ export default function ProfileScreen() {
                         </Text>
                       </Pressable>
                     ))}
-                </View>
-              ) : null}
-
-              {interestSuggestions.length > 0 ? (
-                <View className="mt-3">
-                  <Text className="mb-2 text-[12px] font-semibold uppercase tracking-[0.5px] text-[#7A8594]">
-                    Similar existing tags
-                  </Text>
-                  <View className="flex-row flex-wrap gap-2">
-                    {interestSuggestions.map((suggestion) => (
-                      <Pressable
-                        key={suggestion}
-                        className="rounded-full border border-[#D0D7E2] bg-white px-4 py-2"
-                        onPress={() => applyInterestSuggestion(suggestion)}
-                      >
-                        <Text className="text-[13px] font-semibold text-[#415A77]">
-                          {suggestion}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </View>
                 </View>
               ) : null}
             </View>
@@ -1138,9 +993,7 @@ export default function ProfileScreen() {
         </SectionCard>
 
         <SectionCard className="mb-3">
-          <SectionHeader
-            title={`Timetable Availability · ${visibleManualTimetableSlots.length}`}
-          />
+          <SectionHeader title={`Timetable Availability · ${visibleTimetableSlots.length}`} />
           {isEditing ? (
             <View className="gap-4">
               <View className="rounded-2xl bg-[#F7F9FC] p-3">
@@ -1148,7 +1001,7 @@ export default function ProfileScreen() {
                   Import from NUSMods
                 </Text>
                 <Text className="mt-1 text-[13px] leading-5 text-[#5C6370]">
-                  Paste your NUSMods timetable share URL. We will show the lesson slots we matched, then save the derived availability behind the scenes for matching.
+                  Paste your NUSMods timetable share URL. We will first show the class slots we matched, then let you apply the derived free blocks for matching.
                 </Text>
                 <TextInput
                   value={timetableShareUrlDraft}
@@ -1198,26 +1051,25 @@ export default function ProfileScreen() {
 
                   <View className="mt-3">
                     <AppButton
-                      label="Use this timetable for matching"
+                      label="Apply derived free blocks"
                       onPress={handleApplyImportedAvailability}
                     />
                   </View>
                 </View>
               ) : null}
 
-              {timetableSlotsDraft.some((slot) => slot.source === "nusmods") ? (
+              {importedAvailabilityPreview.length > 0 ? (
                 <View className="rounded-2xl bg-[#F7F9FC] p-3">
                   <Text className="text-[13px] font-semibold text-[#0F1115]">
-                    NUSMods timetable connected
+                    Derived weekly free blocks
                   </Text>
                   <Text className="mt-1 text-[13px] leading-5 text-[#5C6370]">
-                    Imported lesson timing is being used behind the scenes to calculate overlap. We are hiding the derived free blocks from this screen.
+                    These availability blocks are what matching will use after you apply and save.
                   </Text>
                   <View className="mt-3">
-                    <AppButton
-                      label="Remove imported timetable"
-                      variant="secondary"
-                      onPress={handleRemoveImportedTimetable}
+                    <WeeklyTimetableView
+                      slots={importedAvailabilityPreview}
+                      emptyLabel="No derived free blocks found in the weekday study window."
                     />
                   </View>
                 </View>
@@ -1293,8 +1145,8 @@ export default function ProfileScreen() {
               </View>
 
               <View className="gap-2">
-                {visibleManualTimetableSlots.length > 0 ? (
-                  visibleManualTimetableSlots.map((slot) => (
+                {timetableSlotsDraft.length > 0 ? (
+                  timetableSlotsDraft.map((slot) => (
                     <Pressable
                       key={`${slot.day_of_week}-${slot.start_minute}-${slot.end_minute}-${slot.source}`}
                       className="flex-row items-center justify-between rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-3"
@@ -1306,7 +1158,7 @@ export default function ProfileScreen() {
                           {formatMinuteOfDay(slot.end_minute)}
                         </Text>
                         <Text className="mt-1 text-[12px] text-[#5C6370]">
-                          Manual free block
+                          {slot.source === "nusmods" ? "Imported from NUSMods" : "Manual free block"}
                         </Text>
                       </View>
                       <Text className="text-[13px] font-semibold text-[#5B7BA3]">
@@ -1316,27 +1168,20 @@ export default function ProfileScreen() {
                   ))
                 ) : (
                   <Text className="text-[13px] leading-5 text-[#5C6370]">
-                    {hasImportedTimetable
-                      ? "Your imported timetable is already being used for matching. Add manual free blocks only if you want to override or supplement it."
-                      : "No timetable availability saved yet. Import a NUSMods link or add manual blocks for better schedule-overlap matches."}
+                    No timetable availability saved yet. Import a NUSMods link or add manual blocks for better schedule-overlap matches.
                   </Text>
                 )}
               </View>
             </View>
           ) : (
-            <View className="gap-2">
-              {hasImportedTimetable ? (
-                <View className="rounded-[14px] bg-[#F7F9FC] px-4 py-3">
-                  <Text className="text-[14px] font-semibold text-[#0F1115]">
-                    NUSMods timetable connected
-                  </Text>
-                  <Text className="mt-1 text-[12px] text-[#5C6370]">
-                    Used behind the scenes to calculate schedule-overlap matching.
-                  </Text>
-                </View>
-              ) : null}
-              {visibleManualTimetableSlots.length > 0 ? (
-                visibleManualTimetableSlots.map((slot) => (
+            <View className="gap-3">
+              <WeeklyTimetableView
+                slots={savedTimetableSlots}
+                emptyLabel="Add timetable availability to improve schedule-overlap matching in the People tab."
+              />
+
+              {savedTimetableSlots.length > 0 ? (
+                savedTimetableSlots.map((slot) => (
                   <View
                     key={`${slot.day_of_week}-${slot.start_minute}-${slot.end_minute}-${slot.source}`}
                     className="rounded-[14px] bg-[#F7F9FC] px-4 py-3"
@@ -1346,15 +1191,13 @@ export default function ProfileScreen() {
                       {formatMinuteOfDay(slot.end_minute)}
                     </Text>
                     <Text className="mt-1 text-[12px] text-[#5C6370]">
-                      Manual free block
+                      {slot.source === "nusmods" ? "Imported from NUSMods" : "Manual free block"}
                     </Text>
                   </View>
                 ))
               ) : (
                 <Text className="text-[13px] leading-5 text-[#5C6370]">
-                  {hasImportedTimetable
-                    ? "Your imported timetable is being used for schedule-overlap matching."
-                    : "Add timetable availability to improve schedule-overlap matching in the People tab."}
+                  Add timetable availability to improve schedule-overlap matching in the People tab.
                 </Text>
               )}
             </View>
