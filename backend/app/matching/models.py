@@ -5,6 +5,7 @@ from dataclasses import dataclass
 class ModuleRegistration:
     user_id: str
     module_code: str
+    target_grade: str | None
 
 
 @dataclass(frozen=True)
@@ -28,5 +29,3 @@ class ProfileSummary:
     interests: list[str]
     intents: list[str]
     onboarding_completed: bool
-    study_style: str | None = None
-    preferred_group_size: int | None = None

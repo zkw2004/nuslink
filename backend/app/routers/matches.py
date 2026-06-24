@@ -72,7 +72,6 @@ def get_people_matches(
 
     ranked_candidates = rank_candidates(
         current_user_id=current_user.id,
-        current_user_profile=current_user_profile,
         profiles=candidate_profiles,
         current_user_registrations=[
             registration

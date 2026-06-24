@@ -13,7 +13,7 @@ import { saveAcademicProfile } from "./onboardingService";
 import { toSelectedModule, type SelectedModule } from "./types";
 import { OnboardingFrame } from "./OnboardingFrame";
 
-const YEAR_OPTIONS = [1, 2, 3, 4, 5];
+const YEAR_OPTIONS = [1, 2, 3, 4, 5, 6];
 
 export function AcademicInfoScreen() {
   const signOut = useAuthStore((state) => state.signOut);

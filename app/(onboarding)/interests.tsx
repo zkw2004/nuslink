@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Pressable,
   View,
@@ -10,14 +10,22 @@ import {
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { INTEREST_TAG_OPTIONS } from "@constants/index";
-import { searchInterestTagSuggestions } from "@services/index";
 import { useAuthStore, useOnboardingStore } from "@store/index";
-import {
-  normalizeInterestTag,
-  normalizeInterestTags,
-  splitInterestTags,
-} from "@utils/interestTags";
+
+const PREDEFINED_INTERESTS = [
+  "AI / ML",
+  "Software Engineering",
+  "Data Science",
+  "Economics",
+  "Finance",
+  "Consulting",
+  "Entrepreneurship",
+  "Design",
+  "Public Policy",
+  "Operations",
+  "Marketing",
+  "Research",
+];
 
 const TOTAL_STEPS = 5;
 const CURRENT_STEP = 3;
@@ -27,40 +35,17 @@ export default function InterestsScreen() {
   const profile = useAuthStore((state) => state.profile);
   const savedInterests = useOnboardingStore((state) => state.interests);
   const setInterests = useOnboardingStore((state) => state.setInterests);
-  const initialInterests = normalizeInterestTags(
-    savedInterests.length > 0 ? savedInterests : (profile?.interests ?? []),
+  const initialInterests =
+    savedInterests.length > 0 ? savedInterests : (profile?.interests ?? []);
+  const initialCustomTags = initialInterests.filter(
+    (interest) => !PREDEFINED_INTERESTS.includes(interest),
   );
-  const initialCustomTags = splitInterestTags(initialInterests).custom;
   const [selected, setSelected] = useState<Set<string>>(
     new Set(initialInterests),
   );
   const [customTags, setCustomTags] = useState<string[]>(initialCustomTags);
   const [customInput, setCustomInput] = useState("");
   const [showCustomInput, setShowCustomInput] = useState(false);
-  const [suggestions, setSuggestions] = useState<string[]>([]);
-
-  useEffect(() => {
-    const trimmedInput = customInput.trim();
-
-    if (trimmedInput.length < 2) {
-      setSuggestions([]);
-      return;
-    }
-
-    const timeoutId = setTimeout(() => {
-      void searchInterestTagSuggestions(trimmedInput)
-        .then((nextSuggestions) => {
-          setSuggestions(
-            nextSuggestions.filter((suggestion) => !selected.has(suggestion)),
-          );
-        })
-        .catch(() => {
-          setSuggestions([]);
-        });
-    }, 200);
-
-    return () => clearTimeout(timeoutId);
-  }, [customInput, selected]);
 
   function toggleInterest(interest: string) {
     setSelected((prev) => {
@@ -72,31 +57,11 @@ export default function InterestsScreen() {
   }
 
   function addCustomTag() {
-    const tag = normalizeInterestTag(customInput);
-
-    if (!tag || selected.has(tag)) {
-      return;
-    }
-
-    if (!INTEREST_TAG_OPTIONS.includes(tag as (typeof INTEREST_TAG_OPTIONS)[number])) {
-      setCustomTags((prev) => [...prev, tag]);
-    }
-
+    const tag = customInput.trim();
+    if (!tag || customTags.includes(tag) || PREDEFINED_INTERESTS.includes(tag)) return;
+    setCustomTags((prev) => [...prev, tag]);
     setSelected((prev) => new Set([...prev, tag]));
     setCustomInput("");
-    setShowCustomInput(false);
-    setSuggestions([]);
-  }
-
-  function applySuggestion(tag: string) {
-    setSelected((prev) => new Set([...prev, tag]));
-
-    if (!INTEREST_TAG_OPTIONS.includes(tag as (typeof INTEREST_TAG_OPTIONS)[number])) {
-      setCustomTags((prev) => (prev.includes(tag) ? prev : [...prev, tag]));
-    }
-
-    setCustomInput("");
-    setSuggestions([]);
     setShowCustomInput(false);
   }
 
@@ -138,7 +103,7 @@ export default function InterestsScreen() {
         </Text>
 
         <View className="flex-row flex-wrap gap-2 mt-6">
-          {[...INTEREST_TAG_OPTIONS, ...customTags].map((interest) => {
+          {[...PREDEFINED_INTERESTS, ...customTags].map((interest) => {
             const isSelected = selected.has(interest);
             return (
               <TouchableOpacity
@@ -193,36 +158,14 @@ export default function InterestsScreen() {
           <Text className="text-[#5B7BA3] text-base mt-0.5">✦</Text>
           <View className="flex-1">
             <Text className="text-sm font-semibold text-gray-900">
-              Use the shared tag bank first
+              You can add custom tags later
             </Text>
             <Text className="text-xs text-gray-500 mt-1 leading-relaxed">
-              The built-in tags give the best match quality, but you can still add
-              custom ones for niche interests.
+              Mix broad areas like finance, consulting, policy, or entrepreneurship
+              with technical interests if they matter to you.
             </Text>
           </View>
         </View>
-
-        {showCustomInput && suggestions.length > 0 ? (
-          <View className="mt-4">
-            <Text className="mb-2 text-[12px] font-semibold uppercase tracking-[0.5px] text-[#7A8594]">
-              Similar existing tags
-            </Text>
-            <View className="flex-row flex-wrap gap-2">
-              {suggestions.map((suggestion) => (
-                <TouchableOpacity
-                  key={suggestion}
-                  onPress={() => applySuggestion(suggestion)}
-                  activeOpacity={0.75}
-                  className="rounded-full border border-[#D0D7E2] bg-white px-4 py-2"
-                >
-                  <Text className="text-sm font-semibold text-[#415A77]">
-                    {suggestion}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        ) : null}
       </ScrollView>
 
       {/* Footer */}
@@ -232,7 +175,7 @@ export default function InterestsScreen() {
         </Text>
         <TouchableOpacity
           onPress={() => {
-            setInterests(normalizeInterestTags(Array.from(selected)));
+            setInterests(Array.from(selected));
             router.push("/(onboarding)/intent");
           }}
           disabled={!canContinue}
