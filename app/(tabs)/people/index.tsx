@@ -22,7 +22,7 @@ function toBadgeTierLabel(tier: "bronze" | "silver" | "gold" | null) {
     case "bronze":
       return "Reliable" as const;
     default:
-      return "New" as const;
+      return null;
   }
 }
 
@@ -50,6 +50,31 @@ export default function PeopleScreen() {
   const [query, setQuery] = useState("");
   const [activeModule, setActiveModule] = useState<string>("all");
 
+  const normalizedMatches = useMemo(() => {
+    return peopleMatches.map((candidate) => ({
+      ...candidate,
+      bio: candidate.bio ?? "",
+      shared_modules: candidate.shared_modules ?? [],
+      interests: candidate.interests ?? [],
+      intents: candidate.intents ?? [],
+      match_reasons: candidate.match_reasons ?? [],
+      schedule_summary: candidate.schedule_summary ?? "No timetable overlap summary yet.",
+      breakdown: {
+        module_overlap: candidate.breakdown?.module_overlap ?? null,
+        schedule_overlap: candidate.breakdown?.schedule_overlap ?? null,
+        faculty_major: candidate.breakdown?.faculty_major ?? null,
+        year_proximity: candidate.breakdown?.year_proximity ?? null,
+        interest_overlap: candidate.breakdown?.interest_overlap ?? null,
+        study_style: candidate.breakdown?.study_style ?? null,
+        preferred_group_size: candidate.breakdown?.preferred_group_size ?? null,
+      },
+      compatibility_percentage: Math.max(
+        0,
+        Math.min(100, candidate.compatibility_percentage ?? 0),
+      ),
+    }));
+  }, [peopleMatches]);
+
   useEffect(() => {
     void refreshPeopleMatches(activeModule === "all" ? undefined : activeModule);
   }, [activeModule, refreshPeopleMatches]);
@@ -66,10 +91,10 @@ export default function PeopleScreen() {
 
   const filteredMatches = useMemo(() => {
     if (!normalizedQuery) {
-      return peopleMatches;
+      return normalizedMatches;
     }
 
-    return peopleMatches.filter((candidate) => {
+    return normalizedMatches.filter((candidate) => {
       return (
         candidate.display_name.toLowerCase().includes(normalizedQuery) ||
         candidate.major?.toLowerCase().includes(normalizedQuery) ||
@@ -79,7 +104,7 @@ export default function PeopleScreen() {
         )
       );
     });
-  }, [normalizedQuery, peopleMatches]);
+  }, [normalizedMatches, normalizedQuery]);
 
   async function handleSendRequest(recipientId: string) {
     if (!session?.user.id) {
@@ -218,9 +243,11 @@ export default function PeopleScreen() {
                         <Text className="text-[15px] font-bold text-[#0F1115]">
                           {request.requester_profile.display_name}
                         </Text>
-                        <BadgeTierPill
-                          tier={toBadgeTierLabel(request.requester_profile.badge_tier)}
-                        />
+                        {toBadgeTierLabel(request.requester_profile.badge_tier) ? (
+                          <BadgeTierPill
+                            tier={toBadgeTierLabel(request.requester_profile.badge_tier)!}
+                          />
+                        ) : null}
                       </View>
                       <Text className="mt-1 text-[13px] text-[#5C6370]">
                         {[
@@ -325,7 +352,9 @@ export default function PeopleScreen() {
                       <Text className="text-[17px] font-bold text-[#0F1115]">
                         {candidate.display_name}
                       </Text>
-                      <BadgeTierPill tier={toBadgeTierLabel(candidate.badge_tier)} />
+                      {toBadgeTierLabel(candidate.badge_tier) ? (
+                        <BadgeTierPill tier={toBadgeTierLabel(candidate.badge_tier)!} />
+                      ) : null}
                     </View>
                     <Text className="mt-1 text-[13px] text-[#5C6370]">
                       {[candidate.major, candidate.year_of_study ? `Year ${candidate.year_of_study}` : null]
@@ -347,142 +376,14 @@ export default function PeopleScreen() {
                 ))}
               </View>
 
-              {candidate.match_reasons.length > 0 ? (
-                <View className="mt-4 gap-2 rounded-[16px] border border-[#E4E9F1] bg-white p-3">
-                  <Text className="text-[13px] font-semibold text-[#0F1115]">
-                    Why this match
-                  </Text>
-                  {candidate.match_reasons.map((reason) => (
-                    <Text
-                      key={`${candidate.user_id}-${reason}`}
-                      className="text-[13px] leading-5 text-[#5C6370]"
-                    >
-                      {`\u2022 ${reason}`}
-                    </Text>
-                  ))}
-                </View>
-              ) : null}
+              <Text className="mt-3 text-[13px] leading-5 text-[#5C6370]">
+                {candidate.shared_modules.length === 1
+                  ? `Taking ${candidate.shared_modules[0]} with you this semester.`
+                  : `${candidate.shared_modules.length} shared modules this semester.`}
+              </Text>
 
               <View className="mt-4 items-start">
                 {renderConnectionAction(candidate.user_id)}
-              </View>
-
-              <View className="mt-4 gap-3 rounded-[16px] bg-[#F7F9FC] p-3">
-                <Text className="text-[13px] font-semibold text-[#0F1115]">
-                  Shared modules
-                  {candidate.breakdown.module_overlap !== null
-                    ? ` · ${candidate.breakdown.module_overlap}%`
-                    : ""}
-                </Text>
-                <Text className="text-[13px] leading-5 text-[#5C6370]">
-                  {candidate.shared_modules.length === 1
-                    ? `You are both taking ${candidate.shared_modules[0]} this semester.`
-                    : `You share ${candidate.shared_modules.length} current-semester modules, which strongly boosts compatibility.`}
-                </Text>
-
-                <Text className="text-[13px] font-semibold text-[#0F1115]">
-                  Schedule overlap
-                  {candidate.breakdown.schedule_overlap !== null
-                    ? ` · ${candidate.breakdown.schedule_overlap}%`
-                    : ""}
-                </Text>
-                <Text className="text-[13px] leading-5 text-[#5C6370]">
-                  {candidate.schedule_summary}
-                </Text>
-
-                <Text className="text-[13px] font-semibold text-[#0F1115]">
-                  Faculty / major
-                  {candidate.breakdown.faculty_major !== null
-                    ? ` · ${candidate.breakdown.faculty_major}%`
-                    : ""}
-                </Text>
-                <Text className="text-[13px] leading-5 text-[#5C6370]">
-                  {candidate.breakdown.faculty_major === null
-                    ? "Add faculty and major details on both profiles to compare academic background."
-                    : candidate.breakdown.faculty_major >= 100
-                      ? "You share the same major, so your academic context is very closely aligned."
-                      : candidate.breakdown.faculty_major >= 65
-                        ? "You are from the same faculty, which may make your academic context more similar."
-                        : "Your match comes from other signals more than faculty or major."}
-                </Text>
-
-                <Text className="text-[13px] font-semibold text-[#0F1115]">
-                  Year proximity
-                  {candidate.breakdown.year_proximity !== null
-                    ? ` · ${candidate.breakdown.year_proximity}%`
-                    : ""}
-                </Text>
-                <Text className="text-[13px] leading-5 text-[#5C6370]">
-                  {candidate.breakdown.year_proximity === null
-                    ? "Add year-of-study data on both profiles to compare progression."
-                    : candidate.breakdown.year_proximity >= 70
-                      ? "You are close in year of study, which usually means similar pacing and module pathways."
-                      : candidate.breakdown.year_proximity >= 40
-                        ? "There is some academic overlap even though you are not in the exact same year."
-                        : "This match is driven more by module and profile similarity than by year of study."}
-                </Text>
-
-                <Text className="text-[13px] font-semibold text-[#0F1115]">
-                  Interest overlap
-                  {candidate.breakdown.interest_overlap !== null
-                    ? ` · ${candidate.breakdown.interest_overlap}%`
-                    : ""}
-                </Text>
-                <Text className="text-[13px] leading-5 text-[#5C6370]">
-                  {candidate.breakdown.interest_overlap === null
-                    ? "Add interests on both profiles to compare academic themes."
-                    : candidate.breakdown.interest_overlap >= 50
-                      ? "Your listed interests overlap strongly."
-                      : candidate.breakdown.interest_overlap > 0
-                        ? "You share some common interests, though this is not the strongest signal."
-                        : "This match is supported more by shared modules and academic fit than by listed interests."}
-                </Text>
-
-                <Text className="text-[13px] font-semibold text-[#0F1115]">
-                  Study style
-                  {candidate.breakdown.study_style !== null
-                    ? ` · ${candidate.breakdown.study_style}%`
-                    : ""}
-                </Text>
-                <Text className="text-[13px] leading-5 text-[#5C6370]">
-                  {candidate.breakdown.study_style === null
-                    ? "Add study-style preferences on both profiles to compare how you like to work."
-                    : candidate.breakdown.study_style >= 100
-                      ? "You prefer the same study environment."
-                      : candidate.breakdown.study_style >= 70
-                        ? "Your study-style preferences are fairly compatible."
-                        : "You may study differently, but the stronger academic signals still support this match."}
-                </Text>
-
-                <Text className="text-[13px] font-semibold text-[#0F1115]">
-                  Preferred group size
-                  {candidate.breakdown.preferred_group_size !== null
-                    ? ` · ${candidate.breakdown.preferred_group_size}%`
-                    : ""}
-                </Text>
-                <Text className="text-[13px] leading-5 text-[#5C6370]">
-                  {candidate.breakdown.preferred_group_size === null
-                    ? "Add preferred group size on both profiles to compare collaboration preferences."
-                    : candidate.breakdown.preferred_group_size >= 80
-                      ? "You prefer a very similar group size."
-                      : candidate.breakdown.preferred_group_size >= 50
-                        ? "Your group-size preferences are reasonably close."
-                        : "Group-size preference is not the strongest fit here, but the core academic signals still align."}
-                </Text>
-
-                <Text className="text-[13px] font-semibold text-[#0F1115]">
-                  Hall / RC
-                  {candidate.breakdown.hall_rc !== null
-                    ? ` · ${candidate.breakdown.hall_rc}%`
-                    : ""}
-                </Text>
-                <Text className="text-[13px] leading-5 text-[#5C6370]">
-                  {candidate.breakdown.hall_rc === null
-                    ? "Add hall or residential-college details on both profiles for a light proximity boost."
-                    : candidate.breakdown.hall_rc >= 100
-                      ? "You share the same hall / RC, which can make in-person coordination easier."
-                      : "Hall / RC is only a light tie-breaker here, so this match is mostly driven by the stronger academic signals."}
-                </Text>
               </View>
             </SectionCard>
           ))}

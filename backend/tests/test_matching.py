@@ -4,6 +4,7 @@ from app.auth import AuthenticatedUser
 from app.main import app
 from app.matching.models import ModuleRegistration, ProfileSummary, TimetableSlot
 from app.matching.scoring import (
+    calculate_study_style_score,
     calculate_interest_overlap_score,
     normalize_interest_tags,
 )
@@ -29,8 +30,7 @@ class FakeMatchRepository:
                 interests=["AI / ML"],
                 intents=["study_group"],
                 onboarding_completed=True,
-                hall_rc="Tembusu",
-                study_style="library",
+                study_style="in_person",
                 preferred_group_size=4,
             ),
             "user-2": ProfileSummary(
@@ -45,8 +45,7 @@ class FakeMatchRepository:
                 interests=["Artificial Intelligence", "Algorithms"],
                 intents=["study_group"],
                 onboarding_completed=True,
-                hall_rc="Tembusu",
-                study_style="flexible",
+                study_style="in_person",
                 preferred_group_size=4,
             ),
             "user-3": ProfileSummary(
@@ -61,8 +60,7 @@ class FakeMatchRepository:
                 interests=["Backend"],
                 intents=["study_group"],
                 onboarding_completed=True,
-                hall_rc="Sheares",
-                study_style="home",
+                study_style="online",
                 preferred_group_size=2,
             ),
         }
@@ -168,7 +166,6 @@ def test_people_matches_returns_ranked_candidates():
     assert body["candidates"][0]["breakdown"]["interest_overlap"] is not None
     assert body["candidates"][0]["breakdown"]["study_style"] is not None
     assert body["candidates"][0]["breakdown"]["preferred_group_size"] is not None
-    assert body["candidates"][0]["breakdown"]["hall_rc"] is not None
     assert len(body["candidates"][0]["match_reasons"]) > 0
 
 
@@ -194,6 +191,14 @@ def test_people_matches_keeps_missing_optional_fields_matchable():
     assert candidate["compatibility_percentage"] > 0
 
 
+def test_people_matches_never_rounds_positive_match_to_zero():
+    response = client.get("/v1/matches/people")
+
+    assert response.status_code == 200
+    for candidate in response.json()["candidates"]:
+        assert candidate["compatibility_percentage"] >= 1
+
+
 def test_interest_overlap_handles_case_and_common_aliases():
     score = calculate_interest_overlap_score(
         ["AI / ML", "Backend"],
@@ -202,6 +207,12 @@ def test_interest_overlap_handles_case_and_common_aliases():
 
     assert score is not None
     assert round(score, 2) == 0.67
+
+
+def test_study_style_flexible_matches_both_modes():
+    score = calculate_study_style_score("flexible", "online")
+
+    assert score == 1.0
 
 
 def test_normalize_interest_tags_supports_broader_canonical_tag_bank():

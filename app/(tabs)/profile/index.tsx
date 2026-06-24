@@ -47,7 +47,7 @@ import {
   splitInterestTags,
 } from "@utils/interestTags";
 
-const YEAR_OPTIONS = [1, 2, 3, 4, 5, 6];
+const YEAR_OPTIONS = [1, 2, 3, 4, 5];
 
 const INTENT_OPTIONS = [
   { id: "study_group", label: "Study groups" },
@@ -67,10 +67,9 @@ const DAY_OPTIONS = [
 ] as const;
 
 const STUDY_STYLE_OPTIONS: { value: StudyStyle; label: string }[] = [
-  { value: "library", label: "Library" },
-  { value: "cafe", label: "Cafe" },
-  { value: "home", label: "Home" },
-  { value: "flexible", label: "Flexible" },
+  { value: "in_person", label: "In person" },
+  { value: "online", label: "Online" },
+  { value: "flexible", label: "Open to both" },
 ];
 
 const GROUP_SIZE_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8];
@@ -97,8 +96,7 @@ export default function ProfileScreen() {
   const [facultyDraft, setFacultyDraft] = useState("");
   const [majorDraft, setMajorDraft] = useState("");
   const [yearOfStudyDraft, setYearOfStudyDraft] = useState(1);
-  const [hallRcDraft, setHallRcDraft] = useState("");
-  const [studyStyleDraft, setStudyStyleDraft] = useState<StudyStyle>("flexible");
+  const [studyStyleDraft, setStudyStyleDraft] = useState<StudyStyle>("in_person");
   const [preferredGroupSizeDraft, setPreferredGroupSizeDraft] = useState(4);
   const [interestsDraft, setInterestsDraft] = useState<string[]>([]);
   const [intentsDraft, setIntentsDraft] = useState<NonNullable<typeof profile>["intents"]>([]);
@@ -159,8 +157,7 @@ export default function ProfileScreen() {
           setFacultyDraft(profile.faculty ?? "");
           setMajorDraft(profile.major ?? "");
           setYearOfStudyDraft(profile.year_of_study ?? 1);
-          setHallRcDraft(profile.hall_rc ?? "");
-          setStudyStyleDraft(profile.study_style ?? "flexible");
+          setStudyStyleDraft(profile.study_style ?? "in_person");
           setPreferredGroupSizeDraft(profile.preferred_group_size ?? 4);
           setInterestsDraft(normalizeInterestTags(profile.interests));
           setIntentsDraft(profile.intents);
@@ -264,8 +261,7 @@ export default function ProfileScreen() {
     setFacultyDraft(profile.faculty ?? "");
     setMajorDraft(profile.major ?? "");
     setYearOfStudyDraft(profile.year_of_study ?? 1);
-    setHallRcDraft(profile.hall_rc ?? "");
-    setStudyStyleDraft(profile.study_style ?? "flexible");
+    setStudyStyleDraft(profile.study_style ?? "in_person");
     setPreferredGroupSizeDraft(profile.preferred_group_size ?? 4);
     setInterestsDraft(normalizeInterestTags(profile.interests));
     setIntentsDraft(profile.intents);
@@ -513,9 +509,18 @@ export default function ProfileScreen() {
     setTimetableSlotsDraft(importedAvailabilityPreview);
     setTimetableShareUrlDraft("");
     Alert.alert(
-      "Availability applied",
-      `Matched ${importedClassSlotsPreview.length} class slots and converted them into ${importedAvailabilityPreview.length} free blocks. Review them before saving.`,
+      "Timetable linked",
+      `Matched ${importedClassSlotsPreview.length} lesson slots. Your availability has been saved behind the scenes for matching.`,
     );
+  }
+
+  function handleRemoveImportedTimetable() {
+    setTimetableSlotsDraft((current) =>
+      current.filter((slot) => slot.source !== "nusmods"),
+    );
+    setImportedAvailabilityPreview([]);
+    setImportedClassSlotsPreview([]);
+    setTimetableShareUrlDraft("");
   }
 
   function handleAddManualTimetableBlock() {
@@ -617,7 +622,6 @@ export default function ProfileScreen() {
         faculty: facultyDraft,
         major: majorDraft,
         yearOfStudy: yearOfStudyDraft,
-        hallRc: hallRcDraft,
         studyStyle: studyStyleDraft,
         preferredGroupSize: preferredGroupSizeDraft,
         interests: interestsDraft,
@@ -664,6 +668,12 @@ export default function ProfileScreen() {
     ? editableModules.map((module) => module.moduleCode)
     : moduleCodes;
   const visibleTimetableSlots = isEditing ? timetableSlotsDraft : savedTimetableSlots;
+  const visibleManualTimetableSlots = visibleTimetableSlots.filter(
+    (slot) => slot.source === "manual",
+  );
+  const hasImportedTimetable = visibleTimetableSlots.some(
+    (slot) => slot.source === "nusmods",
+  );
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#EEF3F9" }}>
@@ -813,13 +823,6 @@ export default function ProfileScreen() {
                 placeholder="Major"
                 placeholderTextColor="#9AA0AB"
               />
-              <TextInput
-                value={hallRcDraft}
-                onChangeText={setHallRcDraft}
-                className="rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-4 text-[15px] text-[#0F1115]"
-                placeholder="Hall / RC (optional)"
-                placeholderTextColor="#9AA0AB"
-              />
               <View className="flex-row gap-1 rounded-2xl bg-[#EEF2F7] p-1">
                 {YEAR_OPTIONS.map((year) => {
                   const isSelected = year === yearOfStudyDraft;
@@ -850,9 +853,6 @@ export default function ProfileScreen() {
                   .filter(Boolean)
                   .join(" · ") || "No academic details saved yet."}
               </Text>
-              <Text className="text-[14px] leading-6 text-[#5C6370]">
-                {profile.hall_rc ? `Hall / RC: ${profile.hall_rc}` : "Hall / RC not set."}
-              </Text>
             </View>
           )}
         </SectionCard>
@@ -863,7 +863,7 @@ export default function ProfileScreen() {
             <View className="gap-4">
               <View>
                 <Text className="mb-2 text-[13px] font-semibold text-[#0F1115]">
-                  Study style
+                  Study mode
                 </Text>
                 <View className="flex-row flex-wrap gap-2">
                   {STUDY_STYLE_OPTIONS.map((option) => {
@@ -910,7 +910,7 @@ export default function ProfileScreen() {
           ) : (
             <View className="gap-2">
               <Text className="text-[14px] leading-6 text-[#0F1115]">
-                {`Study style: ${
+                {`Study mode: ${
                   profile.study_style
                     ? STUDY_STYLE_OPTIONS.find((option) => option.value === profile.study_style)?.label ??
                       profile.study_style
@@ -1137,7 +1137,9 @@ export default function ProfileScreen() {
         </SectionCard>
 
         <SectionCard className="mb-3">
-          <SectionHeader title={`Timetable Availability · ${visibleTimetableSlots.length}`} />
+          <SectionHeader
+            title={`Timetable Availability · ${visibleManualTimetableSlots.length}`}
+          />
           {isEditing ? (
             <View className="gap-4">
               <View className="rounded-2xl bg-[#F7F9FC] p-3">
@@ -1145,7 +1147,7 @@ export default function ProfileScreen() {
                   Import from NUSMods
                 </Text>
                 <Text className="mt-1 text-[13px] leading-5 text-[#5C6370]">
-                  Paste your NUSMods timetable share URL. We will first show the class slots we matched, then let you apply the derived free blocks for matching.
+                  Paste your NUSMods timetable share URL. We will show the lesson slots we matched, then save the derived availability behind the scenes for matching.
                 </Text>
                 <TextInput
                   value={timetableShareUrlDraft}
@@ -1195,8 +1197,26 @@ export default function ProfileScreen() {
 
                   <View className="mt-3">
                     <AppButton
-                      label="Apply derived free blocks"
+                      label="Use this timetable for matching"
                       onPress={handleApplyImportedAvailability}
+                    />
+                  </View>
+                </View>
+              ) : null}
+
+              {timetableSlotsDraft.some((slot) => slot.source === "nusmods") ? (
+                <View className="rounded-2xl bg-[#F7F9FC] p-3">
+                  <Text className="text-[13px] font-semibold text-[#0F1115]">
+                    NUSMods timetable connected
+                  </Text>
+                  <Text className="mt-1 text-[13px] leading-5 text-[#5C6370]">
+                    Imported lesson timing is being used behind the scenes to calculate overlap. We are hiding the derived free blocks from this screen.
+                  </Text>
+                  <View className="mt-3">
+                    <AppButton
+                      label="Remove imported timetable"
+                      variant="secondary"
+                      onPress={handleRemoveImportedTimetable}
                     />
                   </View>
                 </View>
@@ -1262,8 +1282,8 @@ export default function ProfileScreen() {
               </View>
 
               <View className="gap-2">
-                {timetableSlotsDraft.length > 0 ? (
-                  timetableSlotsDraft.map((slot) => (
+                {visibleManualTimetableSlots.length > 0 ? (
+                  visibleManualTimetableSlots.map((slot) => (
                     <Pressable
                       key={`${slot.day_of_week}-${slot.start_minute}-${slot.end_minute}-${slot.source}`}
                       className="flex-row items-center justify-between rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-3"
@@ -1275,7 +1295,7 @@ export default function ProfileScreen() {
                           {formatMinuteOfDay(slot.end_minute)}
                         </Text>
                         <Text className="mt-1 text-[12px] text-[#5C6370]">
-                          {slot.source === "nusmods" ? "Imported from NUSMods" : "Manual free block"}
+                          Manual free block
                         </Text>
                       </View>
                       <Text className="text-[13px] font-semibold text-[#5B7BA3]">
@@ -1285,15 +1305,27 @@ export default function ProfileScreen() {
                   ))
                 ) : (
                   <Text className="text-[13px] leading-5 text-[#5C6370]">
-                    No timetable availability saved yet. Import a NUSMods link or add manual blocks for better schedule-overlap matches.
+                    {hasImportedTimetable
+                      ? "Your imported timetable is already being used for matching. Add manual free blocks only if you want to override or supplement it."
+                      : "No timetable availability saved yet. Import a NUSMods link or add manual blocks for better schedule-overlap matches."}
                   </Text>
                 )}
               </View>
             </View>
           ) : (
             <View className="gap-2">
-              {savedTimetableSlots.length > 0 ? (
-                savedTimetableSlots.map((slot) => (
+              {hasImportedTimetable ? (
+                <View className="rounded-[14px] bg-[#F7F9FC] px-4 py-3">
+                  <Text className="text-[14px] font-semibold text-[#0F1115]">
+                    NUSMods timetable connected
+                  </Text>
+                  <Text className="mt-1 text-[12px] text-[#5C6370]">
+                    Used behind the scenes to calculate schedule-overlap matching.
+                  </Text>
+                </View>
+              ) : null}
+              {visibleManualTimetableSlots.length > 0 ? (
+                visibleManualTimetableSlots.map((slot) => (
                   <View
                     key={`${slot.day_of_week}-${slot.start_minute}-${slot.end_minute}-${slot.source}`}
                     className="rounded-[14px] bg-[#F7F9FC] px-4 py-3"
@@ -1303,13 +1335,15 @@ export default function ProfileScreen() {
                       {formatMinuteOfDay(slot.end_minute)}
                     </Text>
                     <Text className="mt-1 text-[12px] text-[#5C6370]">
-                      {slot.source === "nusmods" ? "Imported from NUSMods" : "Manual free block"}
+                      Manual free block
                     </Text>
                   </View>
                 ))
               ) : (
                 <Text className="text-[13px] leading-5 text-[#5C6370]">
-                  Add timetable availability to improve schedule-overlap matching in the People tab.
+                  {hasImportedTimetable
+                    ? "Your imported timetable is being used for schedule-overlap matching."
+                    : "Add timetable availability to improve schedule-overlap matching in the People tab."}
                 </Text>
               )}
             </View>

@@ -32,9 +32,8 @@ function mapProfileRowToUserProfile(
   row: ProfileRow,
 ): UserProfile {
   const studyStyle =
-    row.study_style === "library" ||
-    row.study_style === "cafe" ||
-    row.study_style === "home" ||
+    row.study_style === "online" ||
+    row.study_style === "in_person" ||
     row.study_style === "flexible"
       ? (row.study_style as StudyStyle)
       : null;

@@ -158,9 +158,8 @@ export async function saveProfileSetup(input: ProfileSetupInput): Promise<UserPr
   }
 
   const studyStyle =
-    data.study_style === "library" ||
-    data.study_style === "cafe" ||
-    data.study_style === "home" ||
+    data.study_style === "online" ||
+    data.study_style === "in_person" ||
     data.study_style === "flexible"
       ? (data.study_style as StudyStyle)
       : null;

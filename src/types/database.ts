@@ -10,7 +10,6 @@ export type Database = {
           display_name: string;
           faculty: string | null;
           graduation_date: string | null;
-          hall_rc: string | null;
           id: string;
           intents: ("study_group" | "hackathon" | "tutoring" | "internship_networking")[];
           interests: string[];
@@ -31,7 +30,6 @@ export type Database = {
           display_name?: string;
           faculty?: string | null;
           graduation_date?: string | null;
-          hall_rc?: string | null;
           id: string;
           intents?: ("study_group" | "hackathon" | "tutoring" | "internship_networking")[];
           interests?: string[];
@@ -52,7 +50,6 @@ export type Database = {
           display_name?: string;
           faculty?: string | null;
           graduation_date?: string | null;
-          hall_rc?: string | null;
           id?: string;
           intents?: ("study_group" | "hackathon" | "tutoring" | "internship_networking")[];
           interests?: string[];

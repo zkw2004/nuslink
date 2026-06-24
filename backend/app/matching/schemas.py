@@ -11,7 +11,6 @@ class MatchBreakdownResponse(BaseModel):
     interest_overlap: int | None = None
     study_style: int | None = None
     preferred_group_size: int | None = None
-    hall_rc: int | None = None
 
 
 class PeopleMatchResponseItem(BaseModel):

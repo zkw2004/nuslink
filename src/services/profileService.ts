@@ -19,7 +19,6 @@ type EditableProfileInput = {
   faculty: string;
   major: string;
   yearOfStudy: number;
-  hallRc: string;
   studyStyle: StudyStyle;
   preferredGroupSize: number;
   interests: string[];
@@ -165,13 +164,6 @@ export async function searchInterestTagSuggestions(query: string): Promise<strin
     return [];
   }
 
-  const normalizedSuggestion = normalizeInterestTag(trimmedQuery);
-  const suggestions = new Set<string>();
-
-  if (normalizedSuggestion) {
-    suggestions.add(normalizedSuggestion);
-  }
-
   const { data, error } = await supabase.rpc("search_interest_tags", {
     search_input: trimmedQuery,
   });
@@ -180,15 +172,9 @@ export async function searchInterestTagSuggestions(query: string): Promise<strin
     throw new Error(error.message);
   }
 
-  (data ?? []).forEach((row) => {
-    const suggestion = normalizeInterestTag(row.tag);
-
-    if (suggestion) {
-      suggestions.add(suggestion);
-    }
-  });
-
-  return Array.from(suggestions);
+  return (data ?? [])
+    .map((row) => normalizeInterestTag(row.tag))
+    .filter((suggestion): suggestion is string => Boolean(suggestion));
 }
 
 export async function updateEditableProfile(
@@ -209,7 +195,6 @@ export async function updateEditableProfile(
       faculty: input.faculty.trim(),
       major: input.major.trim(),
       year_of_study: input.yearOfStudy,
-      hall_rc: input.hallRc.trim() || null,
       study_style: input.studyStyle,
       preferred_group_size: input.preferredGroupSize,
       interests: normalizeInterestTags(input.interests),

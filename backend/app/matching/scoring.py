@@ -10,9 +10,8 @@ MATCH_WEIGHTS = {
     "faculty_major": 0.14,
     "year_proximity": 0.08,
     "interest_overlap": 0.12,
-    "study_style": 0.08,
-    "preferred_group_size": 0.05,
-    "hall_rc": 0.03,
+    "study_style": 0.11,
+    "preferred_group_size": 0.08,
 }
 
 CANONICAL_INTEREST_ALIASES = {
@@ -57,7 +56,6 @@ class CandidateScore:
     interest_overlap: float | None
     study_style: float | None
     preferred_group_size: float | None
-    hall_rc: float | None
     overlap_minutes: int
 
 
@@ -225,13 +223,10 @@ def calculate_study_style_score(
     normalized_current = current_style.strip().lower()
     normalized_candidate = candidate_style.strip().lower()
 
-    if normalized_current == normalized_candidate:
+    if normalized_current == "flexible" or normalized_candidate == "flexible":
         return 1.0
 
-    if "flexible" in {normalized_current, normalized_candidate}:
-        return 0.7
-
-    return 0.25
+    return 1.0 if normalized_current == normalized_candidate else 0.0
 
 
 def calculate_preferred_group_size_score(
@@ -243,19 +238,6 @@ def calculate_preferred_group_size_score(
 
     diff = abs(current_group_size - candidate_group_size)
     return max(0.0, 1.0 - (diff * 0.2))
-
-
-def calculate_hall_rc_score(
-    current_hall_rc: str | None,
-    candidate_hall_rc: str | None,
-) -> float | None:
-    if not current_hall_rc or not candidate_hall_rc:
-        return None
-
-    normalized_current = current_hall_rc.strip().lower()
-    normalized_candidate = candidate_hall_rc.strip().lower()
-
-    return 1.0 if normalized_current == normalized_candidate else 0.0
 
 
 def build_module_map(
@@ -291,7 +273,6 @@ def calculate_overall_score(score: CandidateScore) -> int:
             "interest_overlap": score.interest_overlap,
             "study_style": score.study_style,
             "preferred_group_size": score.preferred_group_size,
-            "hall_rc": score.hall_rc,
         }.items()
         if value is not None
     }
@@ -307,7 +288,13 @@ def calculate_overall_score(score: CandidateScore) -> int:
     if total_weight <= 0:
         return 0
 
-    return round((weighted_total / total_weight) * 100)
+    percentage = (weighted_total / total_weight) * 100
+    rounded_percentage = round(percentage)
+
+    if weighted_total > 0 and rounded_percentage == 0:
+        return 1
+
+    return rounded_percentage
 
 
 def summarize_schedule(schedule_score: float | None, overlap_minutes: int) -> str:
@@ -355,13 +342,10 @@ def build_match_reasons(
         reasons.append("Shared academic interests.")
 
     if score.study_style is not None and score.study_style >= 0.7:
-        reasons.append("Compatible study style preferences.")
+        reasons.append("Compatible study mode preferences.")
 
     if score.preferred_group_size is not None and score.preferred_group_size >= 0.8:
         reasons.append("Prefer a similar group size.")
-
-    if score.hall_rc == 1.0 and candidate_profile.hall_rc:
-        reasons.append(f"Same hall / RC: {candidate_profile.hall_rc}.")
 
     return reasons[:3]
 
@@ -418,10 +402,6 @@ def rank_candidates(
             current_user_profile.preferred_group_size,
             profile.preferred_group_size,
         )
-        hall_rc_score = calculate_hall_rc_score(
-            current_user_profile.hall_rc,
-            profile.hall_rc,
-        )
 
         candidate_score = CandidateScore(
             module_overlap=module_overlap_score,
@@ -431,7 +411,6 @@ def rank_candidates(
             interest_overlap=interest_overlap_score,
             study_style=study_style_score,
             preferred_group_size=preferred_group_size_score,
-            hall_rc=hall_rc_score,
             overlap_minutes=overlap_minutes,
         )
         compatibility_percentage = calculate_overall_score(candidate_score)
@@ -472,9 +451,6 @@ def rank_candidates(
                     "preferred_group_size": None
                     if preferred_group_size_score is None
                     else round(preferred_group_size_score * 100),
-                    "hall_rc": None
-                    if hall_rc_score is None
-                    else round(hall_rc_score * 100),
                 },
                 "match_reasons": build_match_reasons(
                     shared_modules=shared_modules,
