@@ -17,9 +17,16 @@ import { SymbolView } from "expo-symbols";
 
 import { AppAvatar, AppButton, AppChip, SectionCard } from "@components/shared";
 import type { ChatAttachmentKind } from "@appTypes/index";
+import {
+  ChatPollCard,
+  PinnedMessagesDrawer,
+  PollComposer,
+  type PinnedMessagePreview,
+} from "@features/chat/ChatFeaturePanels";
 import { uploadCommunityChatAttachment } from "@services/communityMessagesService";
 import {
   useAuthStore,
+  useChatFeaturesStore,
   useCommunityMessagesStore,
   useSharedResourcesStore,
 } from "@store/index";
@@ -185,6 +192,7 @@ export default function CommunityChatThreadScreen() {
   const subscribeToCommunity = useCommunityMessagesStore(
     (state) => state.subscribeToCommunity,
   );
+
   const communityResourcesById = useSharedResourcesStore(
     (state) => state.communityResources,
   );
@@ -198,16 +206,41 @@ export default function CommunityChatThreadScreen() {
     (state) => state.uploadCommunityResource,
   );
 
+  const pollsByMessageId = useChatFeaturesStore((state) => state.pollsByMessageId);
+  const pinnedMessagesByChatKey = useChatFeaturesStore(
+    (state) => state.pinnedMessagesByChatKey,
+  );
+  const isCreatingPoll = useChatFeaturesStore((state) => state.isCreatingPoll);
+  const isVoting = useChatFeaturesStore((state) => state.isVoting);
+  const isPinning = useChatFeaturesStore((state) => state.isPinning);
+  const loadFeatures = useChatFeaturesStore((state) => state.loadFeatures);
+  const createPoll = useChatFeaturesStore((state) => state.createPoll);
+  const votePoll = useChatFeaturesStore((state) => state.votePoll);
+  const setPinned = useChatFeaturesStore((state) => state.setPinned);
+  const subscribeToFeatureChanges = useChatFeaturesStore(
+    (state) => state.subscribeToFeatureChanges,
+  );
+
   const [messageDraft, setMessageDraft] = useState("");
   const [pendingAttachment, setPendingAttachment] = useState<PendingAttachment | null>(null);
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
+  const [isPinnedDrawerOpen, setIsPinnedDrawerOpen] = useState(false);
+  const [isPollComposerOpen, setIsPollComposerOpen] = useState(false);
+  const [pollQuestion, setPollQuestion] = useState("");
+  const [pollOptions, setPollOptions] = useState(["", ""]);
   const scrollViewRef = useRef<ScrollView | null>(null);
 
   const community = useMemo(
     () => communityChats.find((item) => item.id === communityId) ?? null,
     [communityChats, communityId],
   );
-  const messages = messagesByCommunity[communityId] ?? [];
+  const messages = useMemo(
+    () => messagesByCommunity[communityId] ?? [],
+    [communityId, messagesByCommunity],
+  );
+  const messageIds = useMemo(() => messages.map((message) => message.id), [messages]);
+  const chatKey = `community:${communityId}`;
+  const pinnedMessages = pinnedMessagesByChatKey[chatKey] ?? [];
   const communityResources = useMemo(
     () => communityResourcesById[communityId] ?? [],
     [communityId, communityResourcesById],
@@ -238,6 +271,27 @@ export default function CommunityChatThreadScreen() {
 
     return subscribeToCommunity(communityId, session.user.id);
   }, [communityId, session?.user.id, subscribeToCommunity]);
+
+  useEffect(() => {
+    if (!session?.user.id || !communityId) {
+      return;
+    }
+
+    void loadFeatures("community", communityId, messageIds, session.user.id);
+  }, [communityId, loadFeatures, messageIds, session?.user.id]);
+
+  useEffect(() => {
+    if (!session?.user.id || !communityId) {
+      return undefined;
+    }
+
+    return subscribeToFeatureChanges(
+      "community",
+      communityId,
+      messageIds,
+      session.user.id,
+    );
+  }, [communityId, messageIds, session?.user.id, subscribeToFeatureChanges]);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -288,7 +342,6 @@ export default function CommunityChatThreadScreen() {
     let documentPicker: DocumentPickerModule;
 
     try {
-      // eslint-disable-next-line import/no-unresolved
       documentPicker = (await import("expo-document-picker")) as DocumentPickerModule;
     } catch {
       Alert.alert(
@@ -334,7 +387,6 @@ export default function CommunityChatThreadScreen() {
     let documentPicker: DocumentPickerModule;
 
     try {
-      // eslint-disable-next-line import/no-unresolved
       documentPicker = (await import("expo-document-picker")) as DocumentPickerModule;
     } catch {
       Alert.alert(
@@ -347,13 +399,7 @@ export default function CommunityChatThreadScreen() {
     const result = await documentPicker.getDocumentAsync({
       copyToCacheDirectory: true,
       multiple: false,
-      type: [
-        "audio/mpeg",
-        "audio/mp4",
-        "audio/x-m4a",
-        "audio/wav",
-        "audio/x-wav",
-      ],
+      type: ["audio/mpeg", "audio/mp4", "audio/x-m4a", "audio/wav", "audio/x-wav"],
     });
 
     if (result.canceled) {
@@ -449,7 +495,6 @@ export default function CommunityChatThreadScreen() {
     let documentPicker: DocumentPickerModule;
 
     try {
-      // eslint-disable-next-line import/no-unresolved
       documentPicker = (await import("expo-document-picker")) as DocumentPickerModule;
     } catch {
       Alert.alert(
@@ -500,6 +545,115 @@ export default function CommunityChatThreadScreen() {
     }
   }
 
+  function resetPollComposer() {
+    setPollQuestion("");
+    setPollOptions(["", ""]);
+    setIsPollComposerOpen(false);
+  }
+
+  async function handleCreatePoll() {
+    const trimmedQuestion = pollQuestion.trim();
+    const trimmedOptions = pollOptions.map((option) => option.trim()).filter(Boolean);
+
+    if (!session?.user.id) {
+      Alert.alert("Sign in required", "Please sign in again before creating polls.");
+      return;
+    }
+
+    if (!trimmedQuestion) {
+      Alert.alert("Question required", "Add a poll question before posting.");
+      return;
+    }
+
+    if (trimmedOptions.length < 2) {
+      Alert.alert("Options required", "Polls need at least two options.");
+      return;
+    }
+
+    try {
+      await createPoll("community", communityId, trimmedQuestion, trimmedOptions);
+      await Promise.all([
+        loadCommunityMessages(communityId),
+        refreshCommunityChats(session.user.id),
+      ]);
+      resetPollComposer();
+    } catch (pollError) {
+      Alert.alert(
+        "Could not create poll",
+        pollError instanceof Error ? pollError.message : "Please try again.",
+      );
+    }
+  }
+
+  async function handleVotePoll(pollId: string, optionId: string) {
+    if (!session?.user.id) {
+      Alert.alert("Sign in required", "Please sign in again before voting.");
+      return;
+    }
+
+    try {
+      await votePoll(
+        "community",
+        communityId,
+        messageIds,
+        session.user.id,
+        pollId,
+        optionId,
+      );
+    } catch (voteError) {
+      Alert.alert(
+        "Could not vote",
+        voteError instanceof Error ? voteError.message : "Please try again.",
+      );
+    }
+  }
+
+  async function handleSetPinned(messageId: string, pinned: boolean) {
+    if (!session?.user.id) {
+      Alert.alert("Sign in required", "Please sign in again before pinning messages.");
+      return;
+    }
+
+    try {
+      await setPinned(
+        "community",
+        communityId,
+        messageIds,
+        session.user.id,
+        messageId,
+        pinned,
+      );
+    } catch (pinError) {
+      Alert.alert(
+        "Could not update pinned messages",
+        pinError instanceof Error ? pinError.message : "Please try again.",
+      );
+    }
+  }
+
+  const pinnedPreviews = pinnedMessages
+    .map((pinnedMessage): PinnedMessagePreview | null => {
+      const message = messages.find((item) => item.id === pinnedMessage.message_id);
+
+      if (!message) {
+        return null;
+      }
+
+      return {
+        ...pinnedMessage,
+        body:
+          pollsByMessageId[message.id]?.question ??
+          message.body ??
+          message.attachment_name ??
+          "Attachment",
+        senderName:
+          message.sender_id === session?.user.id
+            ? "You"
+            : message.sender_profile.display_name,
+      };
+    })
+    .filter((message): message is PinnedMessagePreview => message !== null);
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#EEF3F9" }}>
       <View className="px-5 pb-4 pt-3">
@@ -537,8 +691,28 @@ export default function CommunityChatThreadScreen() {
               </View>
             </Pressable>
           ) : null}
+
+          <Pressable
+            onPress={() => setIsPinnedDrawerOpen((current) => !current)}
+            className="h-12 w-12 items-center justify-center rounded-full bg-white"
+          >
+            <SymbolView
+              name={{ ios: "pin.fill", android: "push_pin", web: "push_pin" }}
+              size={18}
+              tintColor="#0F1115"
+            />
+          </Pressable>
         </View>
       </View>
+
+      {isPinnedDrawerOpen ? (
+        <PinnedMessagesDrawer
+          pinnedMessages={pinnedPreviews}
+          onUnpin={(messageId) => {
+            void handleSetPinned(messageId, false);
+          }}
+        />
+      ) : null}
 
       <ScrollView
         ref={(ref) => {
@@ -638,7 +812,8 @@ export default function CommunityChatThreadScreen() {
                         {resource.name}
                       </Text>
                       <Text className="mt-1 text-[12px] text-[#7B8494]">
-                        {formatFileSize(resource.size_bytes)} · {formatMessageTime(resource.created_at)}
+                        {formatFileSize(resource.size_bytes)} ·{" "}
+                        {formatMessageTime(resource.created_at)}
                       </Text>
                     </View>
                   </View>
@@ -667,6 +842,10 @@ export default function CommunityChatThreadScreen() {
               message.attachment_kind !== null &&
               message.attachment_kind !== "image" &&
               Boolean(message.attachment_url);
+            const poll = pollsByMessageId[message.id];
+            const isPinned = pinnedMessages.some(
+              (pinnedMessage) => pinnedMessage.message_id === message.id,
+            );
 
             return (
               <View
@@ -733,14 +912,26 @@ export default function CommunityChatThreadScreen() {
                             isCurrentUser ? "text-[#C9D0DB]" : "text-[#7B8494]"
                           }`}
                         >
-                          {getAttachmentMeta(message.attachment_kind ?? "file", message.attachment_size)}
+                          {getAttachmentMeta(
+                            message.attachment_kind ?? "file",
+                            message.attachment_size,
+                          )}
                         </Text>
                       </View>
                     </View>
                   </Pressable>
                 ) : null}
 
-                {message.body ? (
+                {poll ? (
+                  <ChatPollCard
+                    poll={poll}
+                    disabled={isVoting}
+                    isDark={isCurrentUser}
+                    onVote={(optionId) => {
+                      void handleVotePoll(poll.id, optionId);
+                    }}
+                  />
+                ) : message.body ? (
                   <Text
                     className={`text-[14px] leading-6 ${
                       isCurrentUser ? "text-white" : "text-[#0F1115]"
@@ -749,6 +940,7 @@ export default function CommunityChatThreadScreen() {
                     {message.body}
                   </Text>
                 ) : null}
+
                 <Text
                   className={`mt-2 text-[11px] ${
                     isCurrentUser ? "text-[#C9D0DB]" : "text-[#7B8494]"
@@ -756,6 +948,23 @@ export default function CommunityChatThreadScreen() {
                 >
                   {formatMessageTime(message.created_at)}
                 </Text>
+                <Pressable
+                  disabled={isPinning}
+                  onPress={() => {
+                    void handleSetPinned(message.id, !isPinned);
+                  }}
+                  className={`mt-2 self-start rounded-full px-3 py-1.5 ${
+                    isCurrentUser ? "bg-[#20242B]" : "bg-[#F1F3F7]"
+                  }`}
+                >
+                  <Text
+                    className={`text-[11px] font-semibold ${
+                      isCurrentUser ? "text-[#C9D0DB]" : "text-[#5C6370]"
+                    }`}
+                  >
+                    {isPinned ? "Unpin" : "Pin"}
+                  </Text>
+                </Pressable>
               </View>
             );
           })}
@@ -764,6 +973,36 @@ export default function CommunityChatThreadScreen() {
 
       <View className="border-t border-[#DDE5EF] bg-[#EEF3F9] px-5 pb-6 pt-4">
         <View className="rounded-[22px] bg-white p-3">
+          {isPollComposerOpen ? (
+            <PollComposer
+              question={pollQuestion}
+              options={pollOptions}
+              isCreating={isCreatingPoll}
+              onQuestionChange={setPollQuestion}
+              onOptionChange={(index, value) => {
+                setPollOptions((current) =>
+                  current.map((option, optionIndex) =>
+                    optionIndex === index ? value : option,
+                  ),
+                );
+              }}
+              onAddOption={() => {
+                setPollOptions((current) =>
+                  current.length >= 6 ? current : [...current, ""],
+                );
+              }}
+              onRemoveOption={(index) => {
+                setPollOptions((current) =>
+                  current.filter((_, optionIndex) => optionIndex !== index),
+                );
+              }}
+              onCancel={resetPollComposer}
+              onSubmit={() => {
+                void handleCreatePoll();
+              }}
+            />
+          ) : null}
+
           {pendingAttachment ? (
             <View className="mb-3 rounded-[16px] border border-[#E4E9F1] bg-[#F7F9FC] p-3">
               <View className="flex-row items-center gap-3">
@@ -819,6 +1058,21 @@ export default function CommunityChatThreadScreen() {
                 tintColor="#0F1115"
               />
             </Pressable>
+
+            <Pressable
+              disabled={isSending || isUploadingAttachment || !community}
+              onPress={() => {
+                setIsPollComposerOpen((current) => !current);
+              }}
+              className="h-12 w-12 items-center justify-center rounded-full bg-[#EEF2F7]"
+            >
+              <SymbolView
+                name={{ ios: "chart.bar.doc.horizontal", android: "poll", web: "poll" }}
+                size={20}
+                tintColor="#0F1115"
+              />
+            </Pressable>
+
             <View className="flex-1 rounded-[22px] border border-[#E4E9F1] bg-[#F9FBFD] px-3 py-1">
               <TextInput
                 value={messageDraft}
@@ -829,6 +1083,7 @@ export default function CommunityChatThreadScreen() {
                 className="min-h-[44px] text-[14px] leading-6 text-[#0F1115]"
               />
             </View>
+
             <View className="w-[88px]">
               <AppButton
                 label={isSending || isUploadingAttachment ? "Sending..." : "Send"}

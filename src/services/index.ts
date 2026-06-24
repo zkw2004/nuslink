@@ -1,3 +1,4 @@
+export * from "./chatFeaturesService";
 export * from "./communityMessagesService";
 export * from "./communitiesService";
 export * from "./connectionsService";
