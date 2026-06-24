@@ -39,6 +39,7 @@ import {
   searchInterestTagSuggestions,
   updateEditableProfile,
 } from "@services/index";
+import { WeeklyTimetableView } from "@features/profile/WeeklyTimetableView";
 import type { StudyStyle, TimetableClassSlot, TimetableSlot } from "@appTypes/index";
 import { useAuthStore } from "@store/index";
 import {
@@ -1279,6 +1280,16 @@ export default function ProfileScreen() {
                     onPress={handleAddManualTimetableBlock}
                   />
                 </View>
+              </View>
+
+              <View>
+                <Text className="mb-2 text-[13px] font-semibold text-[#0F1115]">
+                  Weekly availability preview
+                </Text>
+                <WeeklyTimetableView
+                  slots={timetableSlotsDraft}
+                  emptyLabel="Import a NUSMods share URL or add manual free blocks to preview your week."
+                />
               </View>
 
               <View className="gap-2">

@@ -1,5 +1,6 @@
 import { supabase } from "@lib/supabase";
 import type {
+  ChatAttachmentKind,
   ConnectedProfilePreview,
   DirectConversationSummary,
   DirectMessageAttachmentInput,
@@ -21,7 +22,7 @@ type ChatAttachmentUpload = {
   name: string;
   mimeType: string;
   size: number | null;
-  kind: "image" | "file";
+  kind: ChatAttachmentKind;
 };
 
 const CHAT_ATTACHMENTS_BUCKET = "chat-attachments";
@@ -54,6 +55,20 @@ function getFileExtension(uri: string, mimeType: string, name: string) {
       return "webp";
     case "image/gif":
       return "gif";
+    case "video/mp4":
+      return "mp4";
+    case "video/quicktime":
+      return "mov";
+    case "video/x-m4v":
+      return "m4v";
+    case "audio/mpeg":
+      return "mp3";
+    case "audio/mp4":
+    case "audio/x-m4a":
+      return "m4a";
+    case "audio/wav":
+    case "audio/x-wav":
+      return "wav";
     case "application/pdf":
       return "pdf";
     case "text/plain":
@@ -94,6 +109,14 @@ function getMessagePreview(message: DirectMessageRow) {
 
   if (message.attachment_kind === "image") {
     return "Photo attachment";
+  }
+
+  if (message.attachment_kind === "video") {
+    return "Video attachment";
+  }
+
+  if (message.attachment_kind === "audio") {
+    return "Audio attachment";
   }
 
   if (message.attachment_url) {

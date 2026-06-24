@@ -1,6 +1,10 @@
 import { create } from "zustand";
 
-import type { CommunityChatMessage, CommunityChatSummary } from "@appTypes/index";
+import type {
+  CommunityChatMessage,
+  CommunityChatSummary,
+  DirectMessageAttachmentInput,
+} from "@appTypes/index";
 import {
   fetchCommunityMessages,
   fetchJoinedCommunityChats,
@@ -17,7 +21,12 @@ interface CommunityMessagesState {
   error: string | null;
   refreshCommunityChats: (userId: string) => Promise<void>;
   loadCommunityMessages: (communityId: string) => Promise<void>;
-  sendMessage: (communityId: string, body: string, userId: string) => Promise<void>;
+  sendMessage: (
+    communityId: string,
+    body: string,
+    userId: string,
+    attachment?: DirectMessageAttachmentInput | null,
+  ) => Promise<void>;
   subscribeToCommunity: (communityId: string, userId: string) => () => void;
   reset: () => void;
 }
@@ -78,11 +87,11 @@ export const useCommunityMessagesStore = create<CommunityMessagesState>((set, ge
     }
   },
 
-  async sendMessage(communityId, body, userId) {
+  async sendMessage(communityId, body, userId, attachment) {
     set({ isSending: true, error: null });
 
     try {
-      await sendCommunityMessage(communityId, body, userId);
+      await sendCommunityMessage(communityId, body, userId, attachment);
       const [messages] = await Promise.all([
         fetchCommunityMessages(communityId),
         get().refreshCommunityChats(userId),
