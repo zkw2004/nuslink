@@ -10,22 +10,17 @@ import {
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import {
+  INTEREST_TAG_OPTIONS,
+  MAX_CUSTOM_INTEREST_TAGS,
+} from "@constants/index";
 import { useAuthStore, useOnboardingStore } from "@store/index";
-
-const PREDEFINED_INTERESTS = [
-  "AI / ML",
-  "Software Engineering",
-  "Data Science",
-  "Economics",
-  "Finance",
-  "Consulting",
-  "Entrepreneurship",
-  "Design",
-  "Public Policy",
-  "Operations",
-  "Marketing",
-  "Research",
-];
+import {
+  canAddCustomInterest,
+  normalizeInterestTag,
+  normalizeInterestTags,
+  splitInterestTags,
+} from "@utils/interestTags";
 
 const TOTAL_STEPS = 5;
 const CURRENT_STEP = 3;
@@ -35,11 +30,10 @@ export default function InterestsScreen() {
   const profile = useAuthStore((state) => state.profile);
   const savedInterests = useOnboardingStore((state) => state.interests);
   const setInterests = useOnboardingStore((state) => state.setInterests);
-  const initialInterests =
-    savedInterests.length > 0 ? savedInterests : (profile?.interests ?? []);
-  const initialCustomTags = initialInterests.filter(
-    (interest) => !PREDEFINED_INTERESTS.includes(interest),
+  const initialInterests = normalizeInterestTags(
+    savedInterests.length > 0 ? savedInterests : (profile?.interests ?? []),
   );
+  const initialCustomTags = splitInterestTags(initialInterests).custom;
   const [selected, setSelected] = useState<Set<string>>(
     new Set(initialInterests),
   );
@@ -57,9 +51,21 @@ export default function InterestsScreen() {
   }
 
   function addCustomTag() {
-    const tag = customInput.trim();
-    if (!tag || customTags.includes(tag) || PREDEFINED_INTERESTS.includes(tag)) return;
-    setCustomTags((prev) => [...prev, tag]);
+    const tag = normalizeInterestTag(customInput);
+    const currentSelected = Array.from(selected);
+
+    if (!tag || currentSelected.includes(tag)) {
+      return;
+    }
+
+    if (!canAddCustomInterest(currentSelected)) {
+      return;
+    }
+
+    if (!INTEREST_TAG_OPTIONS.includes(tag as (typeof INTEREST_TAG_OPTIONS)[number])) {
+      setCustomTags((prev) => [...prev, tag]);
+    }
+
     setSelected((prev) => new Set([...prev, tag]));
     setCustomInput("");
     setShowCustomInput(false);
@@ -103,7 +109,7 @@ export default function InterestsScreen() {
         </Text>
 
         <View className="flex-row flex-wrap gap-2 mt-6">
-          {[...PREDEFINED_INTERESTS, ...customTags].map((interest) => {
+          {[...INTEREST_TAG_OPTIONS, ...customTags].map((interest) => {
             const isSelected = selected.has(interest);
             return (
               <TouchableOpacity
@@ -158,11 +164,11 @@ export default function InterestsScreen() {
           <Text className="text-[#5B7BA3] text-base mt-0.5">✦</Text>
           <View className="flex-1">
             <Text className="text-sm font-semibold text-gray-900">
-              You can add custom tags later
+              Use the shared tag bank first
             </Text>
             <Text className="text-xs text-gray-500 mt-1 leading-relaxed">
-              Mix broad areas like finance, consulting, policy, or entrepreneurship
-              with technical interests if they matter to you.
+              Choose the canonical interest tags where possible, then add up to{" "}
+              {MAX_CUSTOM_INTEREST_TAGS} niche custom tags if you need them.
             </Text>
           </View>
         </View>
@@ -175,7 +181,7 @@ export default function InterestsScreen() {
         </Text>
         <TouchableOpacity
           onPress={() => {
-            setInterests(Array.from(selected));
+            setInterests(normalizeInterestTags(Array.from(selected)));
             router.push("/(onboarding)/intent");
           }}
           disabled={!canContinue}

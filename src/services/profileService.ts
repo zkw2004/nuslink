@@ -1,6 +1,7 @@
 import { supabase } from "@lib/supabase";
 import { getCurrentSemester } from "@lib/nusmods";
 import type { StudyStyle, TimetableSlot, UserProfile } from "@appTypes/index";
+import { normalizeInterestTags } from "@utils/interestTags";
 import type { SelectedModule } from "@features/onboarding/types";
 import { replaceCurrentSemesterTimetableSlots } from "./timetableService";
 
@@ -174,7 +175,7 @@ export async function updateEditableProfile(
       hall_rc: input.hallRc.trim() || null,
       study_style: input.studyStyle,
       preferred_group_size: input.preferredGroupSize,
-      interests: input.interests,
+      interests: normalizeInterestTags(input.interests),
       intents: input.intents,
     })
     .eq("id", userId);

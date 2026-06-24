@@ -1,5 +1,6 @@
 import { isSupabaseConfigured, supabase } from "@lib/supabase";
 import type { StudyStyle, UserProfile } from "@appTypes/index";
+import { normalizeInterestTags } from "@utils/interestTags";
 import type { SelectedModule } from "./types";
 
 type AcademicProfileInput = {
@@ -167,7 +168,7 @@ export async function saveProfileSetup(input: ProfileSetupInput): Promise<UserPr
   return {
     ...data,
     intents: data.intents ?? [],
-    interests: data.interests ?? [],
+    interests: normalizeInterestTags(data.interests ?? []),
     skills: data.skills ?? [],
     study_style: studyStyle,
   };

@@ -14,6 +14,10 @@ import * as ImagePicker from "expo-image-picker";
 import { SymbolView } from "expo-symbols";
 
 import {
+  INTEREST_TAG_OPTIONS,
+  MAX_CUSTOM_INTEREST_TAGS,
+} from "@constants/index";
+import {
   AppAvatar,
   AppButton,
   AppChip,
@@ -39,23 +43,14 @@ import {
 } from "@services/index";
 import type { StudyStyle, TimetableClassSlot, TimetableSlot } from "@appTypes/index";
 import { useAuthStore } from "@store/index";
+import {
+  canAddCustomInterest,
+  normalizeInterestTag,
+  normalizeInterestTags,
+  splitInterestTags,
+} from "@utils/interestTags";
 
 const YEAR_OPTIONS = [1, 2, 3, 4, 5, 6];
-
-const INTEREST_OPTIONS = [
-  "AI / ML",
-  "Software Engineering",
-  "Data Science",
-  "Economics",
-  "Finance",
-  "Consulting",
-  "Entrepreneurship",
-  "Design",
-  "Public Policy",
-  "Operations",
-  "Marketing",
-  "Research",
-];
 
 const INTENT_OPTIONS = [
   { id: "study_group", label: "Study groups" },
@@ -169,7 +164,7 @@ export default function ProfileScreen() {
           setHallRcDraft(profile.hall_rc ?? "");
           setStudyStyleDraft(profile.study_style ?? "flexible");
           setPreferredGroupSizeDraft(profile.preferred_group_size ?? 4);
-          setInterestsDraft(profile.interests);
+          setInterestsDraft(normalizeInterestTags(profile.interests));
           setIntentsDraft(profile.intents);
           setTimetableSlotsDraft(timetableSlots);
         }
@@ -249,7 +244,7 @@ export default function ProfileScreen() {
     setHallRcDraft(profile.hall_rc ?? "");
     setStudyStyleDraft(profile.study_style ?? "flexible");
     setPreferredGroupSizeDraft(profile.preferred_group_size ?? 4);
-    setInterestsDraft(profile.interests);
+    setInterestsDraft(normalizeInterestTags(profile.interests));
     setIntentsDraft(profile.intents);
     setModuleQuery("");
     setModuleResults([]);
@@ -420,13 +415,21 @@ export default function ProfileScreen() {
   }
 
   function addCustomInterest() {
-    const trimmedInterest = customInterestInput.trim();
+    const trimmedInterest = normalizeInterestTag(customInterestInput);
 
     if (!trimmedInterest || interestsDraft.includes(trimmedInterest)) {
       return;
     }
 
-    setInterestsDraft((current) => [...current, trimmedInterest]);
+    if (!canAddCustomInterest(interestsDraft)) {
+      Alert.alert(
+        "Custom tag limit reached",
+        `Keep custom interests to ${MAX_CUSTOM_INTEREST_TAGS} niche tags so matching stays structured.`,
+      );
+      return;
+    }
+
+    setInterestsDraft((current) => normalizeInterestTags([...current, trimmedInterest]));
     setCustomInterestInput("");
   }
 
@@ -1017,7 +1020,7 @@ export default function ProfileScreen() {
           {isEditing ? (
             <View>
               <View className="flex-row flex-wrap gap-2">
-                {Array.from(new Set([...INTEREST_OPTIONS, ...interestsDraft])).map(
+                {Array.from(new Set([...INTEREST_TAG_OPTIONS, ...interestsDraft])).map(
                   (interest) => {
                     const isSelected = interestsDraft.includes(interest);
 
@@ -1049,7 +1052,7 @@ export default function ProfileScreen() {
                   value={customInterestInput}
                   onChangeText={setCustomInterestInput}
                   className="flex-1 rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-4 text-[15px] text-[#0F1115]"
-                  placeholder="Add a custom interest"
+                  placeholder={`Add a niche custom tag (${MAX_CUSTOM_INTEREST_TAGS} max)`}
                   placeholderTextColor="#9AA0AB"
                 />
                 <Pressable
@@ -1062,8 +1065,7 @@ export default function ProfileScreen() {
 
               {interestsDraft.length > 0 ? (
                 <View className="mt-3 flex-row flex-wrap gap-2">
-                  {interestsDraft
-                    .filter((interest) => !INTEREST_OPTIONS.includes(interest))
+                  {splitInterestTags(interestsDraft).custom
                     .map((interest) => (
                       <Pressable
                         key={interest}
