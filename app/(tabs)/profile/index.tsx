@@ -37,6 +37,7 @@ import {
   parseManualTimeInput,
   updateEditableProfile,
 } from "@services/index";
+import { WeeklyTimetableView } from "@features/profile/WeeklyTimetableView";
 import type { TimetableClassSlot, TimetableSlot } from "@appTypes/index";
 import { useAuthStore } from "@store/index";
 
@@ -1057,6 +1058,23 @@ export default function ProfileScreen() {
                 </View>
               ) : null}
 
+              {importedAvailabilityPreview.length > 0 ? (
+                <View className="rounded-2xl bg-[#F7F9FC] p-3">
+                  <Text className="text-[13px] font-semibold text-[#0F1115]">
+                    Derived weekly free blocks
+                  </Text>
+                  <Text className="mt-1 text-[13px] leading-5 text-[#5C6370]">
+                    These availability blocks are what matching will use after you apply and save.
+                  </Text>
+                  <View className="mt-3">
+                    <WeeklyTimetableView
+                      slots={importedAvailabilityPreview}
+                      emptyLabel="No derived free blocks found in the weekday study window."
+                    />
+                  </View>
+                </View>
+              ) : null}
+
               <View className="rounded-2xl bg-[#F7F9FC] p-3">
                 <Text className="text-[13px] font-semibold text-[#0F1115]">
                   Manual fallback
@@ -1116,6 +1134,16 @@ export default function ProfileScreen() {
                 </View>
               </View>
 
+              <View>
+                <Text className="mb-2 text-[13px] font-semibold text-[#0F1115]">
+                  Weekly availability preview
+                </Text>
+                <WeeklyTimetableView
+                  slots={timetableSlotsDraft}
+                  emptyLabel="Import a NUSMods share URL or add manual free blocks to preview your week."
+                />
+              </View>
+
               <View className="gap-2">
                 {timetableSlotsDraft.length > 0 ? (
                   timetableSlotsDraft.map((slot) => (
@@ -1146,7 +1174,12 @@ export default function ProfileScreen() {
               </View>
             </View>
           ) : (
-            <View className="gap-2">
+            <View className="gap-3">
+              <WeeklyTimetableView
+                slots={savedTimetableSlots}
+                emptyLabel="Add timetable availability to improve schedule-overlap matching in the People tab."
+              />
+
               {savedTimetableSlots.length > 0 ? (
                 savedTimetableSlots.map((slot) => (
                   <View
