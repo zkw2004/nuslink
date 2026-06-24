@@ -917,40 +917,40 @@ export default function ConversationThreadScreen() {
                 tintColor="#0F1115"
               />
             </Pressable>
-          <Pressable
-            disabled={isSending || isUploadingAttachment || !conversation}
-            onPress={() => {
-              setIsPollComposerOpen((current) => !current);
-            }}
-            className="h-12 w-12 items-center justify-center rounded-full bg-[#EEF2F7]"
-          >
-            <SymbolView
-              name={{ ios: "chart.bar.doc.horizontal", android: "poll", web: "poll" }}
-              size={20}
-              tintColor="#0F1115"
-            />
-          </Pressable>
 
-          <View className="flex-1 rounded-[22px] border border-[#E4E9F1] bg-[#F9FBFD] px-3 py-1">
-            <TextInput
-              value={messageDraft}
-              onChangeText={setMessageDraft}
-              placeholder="Write a message"
-              placeholderTextColor="#9AA0AB"
-              multiline
-              className="min-h-[44px] text-[14px] leading-6 text-[#0F1115]"
-            />
-          </View>
-
-          <View className="w-[88px]">
-            <AppButton
-              label={isSending || isUploadingAttachment ? "Sending..." : "Send"}
+            <Pressable
               disabled={isSending || isUploadingAttachment || !conversation}
               onPress={() => {
-                void handleSendMessage();
+                setIsPollComposerOpen((current) => !current);
               }}
-            />
-          </View>
+              className="h-12 w-12 items-center justify-center rounded-full bg-[#EEF2F7]"
+            >
+              <SymbolView
+                name={{ ios: "chart.bar.doc.horizontal", android: "poll", web: "poll" }}
+                size={20}
+                tintColor="#0F1115"
+              />
+            </Pressable>
+
+            <View className="flex-1 rounded-[22px] border border-[#E4E9F1] bg-[#F9FBFD] px-3 py-1">
+              <TextInput
+                value={messageDraft}
+                onChangeText={setMessageDraft}
+                placeholder="Write a message"
+                placeholderTextColor="#9AA0AB"
+                multiline
+                className="min-h-[44px] text-[14px] leading-6 text-[#0F1115]"
+              />
+            </View>
+
+            <View className="w-[88px]">
+              <AppButton
+                label={isSending || isUploadingAttachment ? "Sending..." : "Send"}
+                disabled={isSending || isUploadingAttachment || !conversation}
+                onPress={() => {
+                  void handleSendMessage();
+                }}
+              />
             </View>
           </View>
         </View>
