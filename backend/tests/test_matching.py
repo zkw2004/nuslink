@@ -26,6 +26,9 @@ class FakeMatchRepository:
                 interests=["AI / ML"],
                 intents=["study_group"],
                 onboarding_completed=True,
+                hall_rc="Tembusu",
+                study_style="library",
+                preferred_group_size=4,
             ),
             "user-2": ProfileSummary(
                 id="user-2",
@@ -39,6 +42,9 @@ class FakeMatchRepository:
                 interests=["Artificial Intelligence", "Algorithms"],
                 intents=["study_group"],
                 onboarding_completed=True,
+                hall_rc="Tembusu",
+                study_style="flexible",
+                preferred_group_size=4,
             ),
             "user-3": ProfileSummary(
                 id="user-3",
@@ -52,6 +58,9 @@ class FakeMatchRepository:
                 interests=["Backend"],
                 intents=["study_group"],
                 onboarding_completed=True,
+                hall_rc="Sheares",
+                study_style="home",
+                preferred_group_size=2,
             ),
         }
         return profiles.get(user_id)
@@ -154,6 +163,9 @@ def test_people_matches_returns_ranked_candidates():
     assert body["candidates"][0]["breakdown"]["faculty_major"] is not None
     assert body["candidates"][0]["breakdown"]["year_proximity"] is not None
     assert body["candidates"][0]["breakdown"]["interest_overlap"] is not None
+    assert body["candidates"][0]["breakdown"]["study_style"] is not None
+    assert body["candidates"][0]["breakdown"]["preferred_group_size"] is not None
+    assert body["candidates"][0]["breakdown"]["hall_rc"] is not None
     assert len(body["candidates"][0]["match_reasons"]) > 0
 
 
@@ -174,7 +186,8 @@ def test_people_matches_keeps_missing_optional_fields_matchable():
     candidate = response.json()["candidates"][0]
 
     assert candidate["breakdown"]["schedule_overlap"] == 0
-    assert candidate["breakdown"]["target_grade"] is not None
+    assert candidate["breakdown"]["module_overlap"] is not None
+    assert candidate["breakdown"]["faculty_major"] is not None
     assert candidate["compatibility_percentage"] > 0
 
 

@@ -381,16 +381,6 @@ export default function PeopleScreen() {
                 </Text>
 
                 <Text className="text-[13px] font-semibold text-[#0F1115]">
-                  Target grade
-                  {candidate.breakdown.target_grade !== null
-                    ? ` · ${candidate.breakdown.target_grade}%`
-                    : ""}
-                </Text>
-                <Text className="text-[13px] leading-5 text-[#5C6370]">
-                  {candidate.target_grade_summary}
-                </Text>
-
-                <Text className="text-[13px] font-semibold text-[#0F1115]">
                   Schedule overlap
                   {candidate.breakdown.schedule_overlap !== null
                     ? ` · ${candidate.breakdown.schedule_overlap}%`
