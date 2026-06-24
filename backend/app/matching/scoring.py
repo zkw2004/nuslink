@@ -1,6 +1,6 @@
+import re
 from collections import defaultdict
 from dataclasses import dataclass
-import re
 
 from app.matching.models import ModuleRegistration, ProfileSummary, TimetableSlot
 

@@ -4,8 +4,8 @@ from app.auth import AuthenticatedUser
 from app.main import app
 from app.matching.models import ModuleRegistration, ProfileSummary, TimetableSlot
 from app.matching.scoring import (
-    calculate_study_style_score,
     calculate_interest_overlap_score,
+    calculate_study_style_score,
     normalize_interest_tags,
 )
 from app.routers.matches import get_current_user as get_matches_current_user
