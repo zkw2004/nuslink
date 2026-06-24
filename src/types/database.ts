@@ -231,7 +231,7 @@ export type Database = {
       };
       direct_messages: {
         Row: {
-          attachment_kind: "image" | "file" | null;
+          attachment_kind: "image" | "file" | "audio" | "video" | null;
           attachment_mime_type: string | null;
           attachment_name: string | null;
           attachment_size: number | null;
@@ -243,7 +243,7 @@ export type Database = {
           sender_id: string;
         };
         Insert: {
-          attachment_kind?: "image" | "file" | null;
+          attachment_kind?: "image" | "file" | "audio" | "video" | null;
           attachment_mime_type?: string | null;
           attachment_name?: string | null;
           attachment_size?: number | null;
@@ -255,7 +255,7 @@ export type Database = {
           sender_id: string;
         };
         Update: {
-          attachment_kind?: "image" | "file" | null;
+          attachment_kind?: "image" | "file" | "audio" | "video" | null;
           attachment_mime_type?: string | null;
           attachment_name?: string | null;
           attachment_size?: number | null;
@@ -420,20 +420,35 @@ export type Database = {
       };
       community_messages: {
         Row: {
-          body: string;
+          attachment_kind: "image" | "file" | "audio" | "video" | null;
+          attachment_mime_type: string | null;
+          attachment_name: string | null;
+          attachment_size: number | null;
+          attachment_url: string | null;
+          body: string | null;
           community_id: string;
           created_at: string;
           id: string;
           sender_id: string;
         };
         Insert: {
-          body: string;
+          attachment_kind?: "image" | "file" | "audio" | "video" | null;
+          attachment_mime_type?: string | null;
+          attachment_name?: string | null;
+          attachment_size?: number | null;
+          attachment_url?: string | null;
+          body?: string | null;
           community_id: string;
           created_at?: string;
           id?: string;
           sender_id: string;
         };
         Update: {
+          attachment_kind?: "image" | "file" | "audio" | "video" | null;
+          attachment_mime_type?: string | null;
+          attachment_name?: string | null;
+          attachment_size?: number | null;
+          attachment_url?: string | null;
           body?: string;
           community_id?: string;
           created_at?: string;
@@ -569,7 +584,7 @@ export type Database = {
       };
       send_direct_message: {
         Args: {
-          attachment_kind_input?: "image" | "file" | null;
+          attachment_kind_input?: "image" | "file" | "audio" | "video" | null;
           attachment_mime_type_input?: string | null;
           attachment_name_input?: string | null;
           attachment_size_input?: number | null;

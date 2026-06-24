@@ -16,6 +16,7 @@ import * as ImagePicker from "expo-image-picker";
 import { SymbolView } from "expo-symbols";
 
 import { AppAvatar, AppButton, BadgeTierPill, SectionCard } from "@components/shared";
+import type { ChatAttachmentKind } from "@appTypes/index";
 import { uploadChatAttachment } from "@services/directMessagesService";
 import { useAuthStore, useDirectMessagesStore } from "@store/index";
 
@@ -25,7 +26,7 @@ type PendingAttachment = {
   name: string;
   mimeType: string;
   size: number | null;
-  kind: "image" | "file";
+  kind: ChatAttachmentKind;
 };
 
 type DocumentPickerModule = {
@@ -71,20 +72,9 @@ function formatMessageTime(value: string) {
   });
 }
 
-function decodeBase64(base64: string) {
-  const binary = globalThis.atob(base64);
-  const bytes = new Uint8Array(binary.length);
-
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-
-  return bytes.buffer;
-}
-
 function formatFileSize(size: number | null) {
   if (!size) {
-    return "File attachment";
+    return "Attachment";
   }
 
   if (size < 1024 * 1024) {
@@ -114,14 +104,36 @@ function getMimeTypeFromName(name: string) {
       return "application/vnd.ms-powerpoint";
     case "pptx":
       return "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+    case "mp3":
+      return "audio/mpeg";
+    case "m4a":
+      return "audio/x-m4a";
+    case "wav":
+      return "audio/wav";
+    case "mp4":
+      return "video/mp4";
+    case "mov":
+      return "video/quicktime";
+    case "png":
+      return "image/png";
+    case "webp":
+      return "image/webp";
     default:
       return "application/octet-stream";
   }
 }
 
-function getDefaultAttachmentName(kind: "image" | "file", mimeType: string) {
+function getDefaultAttachmentName(kind: ChatAttachmentKind, mimeType: string) {
   if (kind === "file") {
     return "attachment";
+  }
+
+  if (kind === "audio") {
+    return mimeType === "audio/mpeg" ? "voice-note.mp3" : "voice-note.m4a";
+  }
+
+  if (kind === "video") {
+    return mimeType === "video/quicktime" ? "clip.mov" : "clip.mp4";
   }
 
   if (mimeType === "image/png") {
@@ -133,6 +145,32 @@ function getDefaultAttachmentName(kind: "image" | "file", mimeType: string) {
   }
 
   return "photo.jpg";
+}
+
+function getAttachmentIconName(kind: ChatAttachmentKind) {
+  switch (kind) {
+    case "video":
+      return { ios: "play.rectangle.fill", android: "movie", web: "movie" } as const;
+    case "audio":
+      return { ios: "waveform", android: "graphic_eq", web: "graphic_eq" } as const;
+    case "image":
+      return { ios: "photo.fill", android: "image", web: "image" } as const;
+    default:
+      return { ios: "doc.fill", android: "description", web: "description" } as const;
+  }
+}
+
+function getAttachmentMeta(kind: ChatAttachmentKind, size: number | null) {
+  switch (kind) {
+    case "video":
+      return `Video · ${formatFileSize(size)}`;
+    case "audio":
+      return `Audio · ${formatFileSize(size)}`;
+    case "image":
+      return `Image · ${formatFileSize(size)}`;
+    default:
+      return formatFileSize(size);
+  }
 }
 
 export default function ConversationThreadScreen() {
@@ -157,8 +195,7 @@ export default function ConversationThreadScreen() {
   );
 
   const [messageDraft, setMessageDraft] = useState("");
-  const [pendingAttachment, setPendingAttachment] =
-    useState<PendingAttachment | null>(null);
+  const [pendingAttachment, setPendingAttachment] = useState<PendingAttachment | null>(null);
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
 
   const conversation = useMemo(
@@ -192,23 +229,22 @@ export default function ConversationThreadScreen() {
     }, 80);
 
     return () => clearTimeout(timeoutId);
-  }, [messages.length, scrollViewRef]);
+  }, [messages.length]);
 
-  async function handlePickImage() {
+  async function handlePickMedia() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (!permission.granted) {
       Alert.alert(
         "Permission needed",
-        "Photo library permission is needed to attach an image.",
+        "Photo library permission is needed to attach media.",
       );
       return;
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
       allowsEditing: false,
-      base64: true,
-      mediaTypes: ["images"],
+      mediaTypes: ["images", "videos"],
       quality: 0.82,
     });
 
@@ -217,25 +253,22 @@ export default function ConversationThreadScreen() {
     }
 
     const asset = result.assets[0];
-
-    if (!asset.base64) {
-      Alert.alert("Could not read image", "Try choosing a different image.");
-      return;
-    }
-
     const mimeType = asset.mimeType ?? "image/jpeg";
+    const kind: ChatAttachmentKind =
+      mimeType.startsWith("video/") ? "video" : "image";
+    const bytes = await new ExpoFile(asset.uri).arrayBuffer();
 
     setPendingAttachment({
-      bytes: decodeBase64(asset.base64),
+      bytes,
       previewUri: asset.uri,
-      name: asset.fileName ?? getDefaultAttachmentName("image", mimeType),
+      name: asset.fileName ?? getDefaultAttachmentName(kind, mimeType),
       mimeType,
       size: asset.fileSize ?? null,
-      kind: "image",
+      kind,
     });
   }
 
-async function handlePickFile() {
+  async function handlePickFile() {
     let documentPicker: DocumentPickerModule;
 
     try {
@@ -281,6 +314,73 @@ async function handlePickFile() {
     });
   }
 
+  async function handlePickAudio() {
+    let documentPicker: DocumentPickerModule;
+
+    try {
+      // eslint-disable-next-line import/no-unresolved
+      documentPicker = (await import("expo-document-picker")) as DocumentPickerModule;
+    } catch {
+      Alert.alert(
+        "File picker unavailable",
+        "Install project dependencies again on this machine before sending audio.",
+      );
+      return;
+    }
+
+    const result = await documentPicker.getDocumentAsync({
+      copyToCacheDirectory: true,
+      multiple: false,
+      type: [
+        "audio/mpeg",
+        "audio/mp4",
+        "audio/x-m4a",
+        "audio/wav",
+        "audio/x-wav",
+      ],
+    });
+
+    if (result.canceled) {
+      return;
+    }
+
+    const asset = result.assets[0];
+    const bytes = await new ExpoFile(asset.uri).arrayBuffer();
+
+    setPendingAttachment({
+      bytes,
+      previewUri: null,
+      name: asset.name || getDefaultAttachmentName("audio", asset.mimeType ?? ""),
+      mimeType: asset.mimeType ?? getMimeTypeFromName(asset.name),
+      size: asset.size ?? bytes.byteLength,
+      kind: "audio",
+    });
+  }
+
+  function openAttachmentMenu() {
+    Alert.alert("Attach", "Choose what to share", [
+      {
+        text: "Photo or video",
+        onPress: () => {
+          void handlePickMedia();
+        },
+      },
+      {
+        text: "File",
+        onPress: () => {
+          void handlePickFile();
+        },
+      },
+      {
+        text: "Audio",
+        onPress: () => {
+          void handlePickAudio();
+        },
+      },
+      { text: "Cancel", style: "cancel" },
+    ]);
+  }
+
   async function handleSendMessage() {
     if (!session?.user.id) {
       Alert.alert("Sign in required", "Please sign in again before sending messages.");
@@ -290,7 +390,7 @@ async function handlePickFile() {
     const trimmedMessage = messageDraft.trim();
 
     if (!trimmedMessage && !pendingAttachment) {
-      Alert.alert("Write a message", "Type something or attach a file before sending.");
+      Alert.alert("Write a message", "Type something or attach media before sending.");
       return;
     }
 
@@ -338,7 +438,12 @@ async function handlePickFile() {
           </Pressable>
 
           {conversation ? (
-            <View className="flex-1 flex-row items-center gap-3 rounded-[20px] bg-white px-4 py-3">
+            <Pressable
+              onPress={() => {
+                router.push(`/chats/media/${conversationId}` as never);
+              }}
+              className="flex-1 flex-row items-center gap-3 rounded-[20px] bg-white px-4 py-3"
+            >
               <AppAvatar
                 name={conversation.other_user.display_name}
                 imageUri={conversation.other_user.avatar_url}
@@ -357,7 +462,7 @@ async function handlePickFile() {
                   Mutual connection direct message
                 </Text>
               </View>
-            </View>
+            </Pressable>
           ) : null}
         </View>
       </View>
@@ -408,15 +513,16 @@ async function handlePickFile() {
           {messages.map((message) => {
             const isCurrentUser = message.sender_id === session?.user.id;
             const hasImage = message.attachment_kind === "image" && message.attachment_url;
-            const hasFile = message.attachment_kind === "file" && message.attachment_url;
+            const hasAttachmentCard =
+              message.attachment_kind !== null &&
+              message.attachment_kind !== "image" &&
+              Boolean(message.attachment_url);
 
             return (
               <View
                 key={message.id}
                 className={`max-w-[88%] rounded-[18px] px-4 py-3 ${
-                  isCurrentUser
-                    ? "self-end bg-[#0F1115]"
-                    : "self-start bg-white"
+                  isCurrentUser ? "self-end bg-[#0F1115]" : "self-start bg-white"
                 }`}
               >
                 {hasImage ? (
@@ -433,7 +539,7 @@ async function handlePickFile() {
                   </Pressable>
                 ) : null}
 
-                {hasFile ? (
+                {hasAttachmentCard ? (
                   <Pressable
                     onPress={() => {
                       void Linking.openURL(message.attachment_url ?? "");
@@ -446,11 +552,7 @@ async function handlePickFile() {
                   >
                     <View className="flex-row items-center gap-3">
                       <SymbolView
-                        name={{
-                          ios: "doc.fill",
-                          android: "description",
-                          web: "description",
-                        }}
+                        name={getAttachmentIconName(message.attachment_kind ?? "file")}
                         size={22}
                         tintColor={isCurrentUser ? "#FFFFFF" : "#0F1115"}
                       />
@@ -468,7 +570,7 @@ async function handlePickFile() {
                             isCurrentUser ? "text-[#C9D0DB]" : "text-[#7B8494]"
                           }`}
                         >
-                          {formatFileSize(message.attachment_size)}
+                          {getAttachmentMeta(message.attachment_kind ?? "file", message.attachment_size)}
                         </Text>
                       </View>
                     </View>
@@ -511,11 +613,7 @@ async function handlePickFile() {
                 ) : (
                   <View className="h-14 w-14 items-center justify-center rounded-[12px] bg-[#E4E9F1]">
                     <SymbolView
-                      name={{
-                        ios: "doc.fill",
-                        android: "description",
-                        web: "description",
-                      }}
+                      name={getAttachmentIconName(pendingAttachment.kind)}
                       size={22}
                       tintColor="#0F1115"
                     />
@@ -529,7 +627,7 @@ async function handlePickFile() {
                     {pendingAttachment.name}
                   </Text>
                   <Text className="mt-1 text-[12px] text-[#7B8494]">
-                    {formatFileSize(pendingAttachment.size)}
+                    {getAttachmentMeta(pendingAttachment.kind, pendingAttachment.size)}
                   </Text>
                 </View>
                 <Pressable
@@ -542,34 +640,10 @@ async function handlePickFile() {
             </View>
           ) : null}
 
-          <TextInput
-            value={messageDraft}
-            onChangeText={setMessageDraft}
-            placeholder="Write a message"
-            placeholderTextColor="#9AA0AB"
-            multiline
-            className="min-h-[52px] text-[14px] leading-6 text-[#0F1115]"
-          />
-
-          <View className="mt-3 flex-row items-center gap-2">
+          <View className="flex-row items-end gap-2">
             <Pressable
               disabled={isSending || isUploadingAttachment || !conversation}
-              onPress={() => {
-                void handlePickImage();
-              }}
-              className="h-12 w-12 items-center justify-center rounded-full bg-[#EEF2F7]"
-            >
-              <SymbolView
-                name={{ ios: "photo", android: "image", web: "image" }}
-                size={20}
-                tintColor="#0F1115"
-              />
-            </Pressable>
-            <Pressable
-              disabled={isSending || isUploadingAttachment || !conversation}
-              onPress={() => {
-                void handlePickFile();
-              }}
+              onPress={openAttachmentMenu}
               className="h-12 w-12 items-center justify-center rounded-full bg-[#EEF2F7]"
             >
               <SymbolView
@@ -582,14 +656,24 @@ async function handlePickFile() {
                 tintColor="#0F1115"
               />
             </Pressable>
-            <View className="flex-1">
-            <AppButton
-              label={isSending || isUploadingAttachment ? "Sending..." : "Send"}
-              disabled={isSending || isUploadingAttachment || !conversation}
-              onPress={() => {
-                void handleSendMessage();
-              }}
-            />
+            <View className="flex-1 rounded-[22px] border border-[#E4E9F1] bg-[#F9FBFD] px-3 py-1">
+              <TextInput
+                value={messageDraft}
+                onChangeText={setMessageDraft}
+                placeholder="Write a message"
+                placeholderTextColor="#9AA0AB"
+                multiline
+                className="min-h-[44px] text-[14px] leading-6 text-[#0F1115]"
+              />
+            </View>
+            <View className="w-[88px]">
+              <AppButton
+                label={isSending || isUploadingAttachment ? "Sending..." : "Send"}
+                disabled={isSending || isUploadingAttachment || !conversation}
+                onPress={() => {
+                  void handleSendMessage();
+                }}
+              />
             </View>
           </View>
         </View>

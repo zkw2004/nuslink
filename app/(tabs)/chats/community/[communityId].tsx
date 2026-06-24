@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
+  Image,
   Linking,
   Pressable,
   ScrollView,
@@ -11,9 +12,12 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
 import { File as ExpoFile } from "expo-file-system";
+import * as ImagePicker from "expo-image-picker";
 import { SymbolView } from "expo-symbols";
 
 import { AppAvatar, AppButton, AppChip, SectionCard } from "@components/shared";
+import type { ChatAttachmentKind } from "@appTypes/index";
+import { uploadCommunityChatAttachment } from "@services/communityMessagesService";
 import {
   useAuthStore,
   useCommunityMessagesStore,
@@ -39,6 +43,15 @@ type DocumentPickerModule = {
   >;
 };
 
+type PendingAttachment = {
+  bytes: ArrayBuffer;
+  previewUri: string | null;
+  name: string;
+  mimeType: string;
+  size: number | null;
+  kind: ChatAttachmentKind;
+};
+
 function formatMessageTime(value: string) {
   const date = new Date(value);
 
@@ -50,7 +63,11 @@ function formatMessageTime(value: string) {
   });
 }
 
-function formatFileSize(size: number) {
+function formatFileSize(size: number | null) {
+  if (!size) {
+    return "Attachment";
+  }
+
   if (size < 1024 * 1024) {
     return `${Math.max(1, Math.round(size / 1024))} KB`;
   }
@@ -78,12 +95,72 @@ function getMimeTypeFromName(name: string) {
       return "application/vnd.ms-powerpoint";
     case "pptx":
       return "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+    case "mp3":
+      return "audio/mpeg";
+    case "m4a":
+      return "audio/x-m4a";
+    case "wav":
+      return "audio/wav";
+    case "mp4":
+      return "video/mp4";
+    case "mov":
+      return "video/quicktime";
     case "png":
       return "image/png";
     case "webp":
       return "image/webp";
     default:
       return "image/jpeg";
+  }
+}
+
+function getDefaultAttachmentName(kind: ChatAttachmentKind, mimeType: string) {
+  if (kind === "file") {
+    return "attachment";
+  }
+
+  if (kind === "audio") {
+    return mimeType === "audio/mpeg" ? "voice-note.mp3" : "voice-note.m4a";
+  }
+
+  if (kind === "video") {
+    return mimeType === "video/quicktime" ? "clip.mov" : "clip.mp4";
+  }
+
+  if (mimeType === "image/png") {
+    return "photo.png";
+  }
+
+  if (mimeType === "image/webp") {
+    return "photo.webp";
+  }
+
+  return "photo.jpg";
+}
+
+function getAttachmentIconName(kind: ChatAttachmentKind) {
+  switch (kind) {
+    case "video":
+      return { ios: "play.rectangle.fill", android: "movie", web: "movie" } as const;
+    case "audio":
+      return { ios: "waveform", android: "graphic_eq", web: "graphic_eq" } as const;
+    case "image":
+      return { ios: "photo.fill", android: "image", web: "image" } as const;
+    default:
+      return { ios: "doc.fill", android: "description", web: "description" } as const;
+  }
+}
+
+function getAttachmentMeta(kind: ChatAttachmentKind, size: number | null) {
+  switch (kind) {
+    case "video":
+      return `Video · ${formatFileSize(size)}`;
+    case "audio":
+      return `Audio · ${formatFileSize(size)}`;
+    case "image":
+      return `Image · ${formatFileSize(size)}`;
+    default:
+      return formatFileSize(size);
   }
 }
 
@@ -122,6 +199,8 @@ export default function CommunityChatThreadScreen() {
   );
 
   const [messageDraft, setMessageDraft] = useState("");
+  const [pendingAttachment, setPendingAttachment] = useState<PendingAttachment | null>(null);
+  const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
   const scrollViewRef = useRef<ScrollView | null>(null);
 
   const community = useMemo(
@@ -168,25 +247,196 @@ export default function CommunityChatThreadScreen() {
     return () => clearTimeout(timeoutId);
   }, [messages.length]);
 
+  async function handlePickMedia() {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) {
+      Alert.alert(
+        "Permission needed",
+        "Photo library permission is needed to attach media.",
+      );
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      allowsEditing: false,
+      mediaTypes: ["images", "videos"],
+      quality: 0.82,
+    });
+
+    if (result.canceled) {
+      return;
+    }
+
+    const asset = result.assets[0];
+    const mimeType = asset.mimeType ?? "image/jpeg";
+    const kind: ChatAttachmentKind =
+      mimeType.startsWith("video/") ? "video" : "image";
+    const bytes = await new ExpoFile(asset.uri).arrayBuffer();
+
+    setPendingAttachment({
+      bytes,
+      previewUri: asset.uri,
+      name: asset.fileName ?? getDefaultAttachmentName(kind, mimeType),
+      mimeType,
+      size: asset.fileSize ?? null,
+      kind,
+    });
+  }
+
+  async function handlePickFile() {
+    let documentPicker: DocumentPickerModule;
+
+    try {
+      // eslint-disable-next-line import/no-unresolved
+      documentPicker = (await import("expo-document-picker")) as DocumentPickerModule;
+    } catch {
+      Alert.alert(
+        "File picker unavailable",
+        "Install project dependencies again on this machine before sending file attachments.",
+      );
+      return;
+    }
+
+    const result = await documentPicker.getDocumentAsync({
+      copyToCacheDirectory: true,
+      multiple: false,
+      type: [
+        "application/pdf",
+        "text/plain",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.ms-excel",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.ms-powerpoint",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      ],
+    });
+
+    if (result.canceled) {
+      return;
+    }
+
+    const asset = result.assets[0];
+    const bytes = await new ExpoFile(asset.uri).arrayBuffer();
+
+    setPendingAttachment({
+      bytes,
+      previewUri: null,
+      name: asset.name || getDefaultAttachmentName("file", asset.mimeType ?? ""),
+      mimeType: asset.mimeType ?? getMimeTypeFromName(asset.name),
+      size: asset.size ?? bytes.byteLength,
+      kind: "file",
+    });
+  }
+
+  async function handlePickAudio() {
+    let documentPicker: DocumentPickerModule;
+
+    try {
+      // eslint-disable-next-line import/no-unresolved
+      documentPicker = (await import("expo-document-picker")) as DocumentPickerModule;
+    } catch {
+      Alert.alert(
+        "File picker unavailable",
+        "Install project dependencies again on this machine before sending audio.",
+      );
+      return;
+    }
+
+    const result = await documentPicker.getDocumentAsync({
+      copyToCacheDirectory: true,
+      multiple: false,
+      type: [
+        "audio/mpeg",
+        "audio/mp4",
+        "audio/x-m4a",
+        "audio/wav",
+        "audio/x-wav",
+      ],
+    });
+
+    if (result.canceled) {
+      return;
+    }
+
+    const asset = result.assets[0];
+    const bytes = await new ExpoFile(asset.uri).arrayBuffer();
+
+    setPendingAttachment({
+      bytes,
+      previewUri: null,
+      name: asset.name || getDefaultAttachmentName("audio", asset.mimeType ?? ""),
+      mimeType: asset.mimeType ?? getMimeTypeFromName(asset.name),
+      size: asset.size ?? bytes.byteLength,
+      kind: "audio",
+    });
+  }
+
+  function openAttachmentMenu() {
+    Alert.alert("Attach", "Choose what to share", [
+      {
+        text: "Photo or video",
+        onPress: () => {
+          void handlePickMedia();
+        },
+      },
+      {
+        text: "File",
+        onPress: () => {
+          void handlePickFile();
+        },
+      },
+      {
+        text: "Audio",
+        onPress: () => {
+          void handlePickAudio();
+        },
+      },
+      { text: "Cancel", style: "cancel" },
+    ]);
+  }
+
   async function handleSendMessage() {
     if (!session?.user.id) {
       Alert.alert("Sign in required", "Please sign in again before sending messages.");
       return;
     }
 
-    if (!messageDraft.trim()) {
-      Alert.alert("Write a message", "Type something before sending.");
+    if (!messageDraft.trim() && !pendingAttachment) {
+      Alert.alert("Write a message", "Type something or attach media before sending.");
       return;
     }
 
+    setIsUploadingAttachment(true);
+
     try {
-      await sendMessage(communityId, messageDraft, session.user.id);
+      const uploadedAttachment = pendingAttachment
+        ? await uploadCommunityChatAttachment({
+            bytes: pendingAttachment.bytes,
+            uri: pendingAttachment.previewUri ?? pendingAttachment.name,
+            name: pendingAttachment.name,
+            mimeType: pendingAttachment.mimeType,
+            size: pendingAttachment.size,
+            kind: pendingAttachment.kind,
+          })
+        : null;
+
+      await sendMessage(
+        communityId,
+        messageDraft.trim(),
+        session.user.id,
+        uploadedAttachment,
+      );
       setMessageDraft("");
+      setPendingAttachment(null);
     } catch (sendError) {
       Alert.alert(
         "Could not send message",
         sendError instanceof Error ? sendError.message : "Please try again.",
       );
+    } finally {
+      setIsUploadingAttachment(false);
     }
   }
 
@@ -262,7 +512,12 @@ export default function CommunityChatThreadScreen() {
           </Pressable>
 
           {community ? (
-            <View className="flex-1 rounded-[20px] bg-white px-4 py-3">
+            <Pressable
+              onPress={() => {
+                router.push(`/chats/community-media/${communityId}` as never);
+              }}
+              className="flex-1 rounded-[20px] bg-white px-4 py-3"
+            >
               <View className="flex-row items-center gap-3">
                 <AppAvatar name={community.name} size={44} rounded={false} />
                 <View className="flex-1">
@@ -280,7 +535,7 @@ export default function CommunityChatThreadScreen() {
                   </Text>
                 </View>
               </View>
-            </View>
+            </Pressable>
           ) : null}
         </View>
       </View>
@@ -312,17 +567,6 @@ export default function CommunityChatThreadScreen() {
             </Text>
             <Text className="mt-2 text-[14px] leading-6 text-[#5C6370]">
               Return to Discover or the Chats tab and open the community again.
-            </Text>
-          </SectionCard>
-        ) : null}
-
-        {!error && community && messages.length === 0 && !isThreadLoading ? (
-          <SectionCard className="mb-4">
-            <Text className="text-[17px] font-bold text-[#0F1115]">
-              No messages yet
-            </Text>
-            <Text className="mt-2 text-[14px] leading-6 text-[#5C6370]">
-              Send the first message to kick off this community space.
             </Text>
           </SectionCard>
         ) : null}
@@ -375,9 +619,15 @@ export default function CommunityChatThreadScreen() {
                     <View className="h-11 w-11 items-center justify-center rounded-[14px] bg-white">
                       <SymbolView
                         name={{
-                          ios: "doc.fill",
-                          android: "description",
-                          web: "description",
+                          ios: resource.mime_type.startsWith("image/")
+                            ? "photo.fill"
+                            : "doc.fill",
+                          android: resource.mime_type.startsWith("image/")
+                            ? "image"
+                            : "description",
+                          web: resource.mime_type.startsWith("image/")
+                            ? "image"
+                            : "description",
                         }}
                         size={20}
                         tintColor="#0F1115"
@@ -398,9 +648,25 @@ export default function CommunityChatThreadScreen() {
           ) : null}
         </SectionCard>
 
+        {!error && community && messages.length === 0 && !isThreadLoading ? (
+          <SectionCard className="mb-4">
+            <Text className="text-[17px] font-bold text-[#0F1115]">
+              No messages yet
+            </Text>
+            <Text className="mt-2 text-[14px] leading-6 text-[#5C6370]">
+              Send the first message to kick off this community space.
+            </Text>
+          </SectionCard>
+        ) : null}
+
         <View className="gap-3">
           {messages.map((message) => {
             const isCurrentUser = message.sender_id === session?.user.id;
+            const hasImage = message.attachment_kind === "image" && message.attachment_url;
+            const hasAttachmentCard =
+              message.attachment_kind !== null &&
+              message.attachment_kind !== "image" &&
+              Boolean(message.attachment_url);
 
             return (
               <View
@@ -422,13 +688,67 @@ export default function CommunityChatThreadScreen() {
                   </View>
                 ) : null}
 
-                <Text
-                  className={`text-[14px] leading-6 ${
-                    isCurrentUser ? "text-white" : "text-[#0F1115]"
-                  }`}
-                >
-                  {message.body}
-                </Text>
+                {hasImage ? (
+                  <Pressable
+                    onPress={() => {
+                      void Linking.openURL(message.attachment_url ?? "");
+                    }}
+                  >
+                    <Image
+                      source={{ uri: message.attachment_url ?? "" }}
+                      className="mb-3 h-48 w-64 rounded-[14px] bg-[#DDE5EF]"
+                      resizeMode="cover"
+                    />
+                  </Pressable>
+                ) : null}
+
+                {hasAttachmentCard ? (
+                  <Pressable
+                    onPress={() => {
+                      void Linking.openURL(message.attachment_url ?? "");
+                    }}
+                    className={`mb-3 rounded-[14px] border px-3 py-3 ${
+                      isCurrentUser
+                        ? "border-[#303744] bg-[#20242B]"
+                        : "border-[#E4E9F1] bg-[#F7F9FC]"
+                    }`}
+                  >
+                    <View className="flex-row items-center gap-3">
+                      <SymbolView
+                        name={getAttachmentIconName(message.attachment_kind ?? "file")}
+                        size={22}
+                        tintColor={isCurrentUser ? "#FFFFFF" : "#0F1115"}
+                      />
+                      <View className="flex-1">
+                        <Text
+                          numberOfLines={1}
+                          className={`text-[13px] font-semibold ${
+                            isCurrentUser ? "text-white" : "text-[#0F1115]"
+                          }`}
+                        >
+                          {message.attachment_name ?? "Attachment"}
+                        </Text>
+                        <Text
+                          className={`mt-1 text-[11px] ${
+                            isCurrentUser ? "text-[#C9D0DB]" : "text-[#7B8494]"
+                          }`}
+                        >
+                          {getAttachmentMeta(message.attachment_kind ?? "file", message.attachment_size)}
+                        </Text>
+                      </View>
+                    </View>
+                  </Pressable>
+                ) : null}
+
+                {message.body ? (
+                  <Text
+                    className={`text-[14px] leading-6 ${
+                      isCurrentUser ? "text-white" : "text-[#0F1115]"
+                    }`}
+                  >
+                    {message.body}
+                  </Text>
+                ) : null}
                 <Text
                   className={`mt-2 text-[11px] ${
                     isCurrentUser ? "text-[#C9D0DB]" : "text-[#7B8494]"
@@ -444,23 +764,80 @@ export default function CommunityChatThreadScreen() {
 
       <View className="border-t border-[#DDE5EF] bg-[#EEF3F9] px-5 pb-6 pt-4">
         <View className="rounded-[22px] bg-white p-3">
-          <TextInput
-            value={messageDraft}
-            onChangeText={setMessageDraft}
-            placeholder="Write to the community"
-            placeholderTextColor="#9AA0AB"
-            multiline
-            className="min-h-[52px] text-[14px] leading-6 text-[#0F1115]"
-          />
+          {pendingAttachment ? (
+            <View className="mb-3 rounded-[16px] border border-[#E4E9F1] bg-[#F7F9FC] p-3">
+              <View className="flex-row items-center gap-3">
+                {pendingAttachment.kind === "image" && pendingAttachment.previewUri ? (
+                  <Image
+                    source={{ uri: pendingAttachment.previewUri }}
+                    className="h-14 w-14 rounded-[12px] bg-[#DDE5EF]"
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View className="h-14 w-14 items-center justify-center rounded-[12px] bg-[#E4E9F1]">
+                    <SymbolView
+                      name={getAttachmentIconName(pendingAttachment.kind)}
+                      size={22}
+                      tintColor="#0F1115"
+                    />
+                  </View>
+                )}
+                <View className="flex-1">
+                  <Text
+                    numberOfLines={1}
+                    className="text-[14px] font-semibold text-[#0F1115]"
+                  >
+                    {pendingAttachment.name}
+                  </Text>
+                  <Text className="mt-1 text-[12px] text-[#7B8494]">
+                    {getAttachmentMeta(pendingAttachment.kind, pendingAttachment.size)}
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={() => setPendingAttachment(null)}
+                  className="h-9 w-9 items-center justify-center rounded-full bg-white"
+                >
+                  <SymbolView name="xmark" size={14} tintColor="#0F1115" />
+                </Pressable>
+              </View>
+            </View>
+          ) : null}
 
-          <View className="mt-3">
-            <AppButton
-              label={isSending ? "Sending..." : "Send"}
-              disabled={isSending || !community}
-              onPress={() => {
-                void handleSendMessage();
-              }}
-            />
+          <View className="flex-row items-end gap-2">
+            <Pressable
+              disabled={isSending || isUploadingAttachment || !community}
+              onPress={openAttachmentMenu}
+              className="h-12 w-12 items-center justify-center rounded-full bg-[#EEF2F7]"
+            >
+              <SymbolView
+                name={{
+                  ios: "paperclip",
+                  android: "attach_file",
+                  web: "attach_file",
+                }}
+                size={20}
+                tintColor="#0F1115"
+              />
+            </Pressable>
+            <View className="flex-1 rounded-[22px] border border-[#E4E9F1] bg-[#F9FBFD] px-3 py-1">
+              <TextInput
+                value={messageDraft}
+                onChangeText={setMessageDraft}
+                placeholder="Write to the community"
+                placeholderTextColor="#9AA0AB"
+                multiline
+                className="min-h-[44px] text-[14px] leading-6 text-[#0F1115]"
+              />
+            </View>
+            <View className="w-[88px]">
+              <AppButton
+                label={isSending || isUploadingAttachment ? "Sending..." : "Send"}
+                disabled={isSending || isUploadingAttachment || !community}
+                onPress={() => {
+                  void handleSendMessage();
+                }}
+              />
+            </View>
           </View>
         </View>
       </View>
