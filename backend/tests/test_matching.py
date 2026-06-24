@@ -30,6 +30,8 @@ class FakeMatchRepository:
                 interests=["AI / ML"],
                 intents=["study_group"],
                 onboarding_completed=True,
+                study_style="in_person",
+                preferred_group_size=4,
             ),
             "user-2": ProfileSummary(
                 id="user-2",
@@ -40,9 +42,11 @@ class FakeMatchRepository:
                 major="Computer Science",
                 year_of_study=3,
                 badge_tier="gold",
-                interests=["Algorithms"],
+                interests=["Artificial Intelligence", "Algorithms"],
                 intents=["study_group"],
                 onboarding_completed=True,
+                study_style="in_person",
+                preferred_group_size=4,
             ),
             "user-3": ProfileSummary(
                 id="user-3",
@@ -56,6 +60,8 @@ class FakeMatchRepository:
                 interests=["Backend"],
                 intents=["study_group"],
                 onboarding_completed=True,
+                study_style="online",
+                preferred_group_size=2,
             ),
         }
         return profiles.get(user_id)
@@ -90,10 +96,10 @@ class FakeMatchRepository:
         exclude_user_id: str | None = None,
     ) -> list[ModuleRegistration]:
         registrations = [
-            ModuleRegistration("user-1", "CS2040S", "A"),
-            ModuleRegistration("user-1", "CS2030S", "A-"),
-            ModuleRegistration("user-2", "CS2040S", "A-"),
-            ModuleRegistration("user-3", "CS2030S", "B+"),
+            ModuleRegistration("user-1", "CS2040S"),
+            ModuleRegistration("user-1", "CS2030S"),
+            ModuleRegistration("user-2", "CS2040S"),
+            ModuleRegistration("user-3", "CS2030S"),
         ]
 
         filtered = [
@@ -154,6 +160,13 @@ def test_people_matches_returns_ranked_candidates():
         > body["candidates"][1]["compatibility_percentage"]
     )
     assert body["candidates"][0]["shared_modules"] == ["CS2040S"]
+    assert body["candidates"][0]["breakdown"]["module_overlap"] is not None
+    assert body["candidates"][0]["breakdown"]["faculty_major"] is not None
+    assert body["candidates"][0]["breakdown"]["year_proximity"] is not None
+    assert body["candidates"][0]["breakdown"]["interest_overlap"] is not None
+    assert body["candidates"][0]["breakdown"]["study_style"] is not None
+    assert body["candidates"][0]["breakdown"]["preferred_group_size"] is not None
+    assert len(body["candidates"][0]["match_reasons"]) > 0
 
 
 def test_people_matches_can_scope_to_one_module():
@@ -164,3 +177,79 @@ def test_people_matches_can_scope_to_one_module():
 
     assert len(body["candidates"]) == 1
     assert body["candidates"][0]["user_id"] == "user-3"
+
+
+def test_people_matches_keeps_missing_optional_fields_matchable():
+    response = client.get("/v1/matches/people?module_code=CS2030S")
+
+    assert response.status_code == 200
+    candidate = response.json()["candidates"][0]
+
+    assert candidate["breakdown"]["schedule_overlap"] == 0
+    assert candidate["breakdown"]["module_overlap"] is not None
+    assert candidate["breakdown"]["faculty_major"] is not None
+    assert candidate["compatibility_percentage"] > 0
+
+
+def test_people_matches_never_rounds_positive_match_to_zero():
+    response = client.get("/v1/matches/people")
+
+    assert response.status_code == 200
+    for candidate in response.json()["candidates"]:
+        assert candidate["compatibility_percentage"] >= 1
+
+
+def test_interest_overlap_handles_case_and_common_aliases():
+    score = calculate_interest_overlap_score(
+        ["AI / ML", "Backend"],
+        ["artificial intelligence", "BACKEND"],
+    )
+
+    assert score is not None
+    assert round(score, 2) == 0.67
+
+
+def test_study_style_flexible_matches_both_modes():
+    score = calculate_study_style_score("flexible", "online")
+
+    assert score == 1.0
+
+
+def test_normalize_interest_tags_supports_broader_canonical_tag_bank():
+    normalized = normalize_interest_tags(
+        [
+            "AI / ML",
+            "software eng",
+            "Cyber Security",
+            "product",
+            "PUBLIC POLICY",
+            "backend",
+        ]
+    )
+
+    assert "artificial_intelligence" in normalized
+    assert "machine_learning" in normalized
+    assert "software_engineering" in normalized
+    assert "cybersecurity" in normalized
+    assert "product_management" in normalized
+    assert "public_policy" in normalized
+    assert "backend" in normalized
+
+
+def test_interest_overlap_handles_multiple_canonical_aliases_together():
+    score = calculate_interest_overlap_score(
+        ["software engineering", "Cybersecurity", "Product Management"],
+        ["SWE", "cyber security", "product"],
+    )
+
+    assert score == 1.0
+
+
+def test_interest_overlap_keeps_unknown_custom_tags_as_exact_matches_only():
+    score = calculate_interest_overlap_score(
+        ["quant trading", "AI / ML"],
+        ["Quant Trading", "machine learning"],
+    )
+
+    assert score is not None
+    assert round(score, 2) == 0.67

@@ -22,7 +22,7 @@ function toBadgeTierLabel(tier: "bronze" | "silver" | "gold" | null) {
     case "bronze":
       return "Reliable" as const;
     default:
-      return "New" as const;
+      return null;
   }
 }
 
@@ -50,6 +50,31 @@ export default function PeopleScreen() {
   const [query, setQuery] = useState("");
   const [activeModule, setActiveModule] = useState<string>("all");
 
+  const normalizedMatches = useMemo(() => {
+    return peopleMatches.map((candidate) => ({
+      ...candidate,
+      bio: candidate.bio ?? "",
+      shared_modules: candidate.shared_modules ?? [],
+      interests: candidate.interests ?? [],
+      intents: candidate.intents ?? [],
+      match_reasons: candidate.match_reasons ?? [],
+      schedule_summary: candidate.schedule_summary ?? "No timetable overlap summary yet.",
+      breakdown: {
+        module_overlap: candidate.breakdown?.module_overlap ?? null,
+        schedule_overlap: candidate.breakdown?.schedule_overlap ?? null,
+        faculty_major: candidate.breakdown?.faculty_major ?? null,
+        year_proximity: candidate.breakdown?.year_proximity ?? null,
+        interest_overlap: candidate.breakdown?.interest_overlap ?? null,
+        study_style: candidate.breakdown?.study_style ?? null,
+        preferred_group_size: candidate.breakdown?.preferred_group_size ?? null,
+      },
+      compatibility_percentage: Math.max(
+        0,
+        Math.min(100, candidate.compatibility_percentage ?? 0),
+      ),
+    }));
+  }, [peopleMatches]);
+
   useEffect(() => {
     void refreshPeopleMatches(activeModule === "all" ? undefined : activeModule);
   }, [activeModule, refreshPeopleMatches]);
@@ -66,10 +91,10 @@ export default function PeopleScreen() {
 
   const filteredMatches = useMemo(() => {
     if (!normalizedQuery) {
-      return peopleMatches;
+      return normalizedMatches;
     }
 
-    return peopleMatches.filter((candidate) => {
+    return normalizedMatches.filter((candidate) => {
       return (
         candidate.display_name.toLowerCase().includes(normalizedQuery) ||
         candidate.major?.toLowerCase().includes(normalizedQuery) ||
@@ -79,7 +104,7 @@ export default function PeopleScreen() {
         )
       );
     });
-  }, [normalizedQuery, peopleMatches]);
+  }, [normalizedMatches, normalizedQuery]);
 
   async function handleSendRequest(recipientId: string) {
     if (!session?.user.id) {
@@ -156,7 +181,7 @@ export default function PeopleScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: "#EEF3F9" }}>
       <AppScreenHeader
         title="People"
-        subtitle="Discover module-mates for the current semester, ranked by target-grade alignment and timetable overlap when available."
+        subtitle="Discover module-mates for the current semester, ranked by shared modules, academic alignment, availability, and profile fit."
       />
 
       <ScrollView
@@ -218,9 +243,11 @@ export default function PeopleScreen() {
                         <Text className="text-[15px] font-bold text-[#0F1115]">
                           {request.requester_profile.display_name}
                         </Text>
-                        <BadgeTierPill
-                          tier={toBadgeTierLabel(request.requester_profile.badge_tier)}
-                        />
+                        {toBadgeTierLabel(request.requester_profile.badge_tier) ? (
+                          <BadgeTierPill
+                            tier={toBadgeTierLabel(request.requester_profile.badge_tier)!}
+                          />
+                        ) : null}
                       </View>
                       <Text className="mt-1 text-[13px] text-[#5C6370]">
                         {[
@@ -325,7 +352,9 @@ export default function PeopleScreen() {
                       <Text className="text-[17px] font-bold text-[#0F1115]">
                         {candidate.display_name}
                       </Text>
-                      <BadgeTierPill tier={toBadgeTierLabel(candidate.badge_tier)} />
+                      {toBadgeTierLabel(candidate.badge_tier) ? (
+                        <BadgeTierPill tier={toBadgeTierLabel(candidate.badge_tier)!} />
+                      ) : null}
                     </View>
                     <Text className="mt-1 text-[13px] text-[#5C6370]">
                       {[candidate.major, candidate.year_of_study ? `Year ${candidate.year_of_study}` : null]
@@ -347,30 +376,14 @@ export default function PeopleScreen() {
                 ))}
               </View>
 
+              <Text className="mt-3 text-[13px] leading-5 text-[#5C6370]">
+                {candidate.shared_modules.length === 1
+                  ? `Taking ${candidate.shared_modules[0]} with you this semester.`
+                  : `${candidate.shared_modules.length} shared modules this semester.`}
+              </Text>
+
               <View className="mt-4 items-start">
                 {renderConnectionAction(candidate.user_id)}
-              </View>
-
-              <View className="mt-4 gap-3 rounded-[16px] bg-[#F7F9FC] p-3">
-                <Text className="text-[13px] font-semibold text-[#0F1115]">
-                  Target grade
-                  {candidate.breakdown.target_grade !== null
-                    ? ` · ${candidate.breakdown.target_grade}%`
-                    : ""}
-                </Text>
-                <Text className="text-[13px] leading-5 text-[#5C6370]">
-                  {candidate.target_grade_summary}
-                </Text>
-
-                <Text className="text-[13px] font-semibold text-[#0F1115]">
-                  Schedule overlap
-                  {candidate.breakdown.schedule_overlap !== null
-                    ? ` · ${candidate.breakdown.schedule_overlap}%`
-                    : ""}
-                </Text>
-                <Text className="text-[13px] leading-5 text-[#5C6370]">
-                  {candidate.schedule_summary}
-                </Text>
               </View>
             </SectionCard>
           ))}

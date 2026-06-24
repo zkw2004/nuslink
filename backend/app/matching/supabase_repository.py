@@ -9,7 +9,8 @@ from app.matching.repository import MatchRepository
 
 PROFILE_SELECT_FIELDS = (
     "id,display_name,bio,avatar_url,faculty,major,"
-    "year_of_study,badge_tier,interests,intents,onboarding_completed"
+    "year_of_study,study_style,preferred_group_size,"
+    "badge_tier,interests,intents,onboarding_completed"
 )
 
 
@@ -89,7 +90,7 @@ class SupabaseMatchRepository(MatchRepository):
         rows = self._get(
             "user_modules",
             {
-                "select": "user_id,module_code,target_grade",
+                "select": "user_id,module_code",
                 "user_id": f"eq.{user_id}",
                 "semester": f"eq.{semester}",
             },
@@ -99,7 +100,6 @@ class SupabaseMatchRepository(MatchRepository):
             ModuleRegistration(
                 user_id=row["user_id"],
                 module_code=row["module_code"],
-                target_grade=row.get("target_grade"),
             )
             for row in rows
         ]
@@ -115,7 +115,7 @@ class SupabaseMatchRepository(MatchRepository):
             return []
 
         params = {
-            "select": "user_id,module_code,target_grade",
+            "select": "user_id,module_code",
             "semester": f"eq.{semester}",
             "module_code": _build_in_filter(module_codes),
         }
@@ -128,7 +128,6 @@ class SupabaseMatchRepository(MatchRepository):
             ModuleRegistration(
                 user_id=row["user_id"],
                 module_code=row["module_code"],
-                target_grade=row.get("target_grade"),
             )
             for row in rows
         ]
@@ -180,4 +179,6 @@ def _map_profile(row: dict) -> ProfileSummary:
         interests=row.get("interests") or [],
         intents=row.get("intents") or [],
         onboarding_completed=bool(row.get("onboarding_completed")),
+        study_style=row.get("study_style"),
+        preferred_group_size=row.get("preferred_group_size"),
     )
