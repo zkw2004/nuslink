@@ -4,6 +4,7 @@ export * from "./communityMessagesStore";
 export * from "./communitiesStore";
 export * from "./connectionsStore";
 export * from "./directMessagesStore";
+export * from "./groupMessagesStore";
 export * from "./groupsStore";
 export * from "./groupMessagesStore";
 export * from "./matchesStore";

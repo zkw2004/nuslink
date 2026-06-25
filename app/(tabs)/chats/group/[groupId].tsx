@@ -1,25 +1,28 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  Alert,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { Alert, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
+import { SymbolView } from "expo-symbols";
 
-import { AppAvatar, AppButton, AppChip, SectionCard } from "@components/shared";
+import { AppAvatar, SectionCard } from "@components/shared";
 import { useAuthStore, useGroupMessagesStore } from "@store/index";
 
 function formatMessageTime(value: string) {
-  return new Date(value).toLocaleString("en-SG", {
+  const date = new Date(value);
+
+  return date.toLocaleString("en-SG", {
     day: "numeric",
     month: "short",
     hour: "numeric",
     minute: "2-digit",
   });
+}
+
+function formatGroupTypeLabel(type: string) {
+  return type
+    .split("_")
+    .map((part) => `${part[0].toUpperCase()}${part.slice(1)}`)
+    .join(" ");
 }
 
 export default function GroupChatThreadScreen() {
@@ -53,7 +56,7 @@ export default function GroupChatThreadScreen() {
     }
 
     void refreshGroupChats(session.user.id).then(() => {
-      void loadGroupMessages(groupId);
+      void loadGroupMessages(groupId, session.user.id);
     });
   }, [groupId, loadGroupMessages, refreshGroupChats, session?.user.id]);
 
@@ -66,10 +69,6 @@ export default function GroupChatThreadScreen() {
   }, [groupId, session?.user.id, subscribeToGroup]);
 
   useEffect(() => {
-    if (messages.length === 0) {
-      return;
-    }
-
     const timeoutId = setTimeout(() => {
       scrollViewRef.current?.scrollToEnd({ animated: true });
     }, 80);
@@ -83,15 +82,16 @@ export default function GroupChatThreadScreen() {
       return;
     }
 
-    if (!messageDraft.trim()) {
-      Alert.alert("Write a message", "Type something before sending.");
+    const trimmedDraft = messageDraft.trim();
+    if (!trimmedDraft) {
       return;
     }
 
     try {
-      await sendMessage(groupId, messageDraft.trim(), session.user.id);
       setMessageDraft("");
+      await sendMessage(groupId, trimmedDraft, session.user.id);
     } catch (sendError) {
+      setMessageDraft(trimmedDraft);
       Alert.alert(
         "Could not send message",
         sendError instanceof Error ? sendError.message : "Please try again.",
@@ -101,114 +101,88 @@ export default function GroupChatThreadScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#EEF3F9" }}>
-      <View className="px-5 pb-4 pt-3">
+      <View className="border-b border-[#E4E9F1] bg-white px-5 pb-4 pt-2">
         <View className="flex-row items-center gap-3">
           <Pressable
-            onPress={() => router.replace("/(tabs)/chats")}
-            className="rounded-full bg-white px-4 py-3"
+            onPress={() => router.back()}
+            className="h-10 w-10 items-center justify-center rounded-full bg-[#F1F4F8]"
           >
-            <Text className="text-[13px] font-semibold text-[#0F1115]">Back</Text>
+            <SymbolView
+              name={{ ios: "chevron.left", android: "arrow_back", web: "arrow_back" }}
+              size={20}
+              tintColor="#0F1115"
+            />
           </Pressable>
-
-          {group ? (
-            <View className="flex-1 rounded-[20px] bg-white px-4 py-3">
-              <View className="flex-row items-center gap-3">
-                <AppAvatar name={group.name} size={44} rounded={false} />
-                <View className="flex-1">
-                  <View className="flex-row flex-wrap items-center gap-2">
-                    <Text className="text-[16px] font-bold text-[#0F1115]">
-                      {group.name}
-                    </Text>
-                    <AppChip
-                      label={group.privacy === "private" ? "Private" : "Group"}
-                      variant="outline"
-                    />
-                  </View>
-                  <Text className="mt-1 text-[12px] text-[#5C6370]">
-                    {group.module_code
-                      ? `${group.module_code} member chat`
-                      : "Group member chat"}
-                  </Text>
-                </View>
-              </View>
-            </View>
-          ) : null}
+          <AppAvatar name={group?.name ?? "Group"} size={44} rounded={false} />
+          <View className="flex-1">
+            <Text className="text-[17px] font-bold text-[#0F1115]" numberOfLines={1}>
+              {group?.name ?? "Group chat"}
+            </Text>
+            <Text className="mt-1 text-[13px] text-[#5C6370]" numberOfLines={1}>
+              {group
+                ? [group.module_code, formatGroupTypeLabel(group.type)]
+                    .filter(Boolean)
+                    .join(" · ")
+                : "Loading group chat..."}
+            </Text>
+          </View>
         </View>
       </View>
 
       <ScrollView
-        ref={(ref) => {
-          scrollViewRef.current = ref;
-        }}
+        ref={scrollViewRef}
         className="flex-1 px-5"
-        contentContainerStyle={{ paddingBottom: 24 }}
-        onContentSizeChange={() => {
-          scrollViewRef.current?.scrollToEnd({ animated: true });
-        }}
+        contentContainerStyle={{ paddingBottom: 20, paddingTop: 16 }}
         showsVerticalScrollIndicator={false}
       >
         {error ? (
           <SectionCard className="mb-4">
             <Text className="text-[15px] font-semibold text-[#0F1115]">
-              Group chat unavailable
+              Group chat is not available yet
             </Text>
             <Text className="mt-2 text-[14px] leading-6 text-red-700">{error}</Text>
           </SectionCard>
         ) : null}
 
-        {!error && !group && !isThreadLoading ? (
-          <SectionCard className="mb-4">
-            <Text className="text-[17px] font-bold text-[#0F1115]">
-              Could not find this group chat
-            </Text>
-            <Text className="mt-2 text-[14px] leading-6 text-[#5C6370]">
-              Return to the Chats tab and open the group again.
-            </Text>
-          </SectionCard>
-        ) : null}
-
-        {!error && messages.length === 0 && group ? (
+        {!error && messages.length === 0 && !isThreadLoading ? (
           <SectionCard>
-            <Text className="text-[17px] font-bold text-[#0F1115]">
-              Start the group chat
-            </Text>
+            <Text className="text-[17px] font-bold text-[#0F1115]">No messages yet</Text>
             <Text className="mt-2 text-[14px] leading-6 text-[#5C6370]">
-              Messages sent here are visible to members of this group.
+              Start the group conversation here. Everyone in the group can read
+              messages in this thread.
             </Text>
           </SectionCard>
         ) : null}
 
         <View className="gap-3">
           {messages.map((message) => {
-            const isOwnMessage = message.sender_id === session?.user.id;
+            const isMine = message.sender_id === session?.user.id;
 
             return (
               <View
                 key={message.id}
-                className={`max-w-[86%] ${
-                  isOwnMessage ? "self-end items-end" : "self-start items-start"
-                }`}
+                className={`max-w-[86%] ${isMine ? "self-end" : "self-start"}`}
               >
-                {!isOwnMessage ? (
-                  <Text className="mb-1 px-2 text-[11px] font-semibold text-[#7B8494]">
+                {!isMine ? (
+                  <Text className="mb-1 ml-1 text-[12px] font-semibold text-[#7B8494]">
                     {message.sender_profile.display_name}
                   </Text>
                 ) : null}
                 <View
-                  className={`rounded-[20px] px-4 py-3 ${
-                    isOwnMessage ? "bg-[#0F1115]" : "bg-white"
+                  className={`rounded-[18px] px-4 py-3 ${
+                    isMine ? "bg-[#0F1115]" : "border border-[#E4E9F1] bg-white"
                   }`}
                 >
                   <Text
                     className={`text-[15px] leading-6 ${
-                      isOwnMessage ? "text-white" : "text-[#0F1115]"
+                      isMine ? "text-white" : "text-[#0F1115]"
                     }`}
                   >
                     {message.body}
                   </Text>
                   <Text
                     className={`mt-2 text-[11px] ${
-                      isOwnMessage ? "text-[#C9CED8]" : "text-[#8B93A1]"
+                      isMine ? "text-white/60" : "text-[#9AA0AB]"
                     }`}
                   >
                     {formatMessageTime(message.created_at)}
@@ -220,23 +194,31 @@ export default function GroupChatThreadScreen() {
         </View>
       </ScrollView>
 
-      <View className="border-t border-[#DDE5EF] bg-[#EEF3F9] px-5 py-4">
-        <View className="rounded-[24px] bg-white p-3">
+      <View className="border-t border-[#E4E9F1] bg-white px-5 py-3">
+        <View className="flex-row items-end gap-3">
           <TextInput
             value={messageDraft}
             onChangeText={setMessageDraft}
             placeholder="Write to the group"
             placeholderTextColor="#9AA0AB"
             multiline
-            className="min-h-[56px] text-[15px] leading-6 text-[#0F1115]"
+            className="max-h-28 flex-1 rounded-[18px] border border-[#E4E9F1] bg-[#F9FBFD] px-4 py-3 text-[15px] text-[#0F1115]"
           />
-          <AppButton
-            label={isSending ? "Sending..." : "Send"}
+          <Pressable
             disabled={isSending || !messageDraft.trim()}
             onPress={() => {
               void handleSendMessage();
             }}
-          />
+            className={`h-11 w-11 items-center justify-center rounded-full ${
+              isSending || !messageDraft.trim() ? "bg-[#D7DDE6]" : "bg-[#0F1115]"
+            }`}
+          >
+            <SymbolView
+              name={{ ios: "paperplane.fill", android: "send", web: "send" }}
+              size={18}
+              tintColor="#FFFFFF"
+            />
+          </Pressable>
         </View>
       </View>
     </SafeAreaView>

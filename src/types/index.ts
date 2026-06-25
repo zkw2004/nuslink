@@ -180,6 +180,7 @@ export interface DirectConversationSummary {
   last_message_preview: string | null;
   last_message_at: string | null;
   updated_at: string;
+  unread_count: number;
 }
 
 export interface DirectMessage {
@@ -239,8 +240,10 @@ export interface CommunityChatSummary {
   join_policy: JoinPolicy;
   tags: string[];
   creator_id: string;
+  created_at: string;
   last_message_preview: string | null;
   last_message_at: string | null;
+  unread_count: number;
 }
 
 export interface CommunityChatMessage {
@@ -263,8 +266,11 @@ export interface GroupChatSummary {
   type: GroupType;
   module_code: string | null;
   privacy: PrivacySetting;
+  semester: string;
+  created_at: string;
   last_message_preview: string | null;
   last_message_at: string | null;
+  unread_count: number;
 }
 
 export interface GroupChatMessage {

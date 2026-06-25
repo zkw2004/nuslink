@@ -216,18 +216,21 @@ export type Database = {
           conversation_id: string;
           id: string;
           joined_at: string;
+          last_read_at: string | null;
           user_id: string;
         };
         Insert: {
           conversation_id: string;
           id?: string;
           joined_at?: string;
+          last_read_at?: string | null;
           user_id: string;
         };
         Update: {
           conversation_id?: string;
           id?: string;
           joined_at?: string;
+          last_read_at?: string | null;
           user_id?: string;
         };
         Relationships: [];
@@ -438,6 +441,7 @@ export type Database = {
           group_id: string;
           id: string;
           joined_at: string;
+          last_read_at: string | null;
           role: "member" | "co_admin" | "admin";
           user_id: string;
         };
@@ -445,6 +449,7 @@ export type Database = {
           group_id: string;
           id?: string;
           joined_at?: string;
+          last_read_at?: string | null;
           role?: "member" | "co_admin" | "admin";
           user_id: string;
         };
@@ -452,6 +457,7 @@ export type Database = {
           group_id?: string;
           id?: string;
           joined_at?: string;
+          last_read_at?: string | null;
           role?: "member" | "co_admin" | "admin";
           user_id?: string;
         };
@@ -600,6 +606,7 @@ export type Database = {
           community_id: string;
           id: string;
           joined_at: string;
+          last_read_at: string | null;
           role: "member" | "co_admin" | "admin";
           user_id: string;
         };
@@ -607,6 +614,7 @@ export type Database = {
           community_id: string;
           id?: string;
           joined_at?: string;
+          last_read_at?: string | null;
           role?: "member" | "co_admin" | "admin";
           user_id: string;
         };
@@ -614,6 +622,7 @@ export type Database = {
           community_id?: string;
           id?: string;
           joined_at?: string;
+          last_read_at?: string | null;
           role?: "member" | "co_admin" | "admin";
           user_id?: string;
         };

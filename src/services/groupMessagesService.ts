@@ -22,27 +22,6 @@ function mapProfileToPreview(profile: ProfileRow): ConnectedProfilePreview {
   };
 }
 
-async function fetchProfilesByIds(userIds: string[]) {
-  if (!supabase) {
-    throw new Error("Supabase is not configured.");
-  }
-
-  if (userIds.length === 0) {
-    return [] as ProfileRow[];
-  }
-
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("id, display_name, avatar_url, major, year_of_study, badge_tier")
-    .in("id", userIds);
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  return (data as ProfileRow[]) ?? [];
-}
-
 function getMessagePreview(message: GroupMessageRow) {
   if (message.body?.trim()) {
     return message.body;
@@ -67,6 +46,27 @@ function getMessagePreview(message: GroupMessageRow) {
   }
 
   return null;
+}
+
+async function fetchProfilesByIds(userIds: string[]) {
+  if (!supabase) {
+    throw new Error("Supabase is not configured.");
+  }
+
+  if (userIds.length === 0) {
+    return [] as ProfileRow[];
+  }
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, display_name, avatar_url, major, year_of_study, badge_tier")
+    .in("id", userIds);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data as ProfileRow[]) ?? [];
 }
 
 function mapGroupMessage(
@@ -95,7 +95,7 @@ export async function fetchJoinedGroupChats(userId: string) {
 
   const { data: membershipRows, error: membershipError } = await supabase
     .from("group_members")
-    .select("group_id")
+    .select("*")
     .eq("user_id", userId);
 
   if (membershipError) {
@@ -103,7 +103,7 @@ export async function fetchJoinedGroupChats(userId: string) {
   }
 
   const groupIds = (membershipRows ?? []).map(
-    (membership: Pick<GroupMemberRow, "group_id">) => membership.group_id,
+    (membership: GroupMemberRow) => membership.group_id,
   );
 
   if (groupIds.length === 0) {
@@ -114,11 +114,7 @@ export async function fetchJoinedGroupChats(userId: string) {
     { data: groupRows, error: groupsError },
     { data: messageRows, error: messagesError },
   ] = await Promise.all([
-    supabase
-      .from("groups")
-      .select("*")
-      .in("id", groupIds)
-      .eq("is_active", true),
+    supabase.from("groups").select("*").in("id", groupIds).eq("is_active", true),
     supabase
       .from("group_messages")
       .select("*")
@@ -134,10 +130,30 @@ export async function fetchJoinedGroupChats(userId: string) {
     throw new Error(messagesError.message);
   }
 
+  const membershipByGroup = new Map<string, GroupMemberRow>();
   const lastMessageByGroup = new Map<string, GroupMessageRow>();
+  const unreadCountByGroup = new Map<string, number>();
+
+  for (const membership of (membershipRows ?? []) as GroupMemberRow[]) {
+    membershipByGroup.set(membership.group_id, membership);
+  }
+
   for (const message of (messageRows ?? []) as GroupMessageRow[]) {
     if (!lastMessageByGroup.has(message.group_id)) {
       lastMessageByGroup.set(message.group_id, message);
+    }
+
+    const membership = membershipByGroup.get(message.group_id);
+    const lastReadTime = membership?.last_read_at
+      ? new Date(membership.last_read_at).getTime()
+      : 0;
+    const messageTime = new Date(message.created_at).getTime();
+
+    if (message.sender_id !== userId && messageTime > lastReadTime) {
+      unreadCountByGroup.set(
+        message.group_id,
+        (unreadCountByGroup.get(message.group_id) ?? 0) + 1,
+      );
     }
   }
 
@@ -151,13 +167,16 @@ export async function fetchJoinedGroupChats(userId: string) {
         type: group.type,
         module_code: group.module_code,
         privacy: group.privacy,
+        semester: group.semester,
+        created_at: group.created_at,
         last_message_preview: lastMessage ? getMessagePreview(lastMessage) : null,
         last_message_at: lastMessage?.created_at ?? null,
+        unread_count: unreadCountByGroup.get(group.id) ?? 0,
       } satisfies GroupChatSummary;
     })
     .sort((left, right) => {
-      const rightTime = new Date(right.last_message_at ?? 0).getTime();
-      const leftTime = new Date(left.last_message_at ?? 0).getTime();
+      const rightTime = new Date(right.last_message_at ?? right.created_at).getTime();
+      const leftTime = new Date(left.last_message_at ?? left.created_at).getTime();
       return rightTime - leftTime;
     });
 }
@@ -217,6 +236,22 @@ export async function sendGroupMessage(
     sender_id: senderId,
     body: trimmedBody,
   });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function markGroupChatRead(groupId: string, userId: string) {
+  if (!supabase) {
+    throw new Error("Supabase is not configured.");
+  }
+
+  const { error } = await supabase
+    .from("group_members")
+    .update({ last_read_at: new Date().toISOString() })
+    .eq("group_id", groupId)
+    .eq("user_id", userId);
 
   if (error) {
     throw new Error(error.message);

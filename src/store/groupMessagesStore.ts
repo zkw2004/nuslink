@@ -4,6 +4,7 @@ import type { GroupChatMessage, GroupChatSummary } from "@appTypes/index";
 import {
   fetchGroupMessages,
   fetchJoinedGroupChats,
+  markGroupChatRead,
   sendGroupMessage,
   subscribeToGroupMessages,
 } from "@services/groupMessagesService";
@@ -16,7 +17,7 @@ interface GroupMessagesState {
   isSending: boolean;
   error: string | null;
   refreshGroupChats: (userId: string) => Promise<void>;
-  loadGroupMessages: (groupId: string) => Promise<void>;
+  loadGroupMessages: (groupId: string, userId?: string) => Promise<void>;
   sendMessage: (groupId: string, body: string, userId: string) => Promise<void>;
   subscribeToGroup: (groupId: string, userId: string) => () => void;
   reset: () => void;
@@ -53,11 +54,14 @@ export const useGroupMessagesStore = create<GroupMessagesState>((set, get) => ({
     }
   },
 
-  async loadGroupMessages(groupId) {
+  async loadGroupMessages(groupId, userId) {
     set({ isThreadLoading: true, error: null });
 
     try {
       const messages = await fetchGroupMessages(groupId);
+      if (userId) {
+        await markGroupChatRead(groupId, userId);
+      }
 
       set((state) => ({
         messagesByGroup: {
@@ -111,7 +115,7 @@ export const useGroupMessagesStore = create<GroupMessagesState>((set, get) => ({
   subscribeToGroup(groupId, userId) {
     return subscribeToGroupMessages(groupId, () => {
       void Promise.all([
-        get().loadGroupMessages(groupId),
+        get().loadGroupMessages(groupId, userId),
         get().refreshGroupChats(userId),
       ]);
     });

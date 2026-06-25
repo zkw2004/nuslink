@@ -268,9 +268,29 @@ export async function fetchDirectConversations(userId: string) {
   }
 
   const lastMessageByConversation = new Map<string, DirectMessageRow>();
+  const ownMembershipByConversation = new Map<string, DirectConversationMemberRow>();
+  const unreadCountByConversation = new Map<string, number>();
+
+  for (const membership of (membershipRows ?? []) as DirectConversationMemberRow[]) {
+    ownMembershipByConversation.set(membership.conversation_id, membership);
+  }
+
   for (const message of (messageRows ?? []) as DirectMessageRow[]) {
     if (!lastMessageByConversation.has(message.conversation_id)) {
       lastMessageByConversation.set(message.conversation_id, message);
+    }
+
+    const membership = ownMembershipByConversation.get(message.conversation_id);
+    const lastReadTime = membership?.last_read_at
+      ? new Date(membership.last_read_at).getTime()
+      : 0;
+    const messageTime = new Date(message.created_at).getTime();
+
+    if (message.sender_id !== userId && messageTime > lastReadTime) {
+      unreadCountByConversation.set(
+        message.conversation_id,
+        (unreadCountByConversation.get(message.conversation_id) ?? 0) + 1,
+      );
     }
   }
 
@@ -291,6 +311,7 @@ export async function fetchDirectConversations(userId: string) {
         last_message_preview: lastMessage ? getMessagePreview(lastMessage) : null,
         last_message_at: lastMessage?.created_at ?? null,
         updated_at: conversation.updated_at,
+        unread_count: unreadCountByConversation.get(conversation.id) ?? 0,
       };
     })
     .filter(
@@ -370,6 +391,25 @@ export async function fetchDirectMessages(conversationId: string) {
   return ((data ?? []) as DirectMessageRow[]).map(
     (message): DirectMessage => mapDirectMessage(message),
   );
+}
+
+export async function markDirectConversationRead(
+  conversationId: string,
+  userId: string,
+) {
+  if (!supabase) {
+    throw new Error("Supabase is not configured.");
+  }
+
+  const { error } = await supabase
+    .from("direct_conversation_members")
+    .update({ last_read_at: new Date().toISOString() })
+    .eq("conversation_id", conversationId)
+    .eq("user_id", userId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
 }
 
 export async function uploadChatAttachment(
