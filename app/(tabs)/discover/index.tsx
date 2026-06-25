@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  Modal,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -9,7 +18,9 @@ import {
   AppScreenHeader,
   SectionCard,
 } from "@components/shared";
+import { fetchConnectedProfiles } from "@services/directMessagesService";
 import { useAuthStore, useCommunitiesStore, useGroupsStore } from "@store/index";
+import type { ConnectedProfilePreview } from "@appTypes/index";
 
 function formatGroupTypeLabel(type: string) {
   return type
@@ -57,6 +68,7 @@ export default function DiscoverScreen() {
   const groupsError = useGroupsStore((state) => state.error);
   const joinGroup = useGroupsStore((state) => state.joinGroup);
   const joinGroupWithInvite = useGroupsStore((state) => state.joinGroupWithInvite);
+  const inviteUserToGroup = useGroupsStore((state) => state.inviteUserToGroup);
   const deleteGroup = useGroupsStore((state) => state.deleteGroup);
   const refreshGroups = useGroupsStore((state) => state.refreshGroups);
   const communities = useCommunitiesStore((state) => state.communities);
@@ -67,6 +79,11 @@ export default function DiscoverScreen() {
   const [mode, setMode] = useState<DiscoverMode>("groups");
   const [query, setQuery] = useState("");
   const [inviteCodes, setInviteCodes] = useState<Record<string, string>>({});
+  const [inviteGroupId, setInviteGroupId] = useState<string | null>(null);
+  const [inviteSearch, setInviteSearch] = useState("");
+  const [connectedProfiles, setConnectedProfiles] = useState<ConnectedProfilePreview[]>([]);
+  const [isInviteLoading, setIsInviteLoading] = useState(false);
+  const [invitingUserId, setInvitingUserId] = useState<string | null>(null);
 
   useEffect(() => {
     void refreshGroups(session?.user.id ?? null);
@@ -103,6 +120,26 @@ export default function DiscoverScreen() {
       );
     });
   }, [communities, normalizedQuery]);
+
+  const selectedInviteGroup = useMemo(
+    () => groups.find((group) => group.id === inviteGroupId) ?? null,
+    [groups, inviteGroupId],
+  );
+
+  const filteredConnectedProfiles = useMemo(() => {
+    const normalizedInviteSearch = inviteSearch.trim().toLowerCase();
+
+    if (!normalizedInviteSearch) {
+      return connectedProfiles;
+    }
+
+    return connectedProfiles.filter((profile) => {
+      return (
+        profile.display_name.toLowerCase().includes(normalizedInviteSearch) ||
+        profile.major?.toLowerCase().includes(normalizedInviteSearch)
+      );
+    });
+  }, [connectedProfiles, inviteSearch]);
 
   const titleCopy = useMemo(() => {
     if (mode === "groups") {
@@ -178,6 +215,51 @@ export default function DiscoverScreen() {
     }
   }
 
+  async function handleOpenInviteModal(groupId: string) {
+    if (!session?.user.id) {
+      Alert.alert("Sign in required", "Please sign in before inviting users.");
+      return;
+    }
+
+    setInviteGroupId(groupId);
+    setInviteSearch("");
+    setIsInviteLoading(true);
+
+    try {
+      const profiles = await fetchConnectedProfiles(session.user.id);
+      setConnectedProfiles(profiles);
+    } catch (error) {
+      Alert.alert(
+        "Could not load connections",
+        error instanceof Error ? error.message : "Please try again.",
+      );
+    } finally {
+      setIsInviteLoading(false);
+    }
+  }
+
+  async function handleSendGroupInvite(recipientId: string) {
+    if (!inviteGroupId) {
+      return;
+    }
+
+    setInvitingUserId(recipientId);
+
+    try {
+      await inviteUserToGroup(inviteGroupId, recipientId);
+      Alert.alert("Invitation sent", "The group invitation has been sent.");
+      setInviteGroupId(null);
+      setInviteSearch("");
+    } catch (error) {
+      Alert.alert(
+        "Could not send invitation",
+        error instanceof Error ? error.message : "Please try again.",
+      );
+    } finally {
+      setInvitingUserId(null);
+    }
+  }
+
   async function handleJoinCommunity(communityId: string) {
     if (!session?.user) {
       Alert.alert("Sign in required", "Please sign in again before joining a community.");
@@ -229,6 +311,95 @@ export default function DiscoverScreen() {
         title="Discover"
         subtitle="Browse groups and communities for the current semester from one shared surface."
       />
+
+      <Modal
+        visible={inviteGroupId !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setInviteGroupId(null)}
+      >
+        <View className="flex-1 justify-end bg-black/30">
+          <View className="max-h-[78%] rounded-t-[28px] bg-[#EEF3F9] px-5 pb-8 pt-5">
+            <View className="mb-4 flex-row items-start justify-between gap-3">
+              <View className="flex-1">
+                <Text className="text-[20px] font-bold text-[#0F1115]">
+                  Invite connection
+                </Text>
+                <Text className="mt-1 text-[13px] leading-5 text-[#5C6370]">
+                  {selectedInviteGroup
+                    ? `Send a group invitation for ${selectedInviteGroup.name}.`
+                    : "Send a group invitation to one of your connections."}
+                </Text>
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Close invite panel"
+                className="rounded-full bg-white px-4 py-2"
+                onPress={() => setInviteGroupId(null)}
+              >
+                <Text className="text-[14px] font-semibold text-[#0F1115]">
+                  Close
+                </Text>
+              </Pressable>
+            </View>
+
+            <TextInput
+              value={inviteSearch}
+              onChangeText={setInviteSearch}
+              placeholder="Search connected people"
+              placeholderTextColor="#9AA0AB"
+              className="mb-4 rounded-[18px] border border-[#D7DEE9] bg-white px-4 py-3 text-[15px] text-[#0F1115]"
+            />
+
+            {isInviteLoading ? (
+              <View className="items-center py-8">
+                <ActivityIndicator color="#5B7BA3" />
+              </View>
+            ) : filteredConnectedProfiles.length === 0 ? (
+              <SectionCard>
+                <Text className="text-[16px] font-bold text-[#0F1115]">
+                  No connections found
+                </Text>
+                <Text className="mt-2 text-[14px] leading-6 text-[#5C6370]">
+                  Connect with people first, then invite them to your groups.
+                </Text>
+              </SectionCard>
+            ) : (
+              <ScrollView
+                className="max-h-[420px]"
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
+                <View className="gap-3">
+                  {filteredConnectedProfiles.map((profile) => (
+                    <SectionCard key={profile.id} className="p-3">
+                      <View className="flex-row items-center gap-3">
+                        <View className="flex-1">
+                          <Text className="text-[16px] font-bold text-[#0F1115]">
+                            {profile.display_name}
+                          </Text>
+                          <Text className="mt-1 text-[13px] text-[#5C6370]">
+                            {[profile.major, profile.year_of_study ? `Y${profile.year_of_study}` : null]
+                              .filter(Boolean)
+                              .join(" · ") || "Connected student"}
+                          </Text>
+                        </View>
+                        <AppButton
+                          label={invitingUserId === profile.id ? "Sending..." : "Invite"}
+                          disabled={invitingUserId !== null}
+                          onPress={() => {
+                            void handleSendGroupInvite(profile.id);
+                          }}
+                        />
+                      </View>
+                    </SectionCard>
+                  ))}
+                </View>
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
 
       <ScrollView
         className="flex-1"
@@ -372,6 +543,13 @@ export default function DiscoverScreen() {
                           <View className="min-w-[104px] flex-row gap-2">
                             {isOwner ? (
                               <>
+                                <AppButton
+                                  label="Invite"
+                                  variant="secondary"
+                                  onPress={() => {
+                                    void handleOpenInviteModal(group.id);
+                                  }}
+                                />
                                 <AppButton
                                   label="Resources"
                                   variant="secondary"

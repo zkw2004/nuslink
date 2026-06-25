@@ -70,3 +70,21 @@ export async function markAllNotificationsAsRead(userId: string) {
     throw new Error(error.message);
   }
 }
+
+export async function respondToGroupInvitation(
+  invitationId: string,
+  decision: "accepted" | "declined",
+) {
+  if (!supabase) {
+    throw new Error("Supabase is not configured.");
+  }
+
+  const { error } = await supabase.rpc("respond_to_group_invitation", {
+    invitation_id_input: invitationId,
+    decision_input: decision,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}

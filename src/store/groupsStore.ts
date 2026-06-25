@@ -56,6 +56,7 @@ interface GroupsState {
   error: string | null;
   refreshGroups: (userId?: string | null) => Promise<void>;
   createGroup: (input: CreateGroupInput) => Promise<CreateGroupResult>;
+  inviteUserToGroup: (groupId: string, recipientId: string) => Promise<string>;
   joinGroup: (groupId: string, userId: string) => Promise<void>;
   joinGroupWithInvite: (inviteCode: string, userId: string) => Promise<void>;
   deleteGroup: (groupId: string, userId: string) => Promise<void>;
@@ -170,6 +171,27 @@ export const useGroupsStore = create<GroupsState>((set, get) => ({
     }
 
     await get().refreshGroups(userId);
+  },
+
+  async inviteUserToGroup(groupId, recipientId) {
+    if (!supabase) {
+      throw new Error("Supabase is not configured.");
+    }
+
+    const { data, error } = await supabase.rpc("create_group_invitation", {
+      group_id_input: groupId,
+      recipient_id_input: recipientId,
+    });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    if (!data) {
+      throw new Error("Invitation was not created.");
+    }
+
+    return data;
   },
 
   async joinGroupWithInvite(inviteCode, userId) {

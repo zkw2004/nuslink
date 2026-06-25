@@ -457,6 +457,36 @@ export type Database = {
         };
         Relationships: [];
       };
+      group_invitations: {
+        Row: {
+          created_at: string;
+          group_id: string;
+          id: string;
+          inviter_id: string;
+          recipient_id: string;
+          responded_at: string | null;
+          status: "pending" | "accepted" | "declined";
+        };
+        Insert: {
+          created_at?: string;
+          group_id: string;
+          id?: string;
+          inviter_id: string;
+          recipient_id: string;
+          responded_at?: string | null;
+          status?: "pending" | "accepted" | "declined";
+        };
+        Update: {
+          created_at?: string;
+          group_id?: string;
+          id?: string;
+          inviter_id?: string;
+          recipient_id?: string;
+          responded_at?: string | null;
+          status?: "pending" | "accepted" | "declined";
+        };
+        Relationships: [];
+      };
       communities: {
         Row: {
           created_at: string;
@@ -733,6 +763,13 @@ export type Database = {
         };
         Returns: string;
       };
+      create_group_invitation: {
+        Args: {
+          group_id_input: string;
+          recipient_id_input: string;
+        };
+        Returns: string;
+      };
       get_or_create_direct_conversation: {
         Args: {
           other_user_id_input: string;
@@ -790,6 +827,13 @@ export type Database = {
         };
         Returns: void;
       };
+      respond_to_group_invitation: {
+        Args: {
+          decision_input: string;
+          invitation_id_input: string;
+        };
+        Returns: void;
+      };
       search_interest_tags: {
         Args: {
           search_input: string;
@@ -843,6 +887,7 @@ export type Database = {
     Enums: {
       badge_tier: "bronze" | "silver" | "gold";
       connection_request_status: "pending" | "accepted" | "declined";
+      group_invitation_status: "pending" | "accepted" | "declined";
       intent: "study_group" | "hackathon" | "tutoring" | "internship_networking";
       group_type: "study_group" | "hackathon_team" | "project_team" | "tutoring_session";
       privacy_setting: "public" | "semi_private" | "private";

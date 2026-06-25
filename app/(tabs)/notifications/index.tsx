@@ -1,9 +1,17 @@
-import { useEffect } from "react";
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppButton, AppScreenHeader, SectionCard } from "@components/shared";
 import type { AppNotification, NotificationType } from "@appTypes/index";
+import { respondToGroupInvitation } from "@services/notificationsService";
 import { useAuthStore, useNotificationsStore } from "@store/index";
 
 const NOTIFICATION_LABELS: Record<NotificationType, string> = {
@@ -18,6 +26,10 @@ const NOTIFICATION_LABELS: Record<NotificationType, string> = {
   system_announcement: "Announcement",
 };
 
+function getNotificationLabel(type: string) {
+  return NOTIFICATION_LABELS[type as NotificationType] ?? "Notification";
+}
+
 function formatNotificationTime(value: string) {
   return new Intl.DateTimeFormat("en-SG", {
     day: "numeric",
@@ -30,11 +42,19 @@ function formatNotificationTime(value: string) {
 function NotificationCard({
   notification,
   onMarkRead,
+  onRespondGroupInvite,
+  actionLoadingId,
 }: {
   notification: AppNotification;
   onMarkRead: (notificationId: string) => void;
+  onRespondGroupInvite: (
+    notification: AppNotification,
+    decision: "accepted" | "declined",
+  ) => void;
+  actionLoadingId: string | null;
 }) {
   const isUnread = notification.read_at === null;
+  const isGroupInvite = notification.type === "group_invite_received";
 
   return (
     <Pressable
@@ -53,7 +73,7 @@ function NotificationCard({
         <View className="flex-1">
           <View className="flex-row flex-wrap items-center gap-2">
             <Text className="text-[11px] font-bold uppercase tracking-[0.7px] text-[#5B7BA3]">
-              {NOTIFICATION_LABELS[notification.type]}
+              {getNotificationLabel(notification.type)}
             </Text>
             {isUnread ? (
               <View className="rounded-full bg-[#0F1115] px-2 py-0.5">
@@ -69,6 +89,29 @@ function NotificationCard({
           <Text className="mt-2 text-[14px] leading-6 text-[#5C6370]">
             {notification.body}
           </Text>
+          {isGroupInvite ? (
+            <View className="mt-4 flex-row gap-2">
+              <AppButton
+                label={
+                  actionLoadingId === `${notification.id}:accepted`
+                    ? "Joining..."
+                    : "Accept"
+                }
+                disabled={actionLoadingId !== null}
+                onPress={() => onRespondGroupInvite(notification, "accepted")}
+              />
+              <AppButton
+                label={
+                  actionLoadingId === `${notification.id}:declined`
+                    ? "Declining..."
+                    : "Decline"
+                }
+                variant="secondary"
+                disabled={actionLoadingId !== null}
+                onPress={() => onRespondGroupInvite(notification, "declined")}
+              />
+            </View>
+          ) : null}
         </View>
         <Text className="text-right text-[12px] font-medium text-[#9AA0AB]">
           {formatNotificationTime(notification.created_at)}
@@ -89,6 +132,7 @@ export default function NotificationsScreen() {
   );
   const markAsRead = useNotificationsStore((state) => state.markAsRead);
   const markAllAsRead = useNotificationsStore((state) => state.markAllAsRead);
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!session?.user.id) {
@@ -112,6 +156,38 @@ export default function NotificationsScreen() {
     }
 
     void markAllAsRead(session.user.id);
+  }
+
+  async function handleRespondGroupInvite(
+    notification: AppNotification,
+    decision: "accepted" | "declined",
+  ) {
+    if (!session?.user.id) {
+      return;
+    }
+
+    const invitationId = notification.metadata.invitation_id;
+    if (typeof invitationId !== "string") {
+      Alert.alert(
+        "Could not handle invitation",
+        "This notification is missing its invitation details.",
+      );
+      return;
+    }
+
+    setActionLoadingId(`${notification.id}:${decision}`);
+
+    try {
+      await respondToGroupInvitation(invitationId, decision);
+      await markAsRead(notification.id, session.user.id);
+    } catch (error) {
+      Alert.alert(
+        "Could not handle invitation",
+        error instanceof Error ? error.message : "Please try again.",
+      );
+    } finally {
+      setActionLoadingId(null);
+    }
   }
 
   return (
@@ -182,6 +258,10 @@ export default function NotificationsScreen() {
               key={notification.id}
               notification={notification}
               onMarkRead={handleMarkRead}
+              onRespondGroupInvite={(targetNotification, decision) => {
+                void handleRespondGroupInvite(targetNotification, decision);
+              }}
+              actionLoadingId={actionLoadingId}
             />
           ))}
         </View>
