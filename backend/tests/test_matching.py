@@ -1,10 +1,14 @@
+import pytest
 from fastapi.testclient import TestClient
 
 from app.auth import AuthenticatedUser
 from app.main import app
 from app.matching.models import ModuleRegistration, ProfileSummary, TimetableSlot
 from app.matching.scoring import (
+    CandidateScore,
     calculate_interest_overlap_score,
+    calculate_overall_score,
+    calculate_schedule_overlap_score,
     calculate_study_style_score,
     normalize_interest_tags,
 )
@@ -140,6 +144,21 @@ class FakeMatchRepository:
         return None
 
 
+class MissingProfileRepository(FakeMatchRepository):
+    def get_profile(self, user_id: str) -> ProfileSummary | None:
+        return None
+
+
+class NoModulesRepository(FakeMatchRepository):
+    def list_user_module_registrations(
+        self,
+        *,
+        user_id: str,
+        semester: str,
+    ) -> list[ModuleRegistration]:
+        return []
+
+
 client = TestClient(app)
 
 
@@ -151,8 +170,15 @@ def override_repository() -> FakeMatchRepository:
     return FakeMatchRepository()
 
 
-app.dependency_overrides[get_matches_current_user] = override_current_user
-app.dependency_overrides[get_match_repository] = override_repository
+@pytest.fixture(autouse=True)
+def override_matching_dependencies():
+    app.dependency_overrides[get_matches_current_user] = override_current_user
+    app.dependency_overrides[get_match_repository] = override_repository
+
+    yield
+
+    app.dependency_overrides.pop(get_matches_current_user, None)
+    app.dependency_overrides.pop(get_match_repository, None)
 
 
 def test_people_matches_returns_ranked_candidates():
@@ -188,6 +214,41 @@ def test_people_matches_can_scope_to_one_module():
     assert body["candidates"][0]["user_id"] == "user-3"
 
 
+def test_people_matches_returns_empty_when_module_filter_is_not_registered():
+    response = client.get("/v1/matches/people?module_code=CS9999")
+
+    assert response.status_code == 200
+    body = response.json()
+
+    assert body["available_modules"] == ["CS2030S", "CS2040S"]
+    assert body["candidates"] == []
+
+
+def test_people_matches_returns_empty_when_current_user_has_no_modules():
+    app.dependency_overrides[get_match_repository] = lambda: NoModulesRepository()
+
+    try:
+        response = client.get("/v1/matches/people")
+    finally:
+        app.dependency_overrides[get_match_repository] = override_repository
+
+    assert response.status_code == 200
+    assert response.json()["available_modules"] == []
+    assert response.json()["candidates"] == []
+
+
+def test_people_matches_returns_404_when_profile_is_missing():
+    app.dependency_overrides[get_match_repository] = lambda: MissingProfileRepository()
+
+    try:
+        response = client.get("/v1/matches/people")
+    finally:
+        app.dependency_overrides[get_match_repository] = override_repository
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Profile not found for the current user."
+
+
 def test_people_matches_keeps_missing_optional_fields_matchable():
     response = client.get("/v1/matches/people?module_code=CS2030S")
 
@@ -206,6 +267,36 @@ def test_people_matches_never_rounds_positive_match_to_zero():
     assert response.status_code == 200
     for candidate in response.json()["candidates"]:
         assert candidate["compatibility_percentage"] >= 1
+
+
+def test_overall_score_redistributes_missing_optional_dimensions():
+    score = calculate_overall_score(
+        CandidateScore(
+            module_overlap=1.0,
+            schedule_overlap=None,
+            faculty_major=None,
+            year_proximity=None,
+            interest_overlap=None,
+            study_style=None,
+            preferred_group_size=None,
+            overlap_minutes=0,
+        )
+    )
+
+    assert score == 100
+
+
+def test_schedule_overlap_normalizes_against_smaller_availability_total():
+    score, overlap_minutes = calculate_schedule_overlap_score(
+        [TimetableSlot("user-1", 1, 600, 720)],
+        [
+            TimetableSlot("user-2", 1, 660, 780),
+            TimetableSlot("user-2", 2, 600, 720),
+        ],
+    )
+
+    assert score == 0.5
+    assert overlap_minutes == 60
 
 
 def test_interest_overlap_handles_case_and_common_aliases():
