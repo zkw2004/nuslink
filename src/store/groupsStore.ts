@@ -22,6 +22,7 @@ export interface DiscoverGroup {
   semester: string;
   joined: boolean;
   can_join: boolean;
+  request_pending: boolean;
   join_note: string;
   invite_code: string | null;
 }
@@ -56,8 +57,9 @@ interface GroupsState {
   error: string | null;
   refreshGroups: (userId?: string | null) => Promise<void>;
   createGroup: (input: CreateGroupInput) => Promise<CreateGroupResult>;
+  inviteUserToGroup: (groupId: string, recipientId: string) => Promise<string>;
+  requestToJoinGroup: (groupId: string, userId: string) => Promise<void>;
   joinGroup: (groupId: string, userId: string) => Promise<void>;
-  joinGroupWithInvite: (inviteCode: string, userId: string) => Promise<void>;
   deleteGroup: (groupId: string, userId: string) => Promise<void>;
   reset: () => void;
 }
@@ -75,6 +77,7 @@ function mapGroups(groups: DiscoverGroupRow[]): DiscoverGroup[] {
     semester: group.semester,
     joined: group.joined,
     can_join: group.can_join,
+    request_pending: group.request_pending,
     join_note: group.join_note,
     invite_code: group.invite_code,
   }));
@@ -172,13 +175,34 @@ export const useGroupsStore = create<GroupsState>((set, get) => ({
     await get().refreshGroups(userId);
   },
 
-  async joinGroupWithInvite(inviteCode, userId) {
+  async inviteUserToGroup(groupId, recipientId) {
     if (!supabase) {
       throw new Error("Supabase is not configured.");
     }
 
-    const { error } = await supabase.rpc("join_group_with_invite", {
-      invite_code_input: inviteCode,
+    const { data, error } = await supabase.rpc("create_group_invitation", {
+      group_id_input: groupId,
+      recipient_id_input: recipientId,
+    });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    if (!data) {
+      throw new Error("Invitation was not created.");
+    }
+
+    return data;
+  },
+
+  async requestToJoinGroup(groupId, userId) {
+    if (!supabase) {
+      throw new Error("Supabase is not configured.");
+    }
+
+    const { error } = await supabase.rpc("create_group_join_request", {
+      group_id_input: groupId,
     });
 
     if (error) {

@@ -434,6 +434,17 @@ export default function ChatsScreen() {
             </Text>
           </SectionCard>
         ) : null}
+
+        {!groupError && groupChats.length === 0 && !isGroupChatsLoading ? (
+          <SectionCard className="mt-4">
+            <Text className="text-[17px] font-bold text-[#0F1115]">
+              No group chats yet
+            </Text>
+            <Text className="mt-2 text-[14px] leading-6 text-[#5C6370]">
+              Join or accept an invite to a group to unlock its member chat here.
+            </Text>
+          </SectionCard>
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );

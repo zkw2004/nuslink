@@ -32,6 +32,17 @@ export type ConnectionRelationshipStatus =
   | "incoming_request"
   | "outgoing_request"
   | "connected";
+export type NotificationType =
+  | "connection_request"
+  | "connection_accepted"
+  | "connection_milestone"
+  | "high_match"
+  | "group_invite_received"
+  | "group_join_requested"
+  | "group_join_accepted"
+  | "group_member_joined"
+  | "resource_shared"
+  | "system_announcement";
 
 export interface UserProfile {
   id: string;
@@ -286,5 +297,19 @@ export interface SharedResource {
   file_path: string;
   mime_type: string;
   size_bytes: number;
+  created_at: string;
+}
+
+export interface AppNotification {
+  id: string;
+  recipient_id: string;
+  actor_id: string | null;
+  group_id: string | null;
+  type: NotificationType;
+  title: string;
+  body: string;
+  href: string | null;
+  metadata: Record<string, unknown>;
+  read_at: string | null;
   created_at: string;
 }

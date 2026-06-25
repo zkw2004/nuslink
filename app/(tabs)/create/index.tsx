@@ -57,7 +57,7 @@ const privacyOptions: { label: string; value: PrivacySetting; helper: string }[]
   {
     label: "Private",
     value: "private",
-    helper: "Visible as a limited card. Joining requires an invite code.",
+    helper: "Visible as a limited card. Owners invite connections or approve requests.",
   },
 ];
 
@@ -300,7 +300,7 @@ export default function CreateScreen() {
       if (result.inviteCode) {
         Alert.alert(
           "Private group created",
-          `Share invite code ${result.inviteCode} with students you want to add.`,
+          "Invite connected people from Discover, or approve join requests from Notifications.",
           [
             {
               text: "View Discover",

@@ -51,6 +51,35 @@ class SupabaseMatchRepository(MatchRepository):
                 detail="Could not reach Supabase data API.",
             ) from exc
 
+    def _post(self, table: str, rows: list[dict]) -> None:
+        if not rows:
+            return
+
+        headers = {
+            **self.headers,
+            "Prefer": "resolution=ignore-duplicates",
+        }
+        req = request.Request(
+            f"{self.base_url}/{table}",
+            data=json.dumps(rows).encode("utf-8"),
+            headers=headers,
+            method="POST",
+        )
+
+        try:
+            with request.urlopen(req, timeout=10):
+                return
+        except error.HTTPError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Supabase insert failed for {table}.",
+            ) from exc
+        except error.URLError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Could not reach Supabase data API.",
+            ) from exc
+
     def get_profile(self, user_id: str) -> ProfileSummary | None:
         rows = self._get(
             "profiles",
@@ -159,6 +188,46 @@ class SupabaseMatchRepository(MatchRepository):
             )
             for row in rows
         ]
+
+    def create_high_match_notifications(
+        self,
+        *,
+        user_id: str,
+        semester: str,
+        candidates: list[dict],
+    ) -> None:
+        high_matches = [
+            candidate
+            for candidate in candidates
+            if candidate.get("compatibility_percentage", 0) >= 80
+        ][:5]
+
+        rows = [
+            {
+                "recipient_id": user_id,
+                "actor_id": candidate["user_id"],
+                "type": "high_match",
+                "title": "Recommended for you",
+                "body": (
+                    f"Check out {candidate['display_name']} - "
+                    "you might be a great study partner."
+                ),
+                "href": "/people",
+                "metadata": {
+                    "matched_user_id": candidate["user_id"],
+                    "semester": semester,
+                    "compatibility_percentage": candidate[
+                        "compatibility_percentage"
+                    ],
+                },
+                "dedupe_key": (
+                    f"high_match:{semester}:{user_id}:{candidate['user_id']}"
+                ),
+            }
+            for candidate in high_matches
+        ]
+
+        self._post("notifications", rows)
 
 
 def _build_in_filter(values: list[str]) -> str:

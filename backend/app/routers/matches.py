@@ -82,6 +82,14 @@ def get_people_matches(
         candidate_registrations=candidate_registrations,
         timetable_slots=timetable_slots,
     )
+    try:
+        repository.create_high_match_notifications(
+            user_id=current_user.id,
+            semester=semester,
+            candidates=ranked_candidates,
+        )
+    except HTTPException:
+        pass
 
     return PeopleMatchesResponse(
         semester=semester,

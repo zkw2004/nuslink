@@ -463,6 +463,66 @@ export type Database = {
         };
         Relationships: [];
       };
+      group_invitations: {
+        Row: {
+          created_at: string;
+          group_id: string;
+          id: string;
+          inviter_id: string;
+          recipient_id: string;
+          responded_at: string | null;
+          status: "pending" | "accepted" | "declined";
+        };
+        Insert: {
+          created_at?: string;
+          group_id: string;
+          id?: string;
+          inviter_id: string;
+          recipient_id: string;
+          responded_at?: string | null;
+          status?: "pending" | "accepted" | "declined";
+        };
+        Update: {
+          created_at?: string;
+          group_id?: string;
+          id?: string;
+          inviter_id?: string;
+          recipient_id?: string;
+          responded_at?: string | null;
+          status?: "pending" | "accepted" | "declined";
+        };
+        Relationships: [];
+      };
+      group_join_requests: {
+        Row: {
+          created_at: string;
+          group_id: string;
+          id: string;
+          requester_id: string;
+          responded_at: string | null;
+          responded_by: string | null;
+          status: "pending" | "accepted" | "declined";
+        };
+        Insert: {
+          created_at?: string;
+          group_id: string;
+          id?: string;
+          requester_id: string;
+          responded_at?: string | null;
+          responded_by?: string | null;
+          status?: "pending" | "accepted" | "declined";
+        };
+        Update: {
+          created_at?: string;
+          group_id?: string;
+          id?: string;
+          requester_id?: string;
+          responded_at?: string | null;
+          responded_by?: string | null;
+          status?: "pending" | "accepted" | "declined";
+        };
+        Relationships: [];
+      };
       group_messages: {
         Row: {
           attachment_kind: "image" | "file" | "audio" | "video" | null;
@@ -646,6 +706,81 @@ export type Database = {
         };
         Relationships: [];
       };
+      notifications: {
+        Row: {
+          actor_id: string | null;
+          body: string;
+          created_at: string;
+          dedupe_key: string | null;
+          group_id: string | null;
+          href: string | null;
+          id: string;
+          metadata: Record<string, unknown>;
+          read_at: string | null;
+          recipient_id: string;
+          title: string;
+          type:
+            | "connection_request"
+            | "connection_accepted"
+            | "connection_milestone"
+            | "high_match"
+            | "group_invite_received"
+            | "group_join_requested"
+            | "group_join_accepted"
+            | "group_member_joined"
+            | "resource_shared"
+            | "system_announcement";
+        };
+        Insert: {
+          actor_id?: string | null;
+          body?: string;
+          created_at?: string;
+          dedupe_key?: string | null;
+          group_id?: string | null;
+          href?: string | null;
+          id?: string;
+          metadata?: Record<string, unknown>;
+          read_at?: string | null;
+          recipient_id: string;
+          title: string;
+          type:
+            | "connection_request"
+            | "connection_accepted"
+            | "connection_milestone"
+            | "high_match"
+            | "group_invite_received"
+            | "group_join_requested"
+            | "group_join_accepted"
+            | "group_member_joined"
+            | "resource_shared"
+            | "system_announcement";
+        };
+        Update: {
+          actor_id?: string | null;
+          body?: string;
+          created_at?: string;
+          dedupe_key?: string | null;
+          group_id?: string | null;
+          href?: string | null;
+          id?: string;
+          metadata?: Record<string, unknown>;
+          read_at?: string | null;
+          recipient_id?: string;
+          title?: string;
+          type?:
+            | "connection_request"
+            | "connection_accepted"
+            | "connection_milestone"
+            | "high_match"
+            | "group_invite_received"
+            | "group_join_requested"
+            | "group_join_accepted"
+            | "group_member_joined"
+            | "resource_shared"
+            | "system_announcement";
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -709,6 +844,19 @@ export type Database = {
         };
         Returns: string;
       };
+      create_group_invitation: {
+        Args: {
+          group_id_input: string;
+          recipient_id_input: string;
+        };
+        Returns: string;
+      };
+      create_group_join_request: {
+        Args: {
+          group_id_input: string;
+        };
+        Returns: string;
+      };
       get_or_create_direct_conversation: {
         Args: {
           other_user_id_input: string;
@@ -731,6 +879,7 @@ export type Database = {
           semester: string;
           joined: boolean;
           can_join: boolean;
+          request_pending: boolean;
           join_note: string;
           invite_code: string | null;
         }[];
@@ -760,6 +909,20 @@ export type Database = {
         Returns: void;
       };
       respond_to_connection_request: {
+        Args: {
+          decision_input: string;
+          request_id_input: string;
+        };
+        Returns: void;
+      };
+      respond_to_group_invitation: {
+        Args: {
+          decision_input: string;
+          invitation_id_input: string;
+        };
+        Returns: void;
+      };
+      respond_to_group_join_request: {
         Args: {
           decision_input: string;
           request_id_input: string;
@@ -819,6 +982,8 @@ export type Database = {
     Enums: {
       badge_tier: "bronze" | "silver" | "gold";
       connection_request_status: "pending" | "accepted" | "declined";
+      group_invitation_status: "pending" | "accepted" | "declined";
+      group_join_request_status: "pending" | "accepted" | "declined";
       intent: "study_group" | "hackathon" | "tutoring" | "internship_networking";
       group_type: "study_group" | "hackathon_team" | "project_team" | "tutoring_session";
       privacy_setting: "public" | "semi_private" | "private";
@@ -826,6 +991,17 @@ export type Database = {
       user_role: "member" | "co_admin" | "admin";
       community_join_policy: "open" | "request_approval";
       community_type: "official" | "user_created";
+      notification_type:
+        | "connection_request"
+        | "connection_accepted"
+        | "connection_milestone"
+        | "high_match"
+        | "group_invite_received"
+        | "group_join_requested"
+        | "group_join_accepted"
+        | "group_member_joined"
+        | "resource_shared"
+        | "system_announcement";
     };
   };
 };
