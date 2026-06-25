@@ -161,7 +161,7 @@ export const useChatFeaturesStore = create<ChatFeaturesState>((set, get) => ({
   },
 
   subscribeToFeatureChanges(kind, chatId, messageIds, currentUserId) {
-    return subscribeToChatFeatureChanges(() => {
+    return subscribeToChatFeatureChanges(kind, chatId, () => {
       void get().loadFeatures(kind, chatId, messageIds, currentUserId);
     });
   },

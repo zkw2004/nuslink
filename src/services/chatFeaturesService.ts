@@ -239,14 +239,21 @@ export async function setChatMessagePinned(
   }
 }
 
-export function subscribeToChatFeatureChanges(onChange: () => void) {
+export function subscribeToChatFeatureChanges(
+  kind: ChatKind,
+  chatId: string,
+  onChange: () => void,
+) {
   if (!supabase) {
     throw new Error("Supabase is not configured.");
   }
 
   const supabaseClient = supabase;
+  const channelId = `${kind}:${chatId}:${Date.now()}:${Math.random()
+    .toString(36)
+    .slice(2)}`;
   const channel = supabaseClient
-    .channel("chat-features")
+    .channel(`chat-features:${channelId}`)
     .on(
       "postgres_changes",
       { event: "*", schema: "public", table: "chat_polls" },
