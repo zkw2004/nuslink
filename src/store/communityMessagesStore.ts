@@ -8,6 +8,7 @@ import type {
 import {
   fetchCommunityMessages,
   fetchJoinedCommunityChats,
+  markCommunityChatRead,
   sendCommunityMessage,
   subscribeToCommunityMessages,
 } from "@services/communityMessagesService";
@@ -20,7 +21,7 @@ interface CommunityMessagesState {
   isSending: boolean;
   error: string | null;
   refreshCommunityChats: (userId: string) => Promise<void>;
-  loadCommunityMessages: (communityId: string) => Promise<void>;
+  loadCommunityMessages: (communityId: string, userId?: string) => Promise<void>;
   sendMessage: (
     communityId: string,
     body: string,
@@ -62,11 +63,14 @@ export const useCommunityMessagesStore = create<CommunityMessagesState>((set, ge
     }
   },
 
-  async loadCommunityMessages(communityId) {
+  async loadCommunityMessages(communityId, userId) {
     set({ isThreadLoading: true, error: null });
 
     try {
       const messages = await fetchCommunityMessages(communityId);
+      if (userId) {
+        await markCommunityChatRead(communityId, userId);
+      }
 
       set((state) => ({
         messagesByCommunity: {
@@ -120,7 +124,7 @@ export const useCommunityMessagesStore = create<CommunityMessagesState>((set, ge
   subscribeToCommunity(communityId, userId) {
     return subscribeToCommunityMessages(communityId, () => {
       void Promise.all([
-        get().loadCommunityMessages(communityId),
+        get().loadCommunityMessages(communityId, userId),
         get().refreshCommunityChats(userId),
       ]);
     });

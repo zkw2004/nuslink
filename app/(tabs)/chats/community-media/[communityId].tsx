@@ -74,7 +74,7 @@ export default function CommunityMediaScreen() {
 
     void refreshCommunityChats(session.user.id).then(() => {
       void Promise.all([
-        loadCommunityMessages(communityId),
+        loadCommunityMessages(communityId, session.user.id),
         loadCommunityResources(communityId),
       ]);
     });

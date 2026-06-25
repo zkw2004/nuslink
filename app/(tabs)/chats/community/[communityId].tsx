@@ -252,7 +252,7 @@ export default function CommunityChatThreadScreen() {
     }
 
     void refreshCommunityChats(session.user.id).then(() => {
-      void loadCommunityMessages(communityId);
+      void loadCommunityMessages(communityId, session.user.id);
     });
   }, [communityId, loadCommunityMessages, refreshCommunityChats, session?.user.id]);
 
@@ -573,7 +573,7 @@ export default function CommunityChatThreadScreen() {
     try {
       await createPoll("community", communityId, trimmedQuestion, trimmedOptions);
       await Promise.all([
-        loadCommunityMessages(communityId),
+        loadCommunityMessages(communityId, session.user.id),
         refreshCommunityChats(session.user.id),
       ]);
       resetPollComposer();

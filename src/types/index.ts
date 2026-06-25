@@ -169,6 +169,7 @@ export interface DirectConversationSummary {
   last_message_preview: string | null;
   last_message_at: string | null;
   updated_at: string;
+  unread_count: number;
 }
 
 export interface DirectMessage {
@@ -228,13 +229,42 @@ export interface CommunityChatSummary {
   join_policy: JoinPolicy;
   tags: string[];
   creator_id: string;
+  created_at: string;
   last_message_preview: string | null;
   last_message_at: string | null;
+  unread_count: number;
 }
 
 export interface CommunityChatMessage {
   id: string;
   community_id: string;
+  sender_id: string;
+  body: string | null;
+  attachment_url: string | null;
+  attachment_name: string | null;
+  attachment_mime_type: string | null;
+  attachment_size: number | null;
+  attachment_kind: ChatAttachmentKind | null;
+  created_at: string;
+  sender_profile: ConnectedProfilePreview;
+}
+
+export interface GroupChatSummary {
+  id: string;
+  name: string;
+  type: GroupType;
+  module_code: string | null;
+  privacy: PrivacySetting;
+  semester: string;
+  created_at: string;
+  last_message_preview: string | null;
+  last_message_at: string | null;
+  unread_count: number;
+}
+
+export interface GroupChatMessage {
+  id: string;
+  group_id: string;
   sender_id: string;
   body: string | null;
   attachment_url: string | null;
