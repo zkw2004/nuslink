@@ -1,14 +1,26 @@
+import { useEffect } from "react";
 import { Redirect, Tabs } from "expo-router";
 import { SymbolView } from "expo-symbols";
 
 import { AppLoadingScreen } from "@components/ui";
-import { useAuthStore } from "@store/index";
+import { useAuthStore, useNotificationsStore } from "@store/index";
 
 export default function TabLayout() {
   const session = useAuthStore((state) => state.session);
   const profile = useAuthStore((state) => state.profile);
   const isInitialized = useAuthStore((state) => state.isInitialized);
   const isProfileLoading = useAuthStore((state) => state.isProfileLoading);
+  const refreshNotifications = useNotificationsStore(
+    (state) => state.refreshNotifications,
+  );
+
+  useEffect(() => {
+    if (!session?.user.id || !profile?.onboarding_completed) {
+      return;
+    }
+
+    void refreshNotifications(session.user.id);
+  }, [profile?.onboarding_completed, refreshNotifications, session?.user.id]);
 
   if (!isInitialized || isProfileLoading || (session && !profile)) {
     return <AppLoadingScreen message="Loading your workspace..." />;
@@ -90,6 +102,12 @@ export default function TabLayout() {
               size={24}
             />
           ),
+        }}
+      />
+      <Tabs.Screen
+        name="notifications"
+        options={{
+          href: null,
         }}
       />
       <Tabs.Screen

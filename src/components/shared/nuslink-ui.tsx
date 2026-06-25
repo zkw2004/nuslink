@@ -1,5 +1,8 @@
 import { SymbolView } from "expo-symbols";
+import { useRouter } from "expo-router";
 import { Image, Pressable, Text, View } from "react-native";
+
+import { useNotificationsStore } from "@store/index";
 
 type HeaderAction = {
   icon: "sparkles" | "gearshape.fill" | "pencil";
@@ -11,6 +14,7 @@ type AppScreenHeaderProps = {
   title: string;
   subtitle?: string;
   actions?: HeaderAction[];
+  hideNotificationsAction?: boolean;
 };
 
 type AvatarProps = {
@@ -83,7 +87,11 @@ export function AppScreenHeader({
   title,
   subtitle,
   actions = [],
+  hideNotificationsAction = false,
 }: AppScreenHeaderProps) {
+  const router = useRouter();
+  const unreadCount = useNotificationsStore((state) => state.unreadCount);
+
   return (
     <View className="px-4 pt-6 pb-2">
       <View className="flex-row items-start justify-between gap-4">
@@ -98,8 +106,35 @@ export function AppScreenHeader({
           ) : null}
         </View>
 
-        {actions.length > 0 ? (
+        {!hideNotificationsAction || actions.length > 0 ? (
           <View className="flex-row gap-2">
+            {!hideNotificationsAction ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Open notifications"
+                className="relative h-10 w-10 items-center justify-center rounded-full bg-[#EEF2F7]"
+                onPress={() => {
+                  router.push("/(tabs)/notifications");
+                }}
+              >
+                <SymbolView
+                  name={{
+                    ios: "bell.fill",
+                    android: "notifications",
+                    web: "notifications",
+                  }}
+                  size={18}
+                  tintColor="#0F1115"
+                />
+                {unreadCount > 0 ? (
+                  <View className="absolute -right-1 -top-1 min-w-[16px] items-center rounded-full bg-red-600 px-1">
+                    <Text className="text-[10px] font-bold text-white">
+                      {unreadCount > 9 ? "9+" : unreadCount}
+                    </Text>
+                  </View>
+                ) : null}
+              </Pressable>
+            ) : null}
             {actions.map((action) => (
               <Pressable
                 key={`${title}-${action.icon}`}

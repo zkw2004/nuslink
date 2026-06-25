@@ -29,3 +29,11 @@ class MatchRepository(Protocol):
         user_ids: list[str],
         semester: str,
     ) -> list[TimetableSlot]: ...
+
+    def create_high_match_notifications(
+        self,
+        *,
+        user_id: str,
+        semester: str,
+        candidates: list[dict],
+    ) -> None: ...

@@ -6,5 +6,6 @@ export * from "./connectionsStore";
 export * from "./directMessagesStore";
 export * from "./groupsStore";
 export * from "./matchesStore";
+export * from "./notificationsStore";
 export * from "./onboardingStore";
 export * from "./sharedResourcesStore";

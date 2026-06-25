@@ -130,6 +130,15 @@ class FakeMatchRepository:
         ]
         return [slot for slot in slots if slot.user_id in user_ids]
 
+    def create_high_match_notifications(
+        self,
+        *,
+        user_id: str,
+        semester: str,
+        candidates: list[dict],
+    ) -> None:
+        return None
+
 
 client = TestClient(app)
 

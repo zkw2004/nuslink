@@ -598,6 +598,63 @@ export type Database = {
         };
         Relationships: [];
       };
+      notifications: {
+        Row: {
+          actor_id: string | null;
+          body: string;
+          created_at: string;
+          dedupe_key: string | null;
+          href: string | null;
+          id: string;
+          metadata: Record<string, unknown>;
+          read_at: string | null;
+          recipient_id: string;
+          title: string;
+          type:
+            | "connection_request"
+            | "connection_accepted"
+            | "group_invite"
+            | "group_activity"
+            | "high_match";
+        };
+        Insert: {
+          actor_id?: string | null;
+          body?: string;
+          created_at?: string;
+          dedupe_key?: string | null;
+          href?: string | null;
+          id?: string;
+          metadata?: Record<string, unknown>;
+          read_at?: string | null;
+          recipient_id: string;
+          title: string;
+          type:
+            | "connection_request"
+            | "connection_accepted"
+            | "group_invite"
+            | "group_activity"
+            | "high_match";
+        };
+        Update: {
+          actor_id?: string | null;
+          body?: string;
+          created_at?: string;
+          dedupe_key?: string | null;
+          href?: string | null;
+          id?: string;
+          metadata?: Record<string, unknown>;
+          read_at?: string | null;
+          recipient_id?: string;
+          title?: string;
+          type?:
+            | "connection_request"
+            | "connection_accepted"
+            | "group_invite"
+            | "group_activity"
+            | "high_match";
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -778,6 +835,12 @@ export type Database = {
       user_role: "member" | "co_admin" | "admin";
       community_join_policy: "open" | "request_approval";
       community_type: "official" | "user_created";
+      notification_type:
+        | "connection_request"
+        | "connection_accepted"
+        | "group_invite"
+        | "group_activity"
+        | "high_match";
     };
   };
 };
