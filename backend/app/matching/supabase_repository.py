@@ -207,10 +207,10 @@ class SupabaseMatchRepository(MatchRepository):
                 "recipient_id": user_id,
                 "actor_id": candidate["user_id"],
                 "type": "high_match",
-                "title": "High match found",
+                "title": "Recommended for you",
                 "body": (
-                    f"{candidate['display_name']} is a "
-                    f"{candidate['compatibility_percentage']}% match."
+                    f"Check out {candidate['display_name']} - "
+                    "you might be a great study partner."
                 ),
                 "href": "/people",
                 "metadata": {

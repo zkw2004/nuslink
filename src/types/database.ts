@@ -604,6 +604,7 @@ export type Database = {
           body: string;
           created_at: string;
           dedupe_key: string | null;
+          group_id: string | null;
           href: string | null;
           id: string;
           metadata: Record<string, unknown>;
@@ -613,15 +614,20 @@ export type Database = {
           type:
             | "connection_request"
             | "connection_accepted"
-            | "group_invite"
-            | "group_activity"
-            | "high_match";
+            | "connection_milestone"
+            | "high_match"
+            | "group_invite_code"
+            | "group_invite_received"
+            | "group_member_joined"
+            | "resource_shared"
+            | "system_announcement";
         };
         Insert: {
           actor_id?: string | null;
           body?: string;
           created_at?: string;
           dedupe_key?: string | null;
+          group_id?: string | null;
           href?: string | null;
           id?: string;
           metadata?: Record<string, unknown>;
@@ -631,15 +637,20 @@ export type Database = {
           type:
             | "connection_request"
             | "connection_accepted"
-            | "group_invite"
-            | "group_activity"
-            | "high_match";
+            | "connection_milestone"
+            | "high_match"
+            | "group_invite_code"
+            | "group_invite_received"
+            | "group_member_joined"
+            | "resource_shared"
+            | "system_announcement";
         };
         Update: {
           actor_id?: string | null;
           body?: string;
           created_at?: string;
           dedupe_key?: string | null;
+          group_id?: string | null;
           href?: string | null;
           id?: string;
           metadata?: Record<string, unknown>;
@@ -649,9 +660,13 @@ export type Database = {
           type?:
             | "connection_request"
             | "connection_accepted"
-            | "group_invite"
-            | "group_activity"
-            | "high_match";
+            | "connection_milestone"
+            | "high_match"
+            | "group_invite_code"
+            | "group_invite_received"
+            | "group_member_joined"
+            | "resource_shared"
+            | "system_announcement";
         };
         Relationships: [];
       };
@@ -838,9 +853,13 @@ export type Database = {
       notification_type:
         | "connection_request"
         | "connection_accepted"
-        | "group_invite"
-        | "group_activity"
-        | "high_match";
+        | "connection_milestone"
+        | "high_match"
+        | "group_invite_code"
+        | "group_invite_received"
+        | "group_member_joined"
+        | "resource_shared"
+        | "system_announcement";
     };
   };
 };

@@ -9,6 +9,7 @@ function mapNotification(row: NotificationRow): AppNotification {
     id: row.id,
     recipient_id: row.recipient_id,
     actor_id: row.actor_id,
+    group_id: row.group_id,
     type: row.type,
     title: row.title,
     body: row.body,

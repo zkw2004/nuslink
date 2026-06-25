@@ -35,9 +35,13 @@ export type ConnectionRelationshipStatus =
 export type NotificationType =
   | "connection_request"
   | "connection_accepted"
-  | "group_invite"
-  | "group_activity"
-  | "high_match";
+  | "connection_milestone"
+  | "high_match"
+  | "group_invite_code"
+  | "group_invite_received"
+  | "group_member_joined"
+  | "resource_shared"
+  | "system_announcement";
 
 export interface UserProfile {
   id: string;
@@ -269,6 +273,7 @@ export interface AppNotification {
   id: string;
   recipient_id: string;
   actor_id: string | null;
+  group_id: string | null;
   type: NotificationType;
   title: string;
   body: string;

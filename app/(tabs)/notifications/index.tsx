@@ -9,9 +9,13 @@ import { useAuthStore, useNotificationsStore } from "@store/index";
 const NOTIFICATION_LABELS: Record<NotificationType, string> = {
   connection_request: "Request",
   connection_accepted: "Connection",
-  group_invite: "Invite",
-  group_activity: "Activity",
+  connection_milestone: "Milestone",
   high_match: "Match",
+  group_invite_code: "Invite code",
+  group_invite_received: "Invitation",
+  group_member_joined: "Group activity",
+  resource_shared: "Resource",
+  system_announcement: "Announcement",
 };
 
 function formatNotificationTime(value: string) {
@@ -114,7 +118,7 @@ export default function NotificationsScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: "#EEF3F9" }}>
       <AppScreenHeader
         title="Notifications"
-        subtitle="Requests, group activity, invites, and high-match alerts."
+        subtitle="High-signal updates for requests, matches, groups, and resources."
         hideNotificationsAction
       />
 
@@ -167,7 +171,7 @@ export default function NotificationsScreen() {
               No notifications yet
             </Text>
             <Text className="mt-2 text-[14px] leading-6 text-[#5C6370]">
-              New requests, group activity, invite reminders, and high-match alerts will appear here.
+              Connection requests, match recommendations, group updates, resources, and announcements will appear here.
             </Text>
           </SectionCard>
         ) : null}
