@@ -171,9 +171,29 @@ export async function fetchJoinedCommunityChats(userId: string) {
   }
 
   const lastMessageByCommunity = new Map<string, CommunityMessageRow>();
+  const membershipByCommunity = new Map<string, CommunityMemberRow>();
+  const unreadCountByCommunity = new Map<string, number>();
+
+  for (const membership of (membershipRows ?? []) as CommunityMemberRow[]) {
+    membershipByCommunity.set(membership.community_id, membership);
+  }
+
   for (const message of (messageRows ?? []) as CommunityMessageRow[]) {
     if (!lastMessageByCommunity.has(message.community_id)) {
       lastMessageByCommunity.set(message.community_id, message);
+    }
+
+    const membership = membershipByCommunity.get(message.community_id);
+    const lastReadTime = membership?.last_read_at
+      ? new Date(membership.last_read_at).getTime()
+      : 0;
+    const messageTime = new Date(message.created_at).getTime();
+
+    if (message.sender_id !== userId && messageTime > lastReadTime) {
+      unreadCountByCommunity.set(
+        message.community_id,
+        (unreadCountByCommunity.get(message.community_id) ?? 0) + 1,
+      );
     }
   }
 
@@ -189,6 +209,7 @@ export async function fetchJoinedCommunityChats(userId: string) {
         join_policy: community.join_policy,
         tags: community.tags ?? [],
         creator_id: community.creator_id,
+        created_at: community.created_at,
         last_message_preview:
           lastMessage?.body ??
           (lastMessage?.attachment_kind === "image"
@@ -201,6 +222,7 @@ export async function fetchJoinedCommunityChats(userId: string) {
                   ? `File: ${lastMessage.attachment_name ?? "Attachment"}`
                   : null),
         last_message_at: lastMessage?.created_at ?? null,
+        unread_count: unreadCountByCommunity.get(community.id) ?? 0,
       } satisfies CommunityChatSummary;
     })
     .sort((left, right) => {
@@ -243,6 +265,22 @@ export async function fetchCommunityMessages(communityId: string) {
       return mapCommunityMessage(message, senderProfile);
     })
     .filter((message): message is CommunityChatMessage => message !== null);
+}
+
+export async function markCommunityChatRead(communityId: string, userId: string) {
+  if (!supabase) {
+    throw new Error("Supabase is not configured.");
+  }
+
+  const { error } = await supabase
+    .from("community_members")
+    .update({ last_read_at: new Date().toISOString() })
+    .eq("community_id", communityId)
+    .eq("user_id", userId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
 }
 
 export async function sendCommunityMessage(

@@ -17,7 +17,54 @@ import {
   AppScreenHeader,
   SectionCard,
 } from "@components/shared";
-import { useAuthStore, useCommunityMessagesStore, useDirectMessagesStore } from "@store/index";
+import {
+  useAuthStore,
+  useCommunityMessagesStore,
+  useDirectMessagesStore,
+  useGroupMessagesStore,
+} from "@store/index";
+
+type InboxItem = {
+  id: string;
+  kind: "direct" | "group" | "community";
+  title: string;
+  subtitle: string;
+  preview: string;
+  timestamp: string | null;
+  sortTimestamp: string;
+  unreadCount: number;
+  avatarUri?: string | null;
+  roundedAvatar?: boolean;
+};
+
+function formatInboxTime(value: string | null) {
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(value);
+  const now = new Date();
+  const isToday = date.toDateString() === now.toDateString();
+
+  if (isToday) {
+    return date.toLocaleTimeString("en-SG", {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  }
+
+  return date.toLocaleDateString("en-SG", {
+    day: "numeric",
+    month: "short",
+  });
+}
+
+function formatGroupTypeLabel(type: string) {
+  return type
+    .split("_")
+    .map((part) => `${part[0].toUpperCase()}${part.slice(1)}`)
+    .join(" ");
+}
 
 export default function ChatsScreen() {
   const session = useAuthStore((state) => state.session);
@@ -35,6 +82,10 @@ export default function ChatsScreen() {
   const refreshCommunityChats = useCommunityMessagesStore(
     (state) => state.refreshCommunityChats,
   );
+  const groupChats = useGroupMessagesStore((state) => state.groupChats);
+  const isGroupChatsLoading = useGroupMessagesStore((state) => state.isChatsLoading);
+  const groupError = useGroupMessagesStore((state) => state.error);
+  const refreshGroupChats = useGroupMessagesStore((state) => state.refreshGroupChats);
   const [isCreateChatOpen, setIsCreateChatOpen] = useState(false);
   const [chatSearchQuery, setChatSearchQuery] = useState("");
 
@@ -45,7 +96,8 @@ export default function ChatsScreen() {
 
     void refreshInbox(session.user.id);
     void refreshCommunityChats(session.user.id);
-  }, [refreshCommunityChats, refreshInbox, session?.user.id]);
+    void refreshGroupChats(session.user.id);
+  }, [refreshCommunityChats, refreshGroupChats, refreshInbox, session?.user.id]);
 
   const normalizedChatSearch = chatSearchQuery.trim().toLowerCase();
   const existingConversationUserIds = useMemo(
@@ -64,6 +116,58 @@ export default function ChatsScreen() {
       );
     });
   }, [connectedProfiles, normalizedChatSearch]);
+
+  const inboxItems = useMemo(() => {
+    const directItems: InboxItem[] = conversations.map((conversation) => ({
+      id: conversation.id,
+      kind: "direct",
+      title: conversation.other_user.display_name,
+      subtitle: "Direct message",
+      preview: conversation.last_message_preview ?? "Start the conversation here.",
+      timestamp: conversation.last_message_at,
+      sortTimestamp: conversation.last_message_at ?? conversation.updated_at,
+      unreadCount: conversation.unread_count,
+      avatarUri: conversation.other_user.avatar_url,
+      roundedAvatar: true,
+    }));
+
+    const groupItems: InboxItem[] = groupChats.map((group) => ({
+      id: group.id,
+      kind: "group",
+      title: group.name,
+      subtitle: [group.module_code, formatGroupTypeLabel(group.type)]
+        .filter(Boolean)
+        .join(" · ") || "Group chat",
+      preview: group.last_message_preview ?? "No messages yet. Start the group chat.",
+      timestamp: group.last_message_at,
+      sortTimestamp: group.last_message_at ?? group.created_at,
+      unreadCount: group.unread_count,
+      roundedAvatar: false,
+    }));
+
+    const communityItems: InboxItem[] = communityChats.map((community) => ({
+      id: community.id,
+      kind: "community",
+      title: community.name,
+      subtitle: "Community chat",
+      preview:
+        community.last_message_preview ??
+        "No messages yet. Start the community conversation.",
+      timestamp: community.last_message_at,
+      sortTimestamp: community.last_message_at ?? community.created_at,
+      unreadCount: community.unread_count,
+      roundedAvatar: false,
+    }));
+
+    return [...directItems, ...groupItems, ...communityItems].sort(
+      (left, right) =>
+        new Date(right.sortTimestamp).getTime() -
+        new Date(left.sortTimestamp).getTime(),
+    );
+  }, [communityChats, conversations, groupChats]);
+
+  const isAnyInboxLoading =
+    isInboxLoading || isCommunityChatsLoading || isGroupChatsLoading;
 
   async function handleStartConversation(otherUserId: string) {
     if (!session?.user.id) {
@@ -91,7 +195,7 @@ export default function ChatsScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: "#EEF3F9" }}>
       <AppScreenHeader
         title="Chats"
-        subtitle="Keep up with direct messages and the communities you have already joined."
+        subtitle="Keep up with group chats, community spaces, and direct messages in one inbox."
       />
 
       <ScrollView
@@ -125,6 +229,17 @@ export default function ChatsScreen() {
             </Text>
             <Text className="mt-2 text-[14px] leading-6 text-red-700">
               {communityError}
+            </Text>
+          </SectionCard>
+        ) : null}
+
+        {groupError ? (
+          <SectionCard className="mb-4">
+            <Text className="text-[15px] font-semibold text-[#0F1115]">
+              Group chats are not available yet
+            </Text>
+            <Text className="mt-2 text-[14px] leading-6 text-red-700">
+              {groupError}
             </Text>
           </SectionCard>
         ) : null}
@@ -234,79 +349,66 @@ export default function ChatsScreen() {
           </View>
         ) : null}
 
-        {!error && conversations.length === 0 && connectedProfiles.length === 0 && !isInboxLoading ? (
-          <SectionCard className="mb-4">
-            <Text className="text-[17px] font-bold text-[#0F1115]">
-              No mutual connections yet
-            </Text>
-            <Text className="mt-2 text-[14px] leading-6 text-[#5C6370]">
-              Accept or send connection requests in the People tab first, then your
-              direct-message inbox will appear here.
-            </Text>
-          </SectionCard>
-        ) : null}
-
-        {conversations.length > 0 ? (
+        {inboxItems.length > 0 ? (
           <>
             <Text className="mb-[10px] text-[13px] font-semibold uppercase tracking-[0.5px] text-[#9AA0AB]">
-              Conversations
+              Inbox
             </Text>
 
             <View className="mb-4 gap-4">
-              {conversations.map((conversation) => (
+              {inboxItems.map((item) => (
                 <Pressable
-                  key={conversation.id}
+                  key={`${item.kind}:${item.id}`}
                   onPress={() => {
-                    router.push(`/chats/${conversation.id}` as never);
+                    if (item.kind === "direct") {
+                      router.push(`/chats/${item.id}` as never);
+                      return;
+                    }
+
+                    if (item.kind === "group") {
+                      router.push(`/chats/group/${item.id}` as never);
+                      return;
+                    }
+
+                    router.push(`/chats/community/${item.id}` as never);
                   }}
                 >
                   <SectionCard>
                     <View className="flex-row items-center gap-3">
                       <AppAvatar
-                        name={conversation.other_user.display_name}
-                        imageUri={conversation.other_user.avatar_url}
+                        name={item.title}
+                        imageUri={item.avatarUri}
                         size={52}
+                        rounded={item.roundedAvatar ?? true}
                       />
                       <View className="flex-1">
-                        <Text className="text-[16px] font-bold text-[#0F1115]">
-                          {conversation.other_user.display_name}
-                        </Text>
-                        <Text className="mt-1 text-[13px] text-[#5C6370]">
-                          {conversation.last_message_preview ?? "Start the conversation here."}
-                        </Text>
-                      </View>
-                    </View>
-                  </SectionCard>
-                </Pressable>
-              ))}
-            </View>
-          </>
-        ) : null}
-
-        {!communityError && communityChats.length > 0 ? (
-          <>
-            <Text className="mb-[10px] text-[13px] font-semibold uppercase tracking-[0.5px] text-[#9AA0AB]">
-              Community chats
-            </Text>
-
-            <View className="gap-4">
-              {communityChats.map((community) => (
-                <Pressable
-                  key={community.id}
-                  onPress={() => {
-                    router.push(`/chats/community/${community.id}` as never);
-                  }}
-                >
-                  <SectionCard>
-                    <View className="flex-row items-center gap-3">
-                      <AppAvatar name={community.name} size={52} rounded={false} />
-                      <View className="flex-1">
-                        <Text className="text-[16px] font-bold text-[#0F1115]">
-                          {community.name}
-                        </Text>
-                        <Text className="mt-1 text-[13px] text-[#5C6370]">
-                          {community.last_message_preview ??
-                            "No messages yet. Start the community conversation."}
+                        <View className="flex-row items-start gap-3">
+                          <View className="flex-1">
+                            <Text
+                              className="text-[16px] font-bold text-[#0F1115]"
+                              numberOfLines={1}
+                            >
+                              {item.title}
+                            </Text>
+                            <Text className="mt-1 text-[12px] font-semibold uppercase tracking-[0.4px] text-[#9AA0AB]">
+                              {item.subtitle}
+                            </Text>
+                          </View>
+                          <View className="items-end gap-2">
+                            <Text className="text-[12px] text-[#9AA0AB]">
+                              {formatInboxTime(item.timestamp)}
+                            </Text>
+                            {item.unreadCount > 0 ? (
+                              <View className="min-w-6 items-center rounded-full bg-[#0F1115] px-2 py-1">
+                                <Text className="text-[11px] font-bold text-white">
+                                  {item.unreadCount > 99 ? "99+" : item.unreadCount}
+                                </Text>
+                              </View>
+                            ) : null}
+                          </View>
+                        </View>
+                        <Text className="mt-2 text-[13px] text-[#5C6370]" numberOfLines={1}>
+                          {item.preview}
                         </Text>
                       </View>
                     </View>
@@ -317,13 +419,18 @@ export default function ChatsScreen() {
           </>
         ) : null}
 
-        {!communityError && communityChats.length === 0 && !isCommunityChatsLoading ? (
+        {!error &&
+        !communityError &&
+        !groupError &&
+        inboxItems.length === 0 &&
+        !isAnyInboxLoading ? (
           <SectionCard className="mt-4">
             <Text className="text-[17px] font-bold text-[#0F1115]">
-              No community chats yet
+              No chats yet
             </Text>
             <Text className="mt-2 text-[14px] leading-6 text-[#5C6370]">
-              Join a community from Discover to unlock its shared chat space here.
+              Join a group or community from Discover, or connect with someone in
+              People to start a direct message.
             </Text>
           </SectionCard>
         ) : null}

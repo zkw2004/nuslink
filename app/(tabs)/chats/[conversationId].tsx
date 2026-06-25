@@ -241,7 +241,7 @@ export default function ConversationThreadScreen() {
     }
 
     void refreshInbox(session.user.id).then(() => {
-      void loadConversationMessages(conversationId);
+      void loadConversationMessages(conversationId, session.user.id);
     });
   }, [conversationId, loadConversationMessages, refreshInbox, session?.user.id]);
 
@@ -510,7 +510,7 @@ export default function ConversationThreadScreen() {
     try {
       await createPoll("direct", conversationId, trimmedQuestion, trimmedOptions);
       await Promise.all([
-        loadConversationMessages(conversationId),
+        loadConversationMessages(conversationId, session.user.id),
         refreshInbox(session.user.id),
       ]);
       resetPollComposer();

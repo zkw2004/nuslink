@@ -71,7 +71,7 @@ export default function DirectChatMediaScreen() {
     }
 
     void refreshInbox(session.user.id).then(() => {
-      void loadConversationMessages(conversationId);
+      void loadConversationMessages(conversationId, session.user.id);
     });
   }, [conversationId, loadConversationMessages, refreshInbox, session?.user.id]);
 

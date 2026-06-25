@@ -11,6 +11,7 @@ import {
   fetchDirectConversations,
   fetchDirectMessages,
   getOrCreateDirectConversation,
+  markDirectConversationRead,
   sendDirectMessage,
   subscribeToDirectMessages,
 } from "@services/directMessagesService";
@@ -25,7 +26,7 @@ interface DirectMessagesState {
   error: string | null;
   refreshInbox: (userId: string) => Promise<void>;
   openConversationWithUser: (otherUserId: string, userId: string) => Promise<string>;
-  loadConversationMessages: (conversationId: string) => Promise<void>;
+  loadConversationMessages: (conversationId: string, userId?: string) => Promise<void>;
   sendMessage: (
     conversationId: string,
     body: string,
@@ -88,11 +89,14 @@ export const useDirectMessagesStore = create<DirectMessagesState>((set, get) => 
     return conversationId;
   },
 
-  async loadConversationMessages(conversationId) {
+  async loadConversationMessages(conversationId, userId) {
     set({ isThreadLoading: true, error: null });
 
     try {
       const messages = await fetchDirectMessages(conversationId);
+      if (userId) {
+        await markDirectConversationRead(conversationId, userId);
+      }
 
       set((state) => ({
         messagesByConversation: {
