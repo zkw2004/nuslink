@@ -17,7 +17,12 @@ import {
   AppScreenHeader,
   SectionCard,
 } from "@components/shared";
-import { useAuthStore, useCommunityMessagesStore, useDirectMessagesStore } from "@store/index";
+import {
+  useAuthStore,
+  useCommunityMessagesStore,
+  useDirectMessagesStore,
+  useGroupMessagesStore,
+} from "@store/index";
 
 export default function ChatsScreen() {
   const session = useAuthStore((state) => state.session);
@@ -35,6 +40,10 @@ export default function ChatsScreen() {
   const refreshCommunityChats = useCommunityMessagesStore(
     (state) => state.refreshCommunityChats,
   );
+  const groupChats = useGroupMessagesStore((state) => state.groupChats);
+  const isGroupChatsLoading = useGroupMessagesStore((state) => state.isChatsLoading);
+  const groupError = useGroupMessagesStore((state) => state.error);
+  const refreshGroupChats = useGroupMessagesStore((state) => state.refreshGroupChats);
   const [isCreateChatOpen, setIsCreateChatOpen] = useState(false);
   const [chatSearchQuery, setChatSearchQuery] = useState("");
 
@@ -45,7 +54,8 @@ export default function ChatsScreen() {
 
     void refreshInbox(session.user.id);
     void refreshCommunityChats(session.user.id);
-  }, [refreshCommunityChats, refreshInbox, session?.user.id]);
+    void refreshGroupChats(session.user.id);
+  }, [refreshCommunityChats, refreshGroupChats, refreshInbox, session?.user.id]);
 
   const normalizedChatSearch = chatSearchQuery.trim().toLowerCase();
   const existingConversationUserIds = useMemo(
@@ -125,6 +135,17 @@ export default function ChatsScreen() {
             </Text>
             <Text className="mt-2 text-[14px] leading-6 text-red-700">
               {communityError}
+            </Text>
+          </SectionCard>
+        ) : null}
+
+        {groupError ? (
+          <SectionCard className="mb-4">
+            <Text className="text-[15px] font-semibold text-[#0F1115]">
+              Group chats are not available yet
+            </Text>
+            <Text className="mt-2 text-[14px] leading-6 text-red-700">
+              {groupError}
             </Text>
           </SectionCard>
         ) : null}
@@ -283,6 +304,45 @@ export default function ChatsScreen() {
           </>
         ) : null}
 
+        {!groupError && groupChats.length > 0 ? (
+          <>
+            <Text className="mb-[10px] text-[13px] font-semibold uppercase tracking-[0.5px] text-[#9AA0AB]">
+              Group chats
+            </Text>
+
+            <View className="mb-4 gap-4">
+              {groupChats.map((group) => (
+                <Pressable
+                  key={group.id}
+                  onPress={() => {
+                    router.push(`/chats/group/${group.id}` as never);
+                  }}
+                >
+                  <SectionCard>
+                    <View className="flex-row items-center gap-3">
+                      <AppAvatar name={group.name} size={52} rounded={false} />
+                      <View className="flex-1">
+                        <Text className="text-[16px] font-bold text-[#0F1115]">
+                          {group.name}
+                        </Text>
+                        <Text className="mt-1 text-[13px] text-[#5C6370]">
+                          {group.last_message_preview ??
+                            "No messages yet. Start the group conversation."}
+                        </Text>
+                        {group.module_code ? (
+                          <Text className="mt-1 text-[12px] text-[#8B93A1]">
+                            {group.module_code}
+                          </Text>
+                        ) : null}
+                      </View>
+                    </View>
+                  </SectionCard>
+                </Pressable>
+              ))}
+            </View>
+          </>
+        ) : null}
+
         {!communityError && communityChats.length > 0 ? (
           <>
             <Text className="mb-[10px] text-[13px] font-semibold uppercase tracking-[0.5px] text-[#9AA0AB]">
@@ -324,6 +384,17 @@ export default function ChatsScreen() {
             </Text>
             <Text className="mt-2 text-[14px] leading-6 text-[#5C6370]">
               Join a community from Discover to unlock its shared chat space here.
+            </Text>
+          </SectionCard>
+        ) : null}
+
+        {!groupError && groupChats.length === 0 && !isGroupChatsLoading ? (
+          <SectionCard className="mt-4">
+            <Text className="text-[17px] font-bold text-[#0F1115]">
+              No group chats yet
+            </Text>
+            <Text className="mt-2 text-[14px] leading-6 text-[#5C6370]">
+              Join or accept an invite to a group to unlock its member chat here.
             </Text>
           </SectionCard>
         ) : null}

@@ -257,6 +257,30 @@ export interface CommunityChatMessage {
   sender_profile: ConnectedProfilePreview;
 }
 
+export interface GroupChatSummary {
+  id: string;
+  name: string;
+  type: GroupType;
+  module_code: string | null;
+  privacy: PrivacySetting;
+  last_message_preview: string | null;
+  last_message_at: string | null;
+}
+
+export interface GroupChatMessage {
+  id: string;
+  group_id: string;
+  sender_id: string;
+  body: string | null;
+  attachment_url: string | null;
+  attachment_name: string | null;
+  attachment_mime_type: string | null;
+  attachment_size: number | null;
+  attachment_kind: ChatAttachmentKind | null;
+  created_at: string;
+  sender_profile: ConnectedProfilePreview;
+}
+
 export interface SharedResource {
   id: string;
   owner_id: string;

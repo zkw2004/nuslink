@@ -15,7 +15,12 @@ import {
   respondToGroupInvitation,
   respondToGroupJoinRequest,
 } from "@services/notificationsService";
-import { useAuthStore, useNotificationsStore } from "@store/index";
+import {
+  useAuthStore,
+  useGroupMessagesStore,
+  useGroupsStore,
+  useNotificationsStore,
+} from "@store/index";
 
 const NOTIFICATION_LABELS: Record<NotificationType, string> = {
   connection_request: "Request",
@@ -65,7 +70,7 @@ function NotificationCard({
   const isUnread = notification.read_at === null;
   const isGroupInvite = notification.type === "group_invite_received";
   const isJoinRequest = notification.type === "group_join_requested";
-  const canRespond = isGroupInvite || isJoinRequest;
+  const canRespond = isUnread && (isGroupInvite || isJoinRequest);
   const handleRespond = isGroupInvite ? onRespondGroupInvite : onRespondJoinRequest;
 
   return (
@@ -148,6 +153,8 @@ export default function NotificationsScreen() {
   );
   const markAsRead = useNotificationsStore((state) => state.markAsRead);
   const markAllAsRead = useNotificationsStore((state) => state.markAllAsRead);
+  const refreshGroups = useGroupsStore((state) => state.refreshGroups);
+  const refreshGroupChats = useGroupMessagesStore((state) => state.refreshGroupChats);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -196,6 +203,10 @@ export default function NotificationsScreen() {
     try {
       await respondToGroupInvitation(invitationId, decision);
       await markAsRead(notification.id, session.user.id);
+      await Promise.all([
+        refreshGroups(session.user.id),
+        refreshGroupChats(session.user.id),
+      ]);
     } catch (error) {
       Alert.alert(
         "Could not handle invitation",
@@ -228,6 +239,10 @@ export default function NotificationsScreen() {
     try {
       await respondToGroupJoinRequest(requestId, decision);
       await markAsRead(notification.id, session.user.id);
+      await Promise.all([
+        refreshGroups(session.user.id),
+        refreshGroupChats(session.user.id),
+      ]);
     } catch (error) {
       Alert.alert(
         "Could not handle request",

@@ -517,6 +517,45 @@ export type Database = {
         };
         Relationships: [];
       };
+      group_messages: {
+        Row: {
+          attachment_kind: "image" | "file" | "audio" | "video" | null;
+          attachment_mime_type: string | null;
+          attachment_name: string | null;
+          attachment_size: number | null;
+          attachment_url: string | null;
+          body: string | null;
+          created_at: string;
+          group_id: string;
+          id: string;
+          sender_id: string;
+        };
+        Insert: {
+          attachment_kind?: "image" | "file" | "audio" | "video" | null;
+          attachment_mime_type?: string | null;
+          attachment_name?: string | null;
+          attachment_size?: number | null;
+          attachment_url?: string | null;
+          body?: string | null;
+          created_at?: string;
+          group_id: string;
+          id?: string;
+          sender_id: string;
+        };
+        Update: {
+          attachment_kind?: "image" | "file" | "audio" | "video" | null;
+          attachment_mime_type?: string | null;
+          attachment_name?: string | null;
+          attachment_size?: number | null;
+          attachment_url?: string | null;
+          body?: string | null;
+          created_at?: string;
+          group_id?: string;
+          id?: string;
+          sender_id?: string;
+        };
+        Relationships: [];
+      };
       communities: {
         Row: {
           created_at: string;

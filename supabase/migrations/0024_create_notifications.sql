@@ -453,6 +453,12 @@ BEGIN
       responded_at = NOW()
   WHERE id = target_invitation.id;
 
+  UPDATE public.notifications
+  SET read_at = COALESCE(read_at, NOW())
+  WHERE recipient_id = current_user_id
+    AND type = 'group_invite_received'
+    AND metadata ->> 'invitation_id' = target_invitation.id::text;
+
   IF decision_input = 'accepted' THEN
     INSERT INTO public.group_members (group_id, user_id, role)
     VALUES (target_invitation.group_id, current_user_id, 'member')
@@ -588,6 +594,11 @@ BEGIN
       responded_at = NOW(),
       responded_by = current_user_id
   WHERE id = target_request.id;
+
+  UPDATE public.notifications
+  SET read_at = COALESCE(read_at, NOW())
+  WHERE type = 'group_join_requested'
+    AND metadata ->> 'join_request_id' = target_request.id::text;
 
   IF decision_input = 'accepted' THEN
     INSERT INTO public.group_members (group_id, user_id, role)
@@ -907,6 +918,106 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION public.create_group(
+  module_code_input TEXT,
+  module_name_input TEXT,
+  module_department_input TEXT,
+  module_faculty_input TEXT,
+  group_name_input TEXT,
+  group_type_input group_type,
+  privacy_input privacy_setting,
+  restriction_input semi_private_restriction,
+  semester_input TEXT,
+  description_input TEXT,
+  min_size_input SMALLINT,
+  max_size_input SMALLINT,
+  venue_input TEXT
+)
+RETURNS TABLE(group_id UUID, invite_code TEXT)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  created_group_id UUID;
+  generated_invite_code TEXT;
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated';
+  END IF;
+
+  IF privacy_input = 'semi_private' AND restriction_input IS NULL THEN
+    RAISE EXCEPTION 'Choose a semi-private restriction';
+  END IF;
+
+  IF privacy_input <> 'semi_private' AND restriction_input IS NOT NULL THEN
+    RAISE EXCEPTION 'Restrictions only apply to semi-private groups';
+  END IF;
+
+  IF min_size_input IS NOT NULL AND max_size_input IS NOT NULL
+    AND min_size_input > max_size_input THEN
+    RAISE EXCEPTION 'Minimum size cannot be greater than maximum size';
+  END IF;
+
+  INSERT INTO public.modules (code, name, department, faculty)
+  VALUES (
+    upper(trim(module_code_input)),
+    trim(module_name_input),
+    nullif(trim(module_department_input), ''),
+    nullif(trim(module_faculty_input), '')
+  )
+  ON CONFLICT (code) DO UPDATE SET
+    name = EXCLUDED.name,
+    department = EXCLUDED.department,
+    faculty = EXCLUDED.faculty;
+
+  IF privacy_input = 'private' THEN
+    LOOP
+      generated_invite_code := public.make_group_invite_code();
+      EXIT WHEN NOT EXISTS (
+        SELECT 1
+        FROM public.groups existing_group
+        WHERE existing_group.invite_code = generated_invite_code
+      );
+    END LOOP;
+  END IF;
+
+  INSERT INTO public.groups (
+    name,
+    type,
+    module_code,
+    privacy,
+    restriction,
+    semester,
+    description,
+    min_size,
+    max_size,
+    venue,
+    creator_id,
+    invite_code
+  )
+  VALUES (
+    trim(group_name_input),
+    group_type_input,
+    upper(trim(module_code_input)),
+    privacy_input,
+    restriction_input,
+    semester_input,
+    nullif(trim(description_input), ''),
+    min_size_input,
+    max_size_input,
+    nullif(trim(venue_input), ''),
+    auth.uid(),
+    generated_invite_code
+  )
+  RETURNING id INTO created_group_id;
+
+  group_id := created_group_id;
+  invite_code := generated_invite_code;
+  RETURN NEXT;
+END;
+$$;
+
 DROP FUNCTION IF EXISTS public.get_discover_groups(TEXT);
 
 CREATE OR REPLACE FUNCTION public.get_discover_groups(semester_input TEXT)
@@ -1050,4 +1161,20 @@ GRANT EXECUTE ON FUNCTION public.respond_to_group_invitation(UUID, TEXT)
 GRANT EXECUTE ON FUNCTION public.create_group_join_request(UUID)
   TO authenticated;
 GRANT EXECUTE ON FUNCTION public.respond_to_group_join_request(UUID, TEXT)
+  TO authenticated;
+GRANT EXECUTE ON FUNCTION public.create_group(
+  TEXT,
+  TEXT,
+  TEXT,
+  TEXT,
+  TEXT,
+  group_type,
+  privacy_setting,
+  semi_private_restriction,
+  TEXT,
+  TEXT,
+  SMALLINT,
+  SMALLINT,
+  TEXT
+)
   TO authenticated;
