@@ -65,6 +65,9 @@ CREATE TABLE IF NOT EXISTS public.group_invitations (
 
 ALTER TABLE public.group_invitations ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "group_invitations_select_participants"
+  ON public.group_invitations;
+
 CREATE POLICY "group_invitations_select_participants"
   ON public.group_invitations
   FOR SELECT USING (
@@ -98,6 +101,9 @@ CREATE TABLE IF NOT EXISTS public.group_join_requests (
 
 ALTER TABLE public.group_join_requests ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "group_join_requests_select_participants"
+  ON public.group_join_requests;
+
 CREATE POLICY "group_join_requests_select_participants"
   ON public.group_join_requests
   FOR SELECT USING (
@@ -123,7 +129,7 @@ CREATE INDEX IF NOT EXISTS idx_group_join_requests_requester_status
 CREATE INDEX IF NOT EXISTS idx_group_join_requests_group_status
   ON public.group_join_requests (group_id, status, created_at DESC);
 
-CREATE TABLE public.notifications (
+CREATE TABLE IF NOT EXISTS public.notifications (
   id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   recipient_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   actor_id     UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
@@ -138,23 +144,33 @@ CREATE TABLE public.notifications (
   created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+ALTER TABLE public.notifications
+ADD COLUMN IF NOT EXISTS group_id UUID
+REFERENCES public.groups(id) ON DELETE CASCADE;
+
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "notifications_select_recipient"
+  ON public.notifications;
 
 CREATE POLICY "notifications_select_recipient" ON public.notifications
   FOR SELECT USING (auth.uid() = recipient_id);
+
+DROP POLICY IF EXISTS "notifications_update_recipient"
+  ON public.notifications;
 
 CREATE POLICY "notifications_update_recipient" ON public.notifications
   FOR UPDATE USING (auth.uid() = recipient_id)
   WITH CHECK (auth.uid() = recipient_id);
 
-CREATE INDEX idx_notifications_recipient_created_at
+CREATE INDEX IF NOT EXISTS idx_notifications_recipient_created_at
   ON public.notifications (recipient_id, created_at DESC);
 
-CREATE INDEX idx_notifications_recipient_unread
+CREATE INDEX IF NOT EXISTS idx_notifications_recipient_unread
   ON public.notifications (recipient_id, created_at DESC)
   WHERE read_at IS NULL;
 
-CREATE UNIQUE INDEX idx_notifications_recipient_dedupe
+CREATE UNIQUE INDEX IF NOT EXISTS idx_notifications_recipient_dedupe
   ON public.notifications (recipient_id, dedupe_key)
   WHERE dedupe_key IS NOT NULL;
 
@@ -890,6 +906,8 @@ BEGIN
   RETURN NEW;
 END;
 $$;
+
+DROP FUNCTION IF EXISTS public.get_discover_groups(TEXT);
 
 CREATE OR REPLACE FUNCTION public.get_discover_groups(semester_input TEXT)
 RETURNS TABLE(
