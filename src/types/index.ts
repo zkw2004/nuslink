@@ -37,8 +37,9 @@ export type NotificationType =
   | "connection_accepted"
   | "connection_milestone"
   | "high_match"
-  | "group_invite_code"
   | "group_invite_received"
+  | "group_join_requested"
+  | "group_join_accepted"
   | "group_member_joined"
   | "resource_shared"
   | "system_announcement";

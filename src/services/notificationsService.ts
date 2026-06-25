@@ -88,3 +88,21 @@ export async function respondToGroupInvitation(
     throw new Error(error.message);
   }
 }
+
+export async function respondToGroupJoinRequest(
+  requestId: string,
+  decision: "accepted" | "declined",
+) {
+  if (!supabase) {
+    throw new Error("Supabase is not configured.");
+  }
+
+  const { error } = await supabase.rpc("respond_to_group_join_request", {
+    request_id_input: requestId,
+    decision_input: decision,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}

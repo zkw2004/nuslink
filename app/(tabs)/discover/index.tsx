@@ -67,8 +67,8 @@ export default function DiscoverScreen() {
   const isGroupsLoading = useGroupsStore((state) => state.isLoading);
   const groupsError = useGroupsStore((state) => state.error);
   const joinGroup = useGroupsStore((state) => state.joinGroup);
-  const joinGroupWithInvite = useGroupsStore((state) => state.joinGroupWithInvite);
   const inviteUserToGroup = useGroupsStore((state) => state.inviteUserToGroup);
+  const requestToJoinGroup = useGroupsStore((state) => state.requestToJoinGroup);
   const deleteGroup = useGroupsStore((state) => state.deleteGroup);
   const refreshGroups = useGroupsStore((state) => state.refreshGroups);
   const communities = useCommunitiesStore((state) => state.communities);
@@ -78,7 +78,6 @@ export default function DiscoverScreen() {
   const refreshCommunities = useCommunitiesStore((state) => state.refreshCommunities);
   const [mode, setMode] = useState<DiscoverMode>("groups");
   const [query, setQuery] = useState("");
-  const [inviteCodes, setInviteCodes] = useState<Record<string, string>>({});
   const [inviteGroupId, setInviteGroupId] = useState<string | null>(null);
   const [inviteSearch, setInviteSearch] = useState("");
   const [connectedProfiles, setConnectedProfiles] = useState<ConnectedProfilePreview[]>([]);
@@ -188,29 +187,22 @@ export default function DiscoverScreen() {
     }
   }
 
-  async function handleJoinGroupWithInvite(groupId: string) {
+  async function handleRequestJoinGroup(groupId: string) {
     if (!session?.user) {
-      Alert.alert("Sign in required", "Please sign in again before joining a group.");
-      return;
-    }
-
-    const inviteCode = inviteCodes[groupId]?.trim();
-
-    if (!inviteCode) {
-      Alert.alert("Invite code required", "Enter the private group invite code.");
+      Alert.alert("Sign in required", "Please sign in again before requesting access.");
       return;
     }
 
     try {
-      await joinGroupWithInvite(inviteCode, session.user.id);
-      setInviteCodes((current) => ({
-        ...current,
-        [groupId]: "",
-      }));
-    } catch (joinError) {
+      await requestToJoinGroup(groupId, session.user.id);
       Alert.alert(
-        "Could not join group",
-        joinError instanceof Error ? joinError.message : "Please try again.",
+        "Request sent",
+        "The group owner will be notified and can approve your request.",
+      );
+    } catch (error) {
+      Alert.alert(
+        "Could not request access",
+        error instanceof Error ? error.message : "Please try again.",
       );
     }
   }
@@ -492,10 +484,18 @@ export default function DiscoverScreen() {
                 {(() => {
                   const isOwner = session?.user.id === group.creator_id;
                   const restrictionLabel = formatRestrictionLabel(group.restriction);
-                  const needsInvite = group.privacy === "private" && !group.joined && !isOwner;
+                  const canRequestPrivateGroup =
+                    group.privacy === "private" &&
+                    !group.joined &&
+                    !isOwner &&
+                    !group.request_pending;
                   const canJoinVisibleGroup = group.can_join && !group.joined && !isOwner;
                   const actionLabel = group.joined
                     ? "Joined"
+                    : group.privacy === "private" && group.request_pending
+                      ? "Requested"
+                      : group.privacy === "private"
+                        ? "Request to join"
                     : group.privacy === "semi_private" && !group.can_join
                       ? "Locked"
                       : "Join group";
@@ -511,7 +511,7 @@ export default function DiscoverScreen() {
                             <Text className="mt-1 text-[13px] leading-5 text-[#5C6370]">
                               {group.description?.trim() ||
                                 (group.privacy === "private"
-                                  ? "Private group. Ask the creator for an invite code to join."
+                                  ? "Private group. Request access or wait for an invitation."
                                   : "Group open to eligible students this semester.")}
                             </Text>
                           </View>
@@ -528,9 +528,6 @@ export default function DiscoverScreen() {
                           ) : null}
                           {isOwner ? <AppChip label="Owner" variant="solid" /> : null}
                           {group.joined ? <AppChip label="Joined" variant="solid" /> : null}
-                          {isOwner && group.invite_code ? (
-                            <AppChip label={`Invite ${group.invite_code}`} variant="solid" />
-                          ) : null}
                         </View>
                       </View>
 
@@ -565,7 +562,7 @@ export default function DiscoverScreen() {
                                   onPress={() => handleDeleteGroup(group.id, group.name)}
                                 />
                               </>
-                            ) : needsInvite ? null : (
+                            ) : (
                               <>
                                 {group.joined ? (
                                   <AppButton
@@ -580,8 +577,17 @@ export default function DiscoverScreen() {
                                 ) : null}
                                 <AppButton
                                   label={actionLabel}
-                                  disabled={!canJoinVisibleGroup}
+                                  disabled={
+                                    group.privacy === "private"
+                                      ? !canRequestPrivateGroup
+                                      : !canJoinVisibleGroup
+                                  }
                                   onPress={() => {
+                                    if (group.privacy === "private") {
+                                      void handleRequestJoinGroup(group.id);
+                                      return;
+                                    }
+
                                     void handleJoinGroup(group.id);
                                   }}
                                 />
@@ -589,30 +595,6 @@ export default function DiscoverScreen() {
                             )}
                           </View>
                         </View>
-
-                        {needsInvite ? (
-                          <View className="mt-3 flex-row items-center gap-2">
-                            <TextInput
-                              value={inviteCodes[group.id] ?? ""}
-                              onChangeText={(value) =>
-                                setInviteCodes((current) => ({
-                                  ...current,
-                                  [group.id]: value.toUpperCase(),
-                                }))
-                              }
-                              autoCapitalize="characters"
-                              placeholder="Invite code"
-                              placeholderTextColor="#9AA0AB"
-                              className="flex-1 rounded-[14px] border border-[#D7DEE9] bg-white px-4 py-3 text-[14px] uppercase text-[#0F1115]"
-                            />
-                            <AppButton
-                              label="Join"
-                              onPress={() => {
-                                void handleJoinGroupWithInvite(group.id);
-                              }}
-                            />
-                          </View>
-                        ) : null}
                       </View>
                     </>
                   );

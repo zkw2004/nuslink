@@ -11,7 +11,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppButton, AppScreenHeader, SectionCard } from "@components/shared";
 import type { AppNotification, NotificationType } from "@appTypes/index";
-import { respondToGroupInvitation } from "@services/notificationsService";
+import {
+  respondToGroupInvitation,
+  respondToGroupJoinRequest,
+} from "@services/notificationsService";
 import { useAuthStore, useNotificationsStore } from "@store/index";
 
 const NOTIFICATION_LABELS: Record<NotificationType, string> = {
@@ -19,8 +22,9 @@ const NOTIFICATION_LABELS: Record<NotificationType, string> = {
   connection_accepted: "Connection",
   connection_milestone: "Milestone",
   high_match: "Match",
-  group_invite_code: "Invite code",
   group_invite_received: "Invitation",
+  group_join_requested: "Join request",
+  group_join_accepted: "Group access",
   group_member_joined: "Group activity",
   resource_shared: "Resource",
   system_announcement: "Announcement",
@@ -43,6 +47,7 @@ function NotificationCard({
   notification,
   onMarkRead,
   onRespondGroupInvite,
+  onRespondJoinRequest,
   actionLoadingId,
 }: {
   notification: AppNotification;
@@ -51,10 +56,17 @@ function NotificationCard({
     notification: AppNotification,
     decision: "accepted" | "declined",
   ) => void;
+  onRespondJoinRequest: (
+    notification: AppNotification,
+    decision: "accepted" | "declined",
+  ) => void;
   actionLoadingId: string | null;
 }) {
   const isUnread = notification.read_at === null;
   const isGroupInvite = notification.type === "group_invite_received";
+  const isJoinRequest = notification.type === "group_join_requested";
+  const canRespond = isGroupInvite || isJoinRequest;
+  const handleRespond = isGroupInvite ? onRespondGroupInvite : onRespondJoinRequest;
 
   return (
     <Pressable
@@ -89,16 +101,20 @@ function NotificationCard({
           <Text className="mt-2 text-[14px] leading-6 text-[#5C6370]">
             {notification.body}
           </Text>
-          {isGroupInvite ? (
+          {canRespond ? (
             <View className="mt-4 flex-row gap-2">
               <AppButton
                 label={
                   actionLoadingId === `${notification.id}:accepted`
-                    ? "Joining..."
-                    : "Accept"
+                    ? isJoinRequest
+                      ? "Approving..."
+                      : "Joining..."
+                    : isJoinRequest
+                      ? "Approve"
+                      : "Accept"
                 }
                 disabled={actionLoadingId !== null}
-                onPress={() => onRespondGroupInvite(notification, "accepted")}
+                onPress={() => handleRespond(notification, "accepted")}
               />
               <AppButton
                 label={
@@ -108,7 +124,7 @@ function NotificationCard({
                 }
                 variant="secondary"
                 disabled={actionLoadingId !== null}
-                onPress={() => onRespondGroupInvite(notification, "declined")}
+                onPress={() => handleRespond(notification, "declined")}
               />
             </View>
           ) : null}
@@ -190,6 +206,38 @@ export default function NotificationsScreen() {
     }
   }
 
+  async function handleRespondJoinRequest(
+    notification: AppNotification,
+    decision: "accepted" | "declined",
+  ) {
+    if (!session?.user.id) {
+      return;
+    }
+
+    const requestId = notification.metadata.join_request_id;
+    if (typeof requestId !== "string") {
+      Alert.alert(
+        "Could not handle request",
+        "This notification is missing its request details.",
+      );
+      return;
+    }
+
+    setActionLoadingId(`${notification.id}:${decision}`);
+
+    try {
+      await respondToGroupJoinRequest(requestId, decision);
+      await markAsRead(notification.id, session.user.id);
+    } catch (error) {
+      Alert.alert(
+        "Could not handle request",
+        error instanceof Error ? error.message : "Please try again.",
+      );
+    } finally {
+      setActionLoadingId(null);
+    }
+  }
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#EEF3F9" }}>
       <AppScreenHeader
@@ -260,6 +308,9 @@ export default function NotificationsScreen() {
               onMarkRead={handleMarkRead}
               onRespondGroupInvite={(targetNotification, decision) => {
                 void handleRespondGroupInvite(targetNotification, decision);
+              }}
+              onRespondJoinRequest={(targetNotification, decision) => {
+                void handleRespondJoinRequest(targetNotification, decision);
               }}
               actionLoadingId={actionLoadingId}
             />

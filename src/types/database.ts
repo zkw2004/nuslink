@@ -487,6 +487,36 @@ export type Database = {
         };
         Relationships: [];
       };
+      group_join_requests: {
+        Row: {
+          created_at: string;
+          group_id: string;
+          id: string;
+          requester_id: string;
+          responded_at: string | null;
+          responded_by: string | null;
+          status: "pending" | "accepted" | "declined";
+        };
+        Insert: {
+          created_at?: string;
+          group_id: string;
+          id?: string;
+          requester_id: string;
+          responded_at?: string | null;
+          responded_by?: string | null;
+          status?: "pending" | "accepted" | "declined";
+        };
+        Update: {
+          created_at?: string;
+          group_id?: string;
+          id?: string;
+          requester_id?: string;
+          responded_at?: string | null;
+          responded_by?: string | null;
+          status?: "pending" | "accepted" | "declined";
+        };
+        Relationships: [];
+      };
       communities: {
         Row: {
           created_at: string;
@@ -646,8 +676,9 @@ export type Database = {
             | "connection_accepted"
             | "connection_milestone"
             | "high_match"
-            | "group_invite_code"
             | "group_invite_received"
+            | "group_join_requested"
+            | "group_join_accepted"
             | "group_member_joined"
             | "resource_shared"
             | "system_announcement";
@@ -669,8 +700,9 @@ export type Database = {
             | "connection_accepted"
             | "connection_milestone"
             | "high_match"
-            | "group_invite_code"
             | "group_invite_received"
+            | "group_join_requested"
+            | "group_join_accepted"
             | "group_member_joined"
             | "resource_shared"
             | "system_announcement";
@@ -692,8 +724,9 @@ export type Database = {
             | "connection_accepted"
             | "connection_milestone"
             | "high_match"
-            | "group_invite_code"
             | "group_invite_received"
+            | "group_join_requested"
+            | "group_join_accepted"
             | "group_member_joined"
             | "resource_shared"
             | "system_announcement";
@@ -770,6 +803,12 @@ export type Database = {
         };
         Returns: string;
       };
+      create_group_join_request: {
+        Args: {
+          group_id_input: string;
+        };
+        Returns: string;
+      };
       get_or_create_direct_conversation: {
         Args: {
           other_user_id_input: string;
@@ -792,6 +831,7 @@ export type Database = {
           semester: string;
           joined: boolean;
           can_join: boolean;
+          request_pending: boolean;
           join_note: string;
           invite_code: string | null;
         }[];
@@ -831,6 +871,13 @@ export type Database = {
         Args: {
           decision_input: string;
           invitation_id_input: string;
+        };
+        Returns: void;
+      };
+      respond_to_group_join_request: {
+        Args: {
+          decision_input: string;
+          request_id_input: string;
         };
         Returns: void;
       };
@@ -888,6 +935,7 @@ export type Database = {
       badge_tier: "bronze" | "silver" | "gold";
       connection_request_status: "pending" | "accepted" | "declined";
       group_invitation_status: "pending" | "accepted" | "declined";
+      group_join_request_status: "pending" | "accepted" | "declined";
       intent: "study_group" | "hackathon" | "tutoring" | "internship_networking";
       group_type: "study_group" | "hackathon_team" | "project_team" | "tutoring_session";
       privacy_setting: "public" | "semi_private" | "private";
@@ -900,8 +948,9 @@ export type Database = {
         | "connection_accepted"
         | "connection_milestone"
         | "high_match"
-        | "group_invite_code"
         | "group_invite_received"
+        | "group_join_requested"
+        | "group_join_accepted"
         | "group_member_joined"
         | "resource_shared"
         | "system_announcement";
