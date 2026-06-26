@@ -44,13 +44,12 @@ jobs:
         with:
           python-version: '3.11'
           cache: 'pip'
-          cache-dependency-path: backend/requirements.txt
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
 
       - name: Install dependencies
-        run: pip install -r backend/requirements.txt
-
-      - name: Install dev dependencies
-        run: pip install ruff pytest httpx
+        run: pip install -r backend/requirements-dev.txt
 
       - name: Lint
         run: ruff check backend/
