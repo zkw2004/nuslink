@@ -17,6 +17,7 @@ interface AuthState {
   profile: UserProfile | null;
   isInitialized: boolean;
   isProfileLoading: boolean;
+  hasProfileLoaded: boolean;
   initialize: () => Promise<void>;
   setSession: (session: Session | null) => void;
   setProfile: (profile: UserProfile | null) => void;
@@ -97,6 +98,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   profile: null,
   isInitialized: false,
   isProfileLoading: false,
+  hasProfileLoaded: false,
 
   async initialize() {
     if (get().isInitialized) {
@@ -104,7 +106,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
 
     if (!supabase) {
-      set({ session: null, profile: null, isInitialized: true, isProfileLoading: false });
+      set({
+        session: null,
+        profile: null,
+        isInitialized: true,
+        isProfileLoading: false,
+        hasProfileLoaded: true,
+      });
       return;
     }
 
@@ -122,11 +130,33 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   setSession(session) {
-    set({ session });
+    set((state) => {
+      const currentUserId = state.session?.user.id;
+      const nextUserId = session?.user.id;
+
+      if (!nextUserId) {
+        return {
+          session: null,
+          profile: null,
+          isProfileLoading: false,
+          hasProfileLoaded: true,
+        };
+      }
+
+      if (currentUserId && currentUserId !== nextUserId) {
+        return {
+          session,
+          profile: null,
+          hasProfileLoaded: false,
+        };
+      }
+
+      return { session };
+    });
   },
 
   setProfile(profile) {
-    set({ profile, isProfileLoading: false });
+    set({ profile, isProfileLoading: false, hasProfileLoaded: true });
   },
 
   setInitialized(isInitialized) {
@@ -134,23 +164,23 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   clearProfile() {
-    set({ profile: null, isProfileLoading: false });
+    set({ profile: null, isProfileLoading: false, hasProfileLoaded: true });
   },
 
   async refreshProfile(userId) {
     const nextUserId = userId ?? get().session?.user.id;
 
     if (!nextUserId) {
-      set({ profile: null, isProfileLoading: false });
+      set({ profile: null, isProfileLoading: false, hasProfileLoaded: true });
       return null;
     }
 
     if (!supabase) {
-      set({ profile: null, isProfileLoading: false });
+      set({ profile: null, isProfileLoading: false, hasProfileLoaded: true });
       return null;
     }
 
-    set({ isProfileLoading: true });
+    set({ isProfileLoading: true, hasProfileLoaded: false });
 
     try {
       const { data, error } = await withTimeout(
@@ -171,12 +201,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           );
 
           if (!createdProfile) {
-            set({ profile: null, isProfileLoading: false });
+            set({ profile: null, isProfileLoading: false, hasProfileLoaded: true });
             return null;
           }
 
           const profile = mapProfileRowToUserProfile(createdProfile);
-          set({ profile, isProfileLoading: false });
+          set({ profile, isProfileLoading: false, hasProfileLoaded: true });
           return profile;
         }
 
@@ -184,10 +214,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
 
       const profile = mapProfileRowToUserProfile(data);
-      set({ profile, isProfileLoading: false });
+      set({ profile, isProfileLoading: false, hasProfileLoaded: true });
       return profile;
     } catch (error) {
-      set({ profile: null, isProfileLoading: false });
+      set({ profile: null, isProfileLoading: false, hasProfileLoaded: true });
       throw error;
     }
   },
@@ -203,7 +233,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       throw new Error("Supabase is not configured.");
     }
 
-    set({ isProfileLoading: true });
+    set({ isProfileLoading: true, hasProfileLoaded: false });
 
     const updates: ProfileUpdate = {
       interests: normalizeInterestTags(payload.interests),
@@ -219,18 +249,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       .single();
 
     if (error) {
-      set({ isProfileLoading: false });
+      set({ isProfileLoading: false, hasProfileLoaded: true });
       throw error;
     }
 
     const profile = mapProfileRowToUserProfile(data);
-    set({ profile, isProfileLoading: false });
+    set({ profile, isProfileLoading: false, hasProfileLoaded: true });
     return profile;
   },
 
   async signOut() {
     if (!supabase) {
-      set({ session: null, profile: null, isProfileLoading: false });
+      set({ session: null, profile: null, isProfileLoading: false, hasProfileLoaded: true });
       return;
     }
 
@@ -240,6 +270,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       throw new Error(error.message);
     }
 
-    set({ session: null, profile: null, isProfileLoading: false });
+    set({ session: null, profile: null, isProfileLoading: false, hasProfileLoaded: true });
   },
 }));

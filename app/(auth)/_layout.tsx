@@ -7,8 +7,9 @@ export default function AuthLayout() {
   const session = useAuthStore((state) => state.session);
   const profile = useAuthStore((state) => state.profile);
   const isProfileLoading = useAuthStore((state) => state.isProfileLoading);
+  const hasProfileLoaded = useAuthStore((state) => state.hasProfileLoaded);
 
-  if (session && isProfileLoading) {
+  if (session && (isProfileLoading || !hasProfileLoaded)) {
     return <AppLoadingScreen />;
   }
 

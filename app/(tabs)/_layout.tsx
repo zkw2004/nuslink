@@ -10,6 +10,7 @@ export default function TabLayout() {
   const profile = useAuthStore((state) => state.profile);
   const isInitialized = useAuthStore((state) => state.isInitialized);
   const isProfileLoading = useAuthStore((state) => state.isProfileLoading);
+  const hasProfileLoaded = useAuthStore((state) => state.hasProfileLoaded);
   const refreshNotifications = useNotificationsStore(
     (state) => state.refreshNotifications,
   );
@@ -22,7 +23,7 @@ export default function TabLayout() {
     void refreshNotifications(session.user.id);
   }, [profile?.onboarding_completed, refreshNotifications, session?.user.id]);
 
-  if (!isInitialized || isProfileLoading) {
+  if (!isInitialized || isProfileLoading || (session && !hasProfileLoaded)) {
     return <AppLoadingScreen message="Loading your workspace..." />;
   }
 
