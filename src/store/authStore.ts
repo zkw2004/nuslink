@@ -10,6 +10,8 @@ type ProfileUpdate = Database["public"]["Tables"]["profiles"]["Update"];
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
 type ProfileInsert = Database["public"]["Tables"]["profiles"]["Insert"];
 
+const PROFILE_REQUEST_TIMEOUT_MS = 8000;
+
 interface AuthState {
   session: Session | null;
   profile: UserProfile | null;
@@ -74,6 +76,22 @@ async function ensureProfileRow(userId: string) {
   return data;
 }
 
+function withTimeout<T>(promise: Promise<T>, message: string): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error(message));
+    }, PROFILE_REQUEST_TIMEOUT_MS);
+  });
+
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  });
+}
+
 export const useAuthStore = create<AuthState>((set, get) => ({
   session: null,
   profile: null,
@@ -96,7 +114,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     try {
       if (session?.user) {
-        await get().refreshProfile(session.user.id);
+        await get().refreshProfile(session.user.id).catch(() => null);
       }
     } finally {
       set({ session, isInitialized: true });
@@ -134,33 +152,44 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     set({ isProfileLoading: true });
 
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", nextUserId)
-      .single();
+    try {
+      const { data, error } = await withTimeout(
+        (async () =>
+          supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", nextUserId)
+            .single())(),
+        "Profile request timed out.",
+      );
 
-    if (error) {
-      if (error.code === "PGRST116") {
-        const createdProfile = await ensureProfileRow(nextUserId);
+      if (error) {
+        if (error.code === "PGRST116") {
+          const createdProfile = await withTimeout(
+            ensureProfileRow(nextUserId),
+            "Profile creation timed out.",
+          );
 
-        if (!createdProfile) {
-          set({ profile: null, isProfileLoading: false });
-          return null;
+          if (!createdProfile) {
+            set({ profile: null, isProfileLoading: false });
+            return null;
+          }
+
+          const profile = mapProfileRowToUserProfile(createdProfile);
+          set({ profile, isProfileLoading: false });
+          return profile;
         }
 
-        const profile = mapProfileRowToUserProfile(createdProfile);
-        set({ profile, isProfileLoading: false });
-        return profile;
+        throw error;
       }
 
-      set({ isProfileLoading: false });
+      const profile = mapProfileRowToUserProfile(data);
+      set({ profile, isProfileLoading: false });
+      return profile;
+    } catch (error) {
+      set({ profile: null, isProfileLoading: false });
       throw error;
     }
-
-    const profile = mapProfileRowToUserProfile(data);
-    set({ profile, isProfileLoading: false });
-    return profile;
   },
 
   async completeOnboarding(payload) {

@@ -9,7 +9,7 @@ export default function Index() {
   const isInitialized = useAuthStore((state) => state.isInitialized);
   const isProfileLoading = useAuthStore((state) => state.isProfileLoading);
 
-  if (!isInitialized || isProfileLoading || (session && !profile)) {
+  if (!isInitialized || isProfileLoading) {
     return <AppLoadingScreen />;
   }
 

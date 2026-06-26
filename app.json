@@ -18,7 +18,10 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.nuslink.app"
+      "package": "com.nuslink.app",
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -40,6 +43,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "4bf395e4-5cbc-42bb-8756-c782b8de3a82"
+      }
     }
   }
 }

@@ -22,7 +22,7 @@ export default function TabLayout() {
     void refreshNotifications(session.user.id);
   }, [profile?.onboarding_completed, refreshNotifications, session?.user.id]);
 
-  if (!isInitialized || isProfileLoading || (session && !profile)) {
+  if (!isInitialized || isProfileLoading) {
     return <AppLoadingScreen message="Loading your workspace..." />;
   }
 
