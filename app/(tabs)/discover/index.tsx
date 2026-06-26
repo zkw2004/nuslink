@@ -21,6 +21,7 @@ import {
 import { fetchConnectedProfiles } from "@services/directMessagesService";
 import { useAuthStore, useCommunitiesStore, useGroupsStore } from "@store/index";
 import type { ConnectedProfilePreview } from "@appTypes/index";
+import { getDiscoverGroupAccess } from "@utils/groupAccess";
 
 function formatGroupTypeLabel(type: string) {
   return type
@@ -482,23 +483,11 @@ export default function DiscoverScreen() {
             {filteredGroups.map((group) => (
               <SectionCard key={group.id} className="overflow-hidden rounded-[20px] p-0">
                 {(() => {
-                  const isOwner = session?.user.id === group.creator_id;
+                  const groupAccess = getDiscoverGroupAccess(
+                    group,
+                    session?.user.id,
+                  );
                   const restrictionLabel = formatRestrictionLabel(group.restriction);
-                  const canRequestPrivateGroup =
-                    group.privacy === "private" &&
-                    !group.joined &&
-                    !isOwner &&
-                    !group.request_pending;
-                  const canJoinVisibleGroup = group.can_join && !group.joined && !isOwner;
-                  const actionLabel = group.joined
-                    ? "Joined"
-                    : group.privacy === "private" && group.request_pending
-                      ? "Requested"
-                      : group.privacy === "private"
-                        ? "Request to join"
-                    : group.privacy === "semi_private" && !group.can_join
-                      ? "Locked"
-                      : "Join group";
 
                   return (
                     <>
@@ -526,7 +515,7 @@ export default function DiscoverScreen() {
                           {restrictionLabel ? (
                             <AppChip label={restrictionLabel} variant="outline" />
                           ) : null}
-                          {isOwner ? <AppChip label="Owner" variant="solid" /> : null}
+                          {groupAccess.isOwner ? <AppChip label="Owner" variant="solid" /> : null}
                           {group.joined ? <AppChip label="Joined" variant="solid" /> : null}
                         </View>
                       </View>
@@ -538,7 +527,7 @@ export default function DiscoverScreen() {
                           </Text>
 
                           <View className="min-w-[104px] flex-row gap-2">
-                            {isOwner ? (
+                            {groupAccess.isOwner ? (
                               <>
                                 <AppButton
                                   label="Invite"
@@ -576,12 +565,8 @@ export default function DiscoverScreen() {
                                   />
                                 ) : null}
                                 <AppButton
-                                  label={actionLabel}
-                                  disabled={
-                                    group.privacy === "private"
-                                      ? !canRequestPrivateGroup
-                                      : !canJoinVisibleGroup
-                                  }
+                                  label={groupAccess.actionLabel}
+                                  disabled={groupAccess.isActionDisabled}
                                   onPress={() => {
                                     if (group.privacy === "private") {
                                       void handleRequestJoinGroup(group.id);
