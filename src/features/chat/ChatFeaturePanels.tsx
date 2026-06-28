@@ -15,6 +15,7 @@ type ChatPollCardProps = {
   disabled?: boolean;
   isDark?: boolean;
   onVote: (optionId: string) => void;
+  onUnvote?: () => void;
 };
 
 type PollComposerProps = {
@@ -39,7 +40,12 @@ export function ChatPollCard({
   disabled = false,
   isDark = false,
   onVote,
+  onUnvote,
 }: ChatPollCardProps) {
+  const hasCurrentUserVote = poll.options.some(
+    (option) => option.is_selected_by_current_user,
+  );
+
   return (
     <View
       className={`w-full min-w-0 self-stretch rounded-[16px] border px-4 py-4 ${
@@ -118,13 +124,29 @@ export function ChatPollCard({
         })}
       </View>
 
-      <Text
-        className={`mt-4 text-[11px] ${
-          isDark ? "text-[#C9D0DB]" : "text-[#7B8494]"
-        }`}
-      >
-        {poll.total_votes} vote{poll.total_votes === 1 ? "" : "s"}
-      </Text>
+      <View className="mt-4 flex-row items-center justify-between gap-3">
+        <Text className={`text-[11px] ${isDark ? "text-[#C9D0DB]" : "text-[#7B8494]"}`}>
+          {poll.total_votes} vote{poll.total_votes === 1 ? "" : "s"}
+        </Text>
+
+        {hasCurrentUserVote && onUnvote ? (
+          <Pressable
+            disabled={disabled}
+            onPress={onUnvote}
+            className={`rounded-full px-3 py-1.5 ${
+              isDark ? "bg-[#171B22]" : "bg-white"
+            }`}
+          >
+            <Text
+              className={`text-[11px] font-semibold ${
+                isDark ? "text-[#C9D0DB]" : "text-[#5C6370]"
+              }`}
+            >
+              Unvote
+            </Text>
+          </Pressable>
+        ) : null}
+      </View>
     </View>
   );
 }

@@ -961,6 +961,12 @@ export type Database = {
         };
         Returns: void;
       };
+      unvote_chat_poll: {
+        Args: {
+          poll_id_input: string;
+        };
+        Returns: void;
+      };
       upsert_user_module: {
         Args: {
           module_code_input: string;

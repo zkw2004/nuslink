@@ -213,6 +213,20 @@ export async function voteChatPoll(pollId: string, optionId: string) {
   }
 }
 
+export async function unvoteChatPoll(pollId: string) {
+  if (!supabase) {
+    throw new Error("Supabase is not configured.");
+  }
+
+  const { error } = await supabase.rpc("unvote_chat_poll", {
+    poll_id_input: pollId,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
 export async function setChatMessagePinned(
   kind: ChatKind,
   messageId: string,

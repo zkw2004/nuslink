@@ -216,6 +216,7 @@ export default function CommunityChatThreadScreen() {
   const loadFeatures = useChatFeaturesStore((state) => state.loadFeatures);
   const createPoll = useChatFeaturesStore((state) => state.createPoll);
   const votePoll = useChatFeaturesStore((state) => state.votePoll);
+  const unvotePoll = useChatFeaturesStore((state) => state.unvotePoll);
   const setPinned = useChatFeaturesStore((state) => state.setPinned);
   const subscribeToFeatureChanges = useChatFeaturesStore(
     (state) => state.subscribeToFeatureChanges,
@@ -608,6 +609,28 @@ export default function CommunityChatThreadScreen() {
     }
   }
 
+  async function handleUnvotePoll(pollId: string) {
+    if (!session?.user.id) {
+      Alert.alert("Sign in required", "Please sign in again before updating votes.");
+      return;
+    }
+
+    try {
+      await unvotePoll(
+        "community",
+        communityId,
+        messageIds,
+        session.user.id,
+        pollId,
+      );
+    } catch (voteError) {
+      Alert.alert(
+        "Could not remove vote",
+        voteError instanceof Error ? voteError.message : "Please try again.",
+      );
+    }
+  }
+
   async function handleSetPinned(messageId: string, pinned: boolean) {
     if (!session?.user.id) {
       Alert.alert("Sign in required", "Please sign in again before pinning messages.");
@@ -931,6 +954,9 @@ export default function CommunityChatThreadScreen() {
                     isDark={isCurrentUser}
                     onVote={(optionId) => {
                       void handleVotePoll(poll.id, optionId);
+                    }}
+                    onUnvote={() => {
+                      void handleUnvotePoll(poll.id);
                     }}
                   />
                 ) : message.body ? (

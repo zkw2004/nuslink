@@ -7,6 +7,7 @@ import {
   fetchPinnedMessagesForMessages,
   setChatMessagePinned,
   subscribeToChatFeatureChanges,
+  unvoteChatPoll,
   voteChatPoll,
 } from "@services/chatFeaturesService";
 
@@ -41,6 +42,13 @@ interface ChatFeaturesState {
     currentUserId: string,
     pollId: string,
     optionId: string,
+  ) => Promise<void>;
+  unvotePoll: (
+    kind: ChatKind,
+    chatId: string,
+    messageIds: string[],
+    currentUserId: string,
+    pollId: string,
   ) => Promise<void>;
   setPinned: (
     kind: ChatKind,
@@ -129,6 +137,23 @@ export const useChatFeaturesStore = create<ChatFeaturesState>((set, get) => ({
         isVoting: false,
         error:
           error instanceof Error ? error.message : "Could not vote on this poll.",
+      });
+      throw error;
+    }
+  },
+
+  async unvotePoll(kind, chatId, messageIds, currentUserId, pollId) {
+    set({ isVoting: true, error: null });
+
+    try {
+      await unvoteChatPoll(pollId);
+      await get().loadFeatures(kind, chatId, messageIds, currentUserId);
+      set({ isVoting: false, error: null });
+    } catch (error) {
+      set({
+        isVoting: false,
+        error:
+          error instanceof Error ? error.message : "Could not remove your vote.",
       });
       throw error;
     }
