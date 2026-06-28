@@ -42,18 +42,18 @@ export function ChatPollCard({
 }: ChatPollCardProps) {
   return (
     <View
-      className={`rounded-[16px] border px-3 py-3 ${
+      className={`w-full min-w-0 self-stretch rounded-[16px] border px-4 py-4 ${
         isDark ? "border-[#303744] bg-[#20242B]" : "border-[#E4E9F1] bg-[#F7F9FC]"
       }`}
     >
-      <View className="mb-3 flex-row items-center gap-2">
+      <View className="mb-4 flex-row items-start gap-2">
         <SymbolView
           name={{ ios: "chart.bar.doc.horizontal", android: "poll", web: "poll" }}
           size={18}
           tintColor={isDark ? "#FFFFFF" : "#0F1115"}
         />
         <Text
-          className={`flex-1 text-[13px] font-bold ${
+          className={`min-w-0 flex-1 text-[14px] font-bold leading-5 ${
             isDark ? "text-white" : "text-[#0F1115]"
           }`}
         >
@@ -73,7 +73,7 @@ export function ChatPollCard({
               key={option.id}
               disabled={disabled}
               onPress={() => onVote(option.id)}
-              className={`rounded-[14px] border px-3 py-3 ${
+              className={`w-full rounded-[14px] border px-3 py-3 ${
                 option.is_selected_by_current_user
                   ? isDark
                     ? "border-white bg-[#303744]"
@@ -83,16 +83,18 @@ export function ChatPollCard({
                     : "border-[#E4E9F1] bg-white"
               }`}
             >
-              <View className="flex-row items-center justify-between gap-3">
+              <View className="flex-row items-start gap-3">
+                <View className="min-w-0 flex-1 pr-2">
+                  <Text
+                    className={`text-[13px] font-semibold leading-5 ${
+                      isDark ? "text-white" : "text-[#0F1115]"
+                    }`}
+                  >
+                    {option.body}
+                  </Text>
+                </View>
                 <Text
-                  className={`flex-1 text-[13px] font-semibold ${
-                    isDark ? "text-white" : "text-[#0F1115]"
-                  }`}
-                >
-                  {option.body}
-                </Text>
-                <Text
-                  className={`text-[12px] font-bold ${
+                  className={`w-11 text-right text-[12px] font-bold ${
                     isDark ? "text-[#C9D0DB]" : "text-[#5C6370]"
                   }`}
                 >
@@ -116,7 +118,11 @@ export function ChatPollCard({
         })}
       </View>
 
-      <Text className={`mt-3 text-[11px] ${isDark ? "text-[#C9D0DB]" : "text-[#7B8494]"}`}>
+      <Text
+        className={`mt-4 text-[11px] ${
+          isDark ? "text-[#C9D0DB]" : "text-[#7B8494]"
+        }`}
+      >
         {poll.total_votes} vote{poll.total_votes === 1 ? "" : "s"}
       </Text>
     </View>
