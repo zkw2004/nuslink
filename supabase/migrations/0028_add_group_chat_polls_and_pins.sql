@@ -266,8 +266,12 @@ BEGIN
   END IF;
 
   INSERT INTO public.chat_pinned_messages (group_message_id, pinned_by)
-  VALUES (message_id_input, current_user_id)
-  ON CONFLICT (group_message_id) DO NOTHING;
+  SELECT message_id_input, current_user_id
+  WHERE NOT EXISTS (
+    SELECT 1
+    FROM public.chat_pinned_messages
+    WHERE group_message_id = message_id_input
+  );
 END;
 $$;
 
