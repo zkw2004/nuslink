@@ -80,7 +80,10 @@ export default function GroupChatThreadScreen() {
   );
   const messageIds = useMemo(() => messages.map((message) => message.id), [messages]);
   const chatKey = `group:${groupId}`;
-  const pinnedMessages = pinnedMessagesByChatKey[chatKey] ?? [];
+  const pinnedMessages = useMemo(
+    () => pinnedMessagesByChatKey[chatKey] ?? [],
+    [chatKey, pinnedMessagesByChatKey],
+  );
 
   useEffect(() => {
     if (!session?.user.id || !groupId) {
