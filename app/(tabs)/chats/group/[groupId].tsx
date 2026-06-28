@@ -4,8 +4,18 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
 import { SymbolView } from "expo-symbols";
 
-import { AppAvatar, SectionCard } from "@components/shared";
-import { useAuthStore, useGroupMessagesStore } from "@store/index";
+import { AppAvatar, AppButton, SectionCard } from "@components/shared";
+import {
+  ChatPollCard,
+  PinnedMessagesDrawer,
+  PollComposer,
+  type PinnedMessagePreview,
+} from "@features/chat/ChatFeaturePanels";
+import {
+  useAuthStore,
+  useChatFeaturesStore,
+  useGroupMessagesStore,
+} from "@store/index";
 
 function formatMessageTime(value: string) {
   const date = new Date(value);
@@ -38,7 +48,26 @@ export default function GroupChatThreadScreen() {
   const loadGroupMessages = useGroupMessagesStore((state) => state.loadGroupMessages);
   const sendMessage = useGroupMessagesStore((state) => state.sendMessage);
   const subscribeToGroup = useGroupMessagesStore((state) => state.subscribeToGroup);
+  const pollsByMessageId = useChatFeaturesStore((state) => state.pollsByMessageId);
+  const pinnedMessagesByChatKey = useChatFeaturesStore(
+    (state) => state.pinnedMessagesByChatKey,
+  );
+  const isCreatingPoll = useChatFeaturesStore((state) => state.isCreatingPoll);
+  const isVoting = useChatFeaturesStore((state) => state.isVoting);
+  const isPinning = useChatFeaturesStore((state) => state.isPinning);
+  const loadFeatures = useChatFeaturesStore((state) => state.loadFeatures);
+  const createPoll = useChatFeaturesStore((state) => state.createPoll);
+  const votePoll = useChatFeaturesStore((state) => state.votePoll);
+  const unvotePoll = useChatFeaturesStore((state) => state.unvotePoll);
+  const setPinned = useChatFeaturesStore((state) => state.setPinned);
+  const subscribeToFeatureChanges = useChatFeaturesStore(
+    (state) => state.subscribeToFeatureChanges,
+  );
   const [messageDraft, setMessageDraft] = useState("");
+  const [isPinnedDrawerOpen, setIsPinnedDrawerOpen] = useState(false);
+  const [isPollComposerOpen, setIsPollComposerOpen] = useState(false);
+  const [pollQuestion, setPollQuestion] = useState("");
+  const [pollOptions, setPollOptions] = useState(["", ""]);
   const scrollViewRef = useRef<ScrollView | null>(null);
 
   const group = useMemo(
@@ -49,6 +78,9 @@ export default function GroupChatThreadScreen() {
     () => messagesByGroup[groupId] ?? [],
     [groupId, messagesByGroup],
   );
+  const messageIds = useMemo(() => messages.map((message) => message.id), [messages]);
+  const chatKey = `group:${groupId}`;
+  const pinnedMessages = pinnedMessagesByChatKey[chatKey] ?? [];
 
   useEffect(() => {
     if (!session?.user.id || !groupId) {
@@ -67,6 +99,22 @@ export default function GroupChatThreadScreen() {
 
     return subscribeToGroup(groupId, session.user.id);
   }, [groupId, session?.user.id, subscribeToGroup]);
+
+  useEffect(() => {
+    if (!session?.user.id || !groupId) {
+      return;
+    }
+
+    void loadFeatures("group", groupId, messageIds, session.user.id);
+  }, [groupId, loadFeatures, messageIds, session?.user.id]);
+
+  useEffect(() => {
+    if (!session?.user.id || !groupId) {
+      return undefined;
+    }
+
+    return subscribeToFeatureChanges("group", groupId, messageIds, session.user.id);
+  }, [groupId, messageIds, session?.user.id, subscribeToFeatureChanges]);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -99,6 +147,120 @@ export default function GroupChatThreadScreen() {
     }
   }
 
+  function resetPollComposer() {
+    setPollQuestion("");
+    setPollOptions(["", ""]);
+    setIsPollComposerOpen(false);
+  }
+
+  async function handleCreatePoll() {
+    const trimmedQuestion = pollQuestion.trim();
+    const trimmedOptions = pollOptions.map((option) => option.trim()).filter(Boolean);
+
+    if (!session?.user.id) {
+      Alert.alert("Sign in required", "Please sign in again before creating polls.");
+      return;
+    }
+
+    if (!trimmedQuestion) {
+      Alert.alert("Question required", "Add a poll question before posting.");
+      return;
+    }
+
+    if (trimmedOptions.length < 2) {
+      Alert.alert("Options required", "Polls need at least two options.");
+      return;
+    }
+
+    try {
+      await createPoll("group", groupId, trimmedQuestion, trimmedOptions);
+      await Promise.all([
+        loadGroupMessages(groupId, session.user.id),
+        refreshGroupChats(session.user.id),
+      ]);
+      resetPollComposer();
+    } catch (pollError) {
+      Alert.alert(
+        "Could not create poll",
+        pollError instanceof Error ? pollError.message : "Please try again.",
+      );
+    }
+  }
+
+  async function handleVotePoll(pollId: string, optionId: string) {
+    if (!session?.user.id) {
+      Alert.alert("Sign in required", "Please sign in again before voting.");
+      return;
+    }
+
+    try {
+      await votePoll("group", groupId, messageIds, session.user.id, pollId, optionId);
+    } catch (voteError) {
+      Alert.alert(
+        "Could not vote",
+        voteError instanceof Error ? voteError.message : "Please try again.",
+      );
+    }
+  }
+
+  async function handleUnvotePoll(pollId: string) {
+    if (!session?.user.id) {
+      Alert.alert("Sign in required", "Please sign in again before updating votes.");
+      return;
+    }
+
+    try {
+      await unvotePoll("group", groupId, messageIds, session.user.id, pollId);
+    } catch (voteError) {
+      Alert.alert(
+        "Could not remove vote",
+        voteError instanceof Error ? voteError.message : "Please try again.",
+      );
+    }
+  }
+
+  async function handleSetPinned(messageId: string, pinned: boolean) {
+    if (!session?.user.id) {
+      Alert.alert(
+        "Sign in required",
+        "Please sign in again before updating pinned messages.",
+      );
+      return;
+    }
+
+    try {
+      await setPinned("group", groupId, messageIds, session.user.id, messageId, pinned);
+    } catch (pinError) {
+      Alert.alert(
+        "Could not update pin",
+        pinError instanceof Error ? pinError.message : "Please try again.",
+      );
+    }
+  }
+
+  const pinnedPreviews = useMemo(
+    () =>
+      pinnedMessages
+        .map((pinnedMessage): PinnedMessagePreview | null => {
+          const message = messages.find((item) => item.id === pinnedMessage.message_id);
+
+          if (!message) {
+            return null;
+          }
+
+          return {
+            ...pinnedMessage,
+            body:
+              pollsByMessageId[message.id]?.question ??
+              message.body ??
+              "Pinned group message",
+            senderName: message.sender_profile.display_name,
+          };
+        })
+        .filter((message): message is PinnedMessagePreview => message !== null),
+    [messages, pinnedMessages, pollsByMessageId],
+  );
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#EEF3F9" }}>
       <View className="border-b border-[#E4E9F1] bg-white px-5 pb-4 pt-2">
@@ -126,8 +288,27 @@ export default function GroupChatThreadScreen() {
                 : "Loading group chat..."}
             </Text>
           </View>
+          <Pressable
+            onPress={() => setIsPinnedDrawerOpen((current) => !current)}
+            className="h-10 w-10 items-center justify-center rounded-full bg-[#F1F4F8]"
+          >
+            <SymbolView
+              name={{ ios: "pin.fill", android: "push_pin", web: "push_pin" }}
+              size={18}
+              tintColor="#0F1115"
+            />
+          </Pressable>
         </View>
       </View>
+
+      {isPinnedDrawerOpen ? (
+        <PinnedMessagesDrawer
+          pinnedMessages={pinnedPreviews}
+          onUnpin={(messageId) => {
+            void handleSetPinned(messageId, false);
+          }}
+        />
+      ) : null}
 
       <ScrollView
         ref={scrollViewRef}
@@ -157,11 +338,17 @@ export default function GroupChatThreadScreen() {
         <View className="gap-3">
           {messages.map((message) => {
             const isMine = message.sender_id === session?.user.id;
+            const poll = pollsByMessageId[message.id];
+            const isPinned = pinnedMessages.some(
+              (pinnedMessage) => pinnedMessage.message_id === message.id,
+            );
 
             return (
               <View
                 key={message.id}
-                className={`max-w-[86%] ${isMine ? "self-end" : "self-start"}`}
+                className={`${
+                  poll ? "w-[88%] min-w-[260px]" : "max-w-[86%]"
+                } ${isMine ? "self-end" : "self-start"}`}
               >
                 {!isMine ? (
                   <Text className="mb-1 ml-1 text-[12px] font-semibold text-[#7B8494]">
@@ -173,20 +360,53 @@ export default function GroupChatThreadScreen() {
                     isMine ? "bg-[#0F1115]" : "border border-[#E4E9F1] bg-white"
                   }`}
                 >
-                  <Text
-                    className={`text-[15px] leading-6 ${
-                      isMine ? "text-white" : "text-[#0F1115]"
-                    }`}
-                  >
-                    {message.body}
-                  </Text>
-                  <Text
-                    className={`mt-2 text-[11px] ${
-                      isMine ? "text-white/60" : "text-[#9AA0AB]"
-                    }`}
-                  >
-                    {formatMessageTime(message.created_at)}
-                  </Text>
+                  {poll ? (
+                    <ChatPollCard
+                      poll={poll}
+                      disabled={isVoting}
+                      isDark={isMine}
+                      onVote={(optionId) => {
+                        void handleVotePoll(poll.id, optionId);
+                      }}
+                      onUnvote={() => {
+                        void handleUnvotePoll(poll.id);
+                      }}
+                    />
+                  ) : (
+                    <Text
+                      className={`text-[15px] leading-6 ${
+                        isMine ? "text-white" : "text-[#0F1115]"
+                      }`}
+                    >
+                      {message.body}
+                    </Text>
+                  )}
+                  <View className={poll ? "mt-3 gap-2" : "mt-2 gap-2"}>
+                    <Text
+                      className={`text-[11px] ${
+                        isMine ? "text-white/60" : "text-[#9AA0AB]"
+                      }`}
+                    >
+                      {formatMessageTime(message.created_at)}
+                    </Text>
+                    <Pressable
+                      disabled={isPinning}
+                      onPress={() => {
+                        void handleSetPinned(message.id, !isPinned);
+                      }}
+                      className={`self-start rounded-full px-3 py-1.5 ${
+                        isMine ? "bg-[#20242B]" : "bg-[#F1F3F7]"
+                      }`}
+                    >
+                      <Text
+                        className={`text-[11px] font-semibold ${
+                          isMine ? "text-[#C9D0DB]" : "text-[#5C6370]"
+                        }`}
+                      >
+                        {isPinned ? "Unpin" : "Pin"}
+                      </Text>
+                    </Pressable>
+                  </View>
                 </View>
               </View>
             );
@@ -194,31 +414,74 @@ export default function GroupChatThreadScreen() {
         </View>
       </ScrollView>
 
-      <View className="border-t border-[#E4E9F1] bg-white px-5 py-3">
-        <View className="flex-row items-end gap-3">
-          <TextInput
-            value={messageDraft}
-            onChangeText={setMessageDraft}
-            placeholder="Write to the group"
-            placeholderTextColor="#9AA0AB"
-            multiline
-            className="max-h-28 flex-1 rounded-[18px] border border-[#E4E9F1] bg-[#F9FBFD] px-4 py-3 text-[15px] text-[#0F1115]"
-          />
-          <Pressable
-            disabled={isSending || !messageDraft.trim()}
-            onPress={() => {
-              void handleSendMessage();
-            }}
-            className={`h-11 w-11 items-center justify-center rounded-full ${
-              isSending || !messageDraft.trim() ? "bg-[#D7DDE6]" : "bg-[#0F1115]"
-            }`}
-          >
-            <SymbolView
-              name={{ ios: "paperplane.fill", android: "send", web: "send" }}
-              size={18}
-              tintColor="#FFFFFF"
+      <View className="border-t border-[#DDE5EF] bg-[#EEF3F9] px-5 pb-6 pt-4">
+        <View className="rounded-[22px] bg-white p-3">
+          {isPollComposerOpen ? (
+            <PollComposer
+              question={pollQuestion}
+              options={pollOptions}
+              isCreating={isCreatingPoll}
+              onQuestionChange={setPollQuestion}
+              onOptionChange={(index, value) => {
+                setPollOptions((current) =>
+                  current.map((option, optionIndex) =>
+                    optionIndex === index ? value : option,
+                  ),
+                );
+              }}
+              onAddOption={() => {
+                setPollOptions((current) =>
+                  current.length >= 6 ? current : [...current, ""],
+                );
+              }}
+              onRemoveOption={(index) => {
+                setPollOptions((current) =>
+                  current.filter((_, optionIndex) => optionIndex !== index),
+                );
+              }}
+              onCancel={resetPollComposer}
+              onSubmit={() => {
+                void handleCreatePoll();
+              }}
             />
-          </Pressable>
+          ) : null}
+
+          <View className="flex-row items-end gap-2">
+            <Pressable
+              disabled={isSending || !group}
+              onPress={() => {
+                setIsPollComposerOpen((current) => !current);
+              }}
+              className="h-12 w-12 items-center justify-center rounded-full bg-[#EEF2F7]"
+            >
+              <SymbolView
+                name={{ ios: "chart.bar.doc.horizontal", android: "poll", web: "poll" }}
+                size={20}
+                tintColor="#0F1115"
+              />
+            </Pressable>
+
+            <View className="flex-1 rounded-[22px] border border-[#E4E9F1] bg-[#F9FBFD] px-3 py-1">
+              <TextInput
+                value={messageDraft}
+                onChangeText={setMessageDraft}
+                placeholder="Write to the group"
+                placeholderTextColor="#9AA0AB"
+                multiline
+                className="min-h-[44px] text-[14px] leading-6 text-[#0F1115]"
+              />
+            </View>
+
+            <View className="w-[88px]">
+              <AppButton
+                label={isSending ? "Sending..." : "Send"}
+                disabled={isSending || !group}
+                onPress={() => {
+                  void handleSendMessage();
+                }}
+              />
+            </View>
+          </View>
         </View>
       </View>
     </SafeAreaView>

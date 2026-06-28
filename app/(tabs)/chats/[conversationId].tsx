@@ -209,6 +209,7 @@ export default function ConversationThreadScreen() {
   const loadFeatures = useChatFeaturesStore((state) => state.loadFeatures);
   const createPoll = useChatFeaturesStore((state) => state.createPoll);
   const votePoll = useChatFeaturesStore((state) => state.votePoll);
+  const unvotePoll = useChatFeaturesStore((state) => state.unvotePoll);
   const setPinned = useChatFeaturesStore((state) => state.setPinned);
   const subscribeToFeatureChanges = useChatFeaturesStore(
     (state) => state.subscribeToFeatureChanges,
@@ -545,6 +546,28 @@ export default function ConversationThreadScreen() {
     }
   }
 
+  async function handleUnvotePoll(pollId: string) {
+    if (!session?.user.id) {
+      Alert.alert("Sign in required", "Please sign in again before updating votes.");
+      return;
+    }
+
+    try {
+      await unvotePoll(
+        "direct",
+        conversationId,
+        messageIds,
+        session.user.id,
+        pollId,
+      );
+    } catch (voteError) {
+      Alert.alert(
+        "Could not remove vote",
+        voteError instanceof Error ? voteError.message : "Please try again.",
+      );
+    }
+  }
+
   async function handleSetPinned(messageId: string, pinned: boolean) {
     if (!session?.user.id) {
       Alert.alert("Sign in required", "Please sign in again before pinning messages.");
@@ -726,7 +749,9 @@ export default function ConversationThreadScreen() {
             return (
               <View
                 key={message.id}
-                className={`max-w-[88%] rounded-[18px] px-4 py-3 ${
+                className={`rounded-[18px] px-4 py-3 ${
+                  poll ? "w-[88%] min-w-[260px]" : "max-w-[88%]"
+                } ${
                   isCurrentUser ? "self-end bg-[#0F1115]" : "self-start bg-white"
                 }`}
               >
@@ -790,6 +815,9 @@ export default function ConversationThreadScreen() {
                     onVote={(optionId) => {
                       void handleVotePoll(poll.id, optionId);
                     }}
+                    onUnvote={() => {
+                      void handleUnvotePoll(poll.id);
+                    }}
                   />
                 ) : message.body ? (
                   <Text
@@ -800,30 +828,32 @@ export default function ConversationThreadScreen() {
                     {message.body}
                   </Text>
                 ) : null}
-                <Text
-                  className={`mt-2 text-[11px] ${
-                    isCurrentUser ? "text-[#C9D0DB]" : "text-[#7B8494]"
-                  }`}
-                >
-                  {formatMessageTime(message.created_at)}
-                </Text>
-                <Pressable
-                  disabled={isPinning}
-                  onPress={() => {
-                    void handleSetPinned(message.id, !isPinned);
-                  }}
-                  className={`mt-2 self-start rounded-full px-3 py-1.5 ${
-                    isCurrentUser ? "bg-[#20242B]" : "bg-[#F1F3F7]"
-                  }`}
-                >
+                <View className={poll ? "mt-3 gap-2" : "mt-2 gap-2"}>
                   <Text
-                    className={`text-[11px] font-semibold ${
-                      isCurrentUser ? "text-[#C9D0DB]" : "text-[#5C6370]"
+                    className={`text-[11px] ${
+                      isCurrentUser ? "text-[#C9D0DB]" : "text-[#7B8494]"
                     }`}
                   >
-                    {isPinned ? "Unpin" : "Pin"}
+                    {formatMessageTime(message.created_at)}
                   </Text>
-                </Pressable>
+                  <Pressable
+                    disabled={isPinning}
+                    onPress={() => {
+                      void handleSetPinned(message.id, !isPinned);
+                    }}
+                    className={`self-start rounded-full px-3 py-1.5 ${
+                      isCurrentUser ? "bg-[#20242B]" : "bg-[#F1F3F7]"
+                    }`}
+                  >
+                    <Text
+                      className={`text-[11px] font-semibold ${
+                        isCurrentUser ? "text-[#C9D0DB]" : "text-[#5C6370]"
+                      }`}
+                    >
+                      {isPinned ? "Unpin" : "Pin"}
+                    </Text>
+                  </Pressable>
+                </View>
               </View>
             );
           })}

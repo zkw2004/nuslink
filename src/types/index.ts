@@ -204,7 +204,7 @@ export interface DirectMessageAttachmentInput {
   kind: ChatAttachmentKind;
 }
 
-export type ChatKind = "direct" | "community";
+export type ChatKind = "direct" | "community" | "group";
 
 export interface ChatPollOption {
   id: string;

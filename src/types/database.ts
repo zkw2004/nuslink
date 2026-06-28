@@ -280,6 +280,7 @@ export type Database = {
           created_at: string;
           created_by: string;
           direct_message_id: string | null;
+          group_message_id: string | null;
           id: string;
           question: string;
         };
@@ -288,6 +289,7 @@ export type Database = {
           created_at?: string;
           created_by: string;
           direct_message_id?: string | null;
+          group_message_id?: string | null;
           id?: string;
           question: string;
         };
@@ -296,6 +298,7 @@ export type Database = {
           created_at?: string;
           created_by?: string;
           direct_message_id?: string | null;
+          group_message_id?: string | null;
           id?: string;
           question?: string;
         };
@@ -354,6 +357,7 @@ export type Database = {
           community_message_id: string | null;
           created_at: string;
           direct_message_id: string | null;
+          group_message_id: string | null;
           id: string;
           pinned_by: string;
         };
@@ -361,6 +365,7 @@ export type Database = {
           community_message_id?: string | null;
           created_at?: string;
           direct_message_id?: string | null;
+          group_message_id?: string | null;
           id?: string;
           pinned_by: string;
         };
@@ -368,6 +373,7 @@ export type Database = {
           community_message_id?: string | null;
           created_at?: string;
           direct_message_id?: string | null;
+          group_message_id?: string | null;
           id?: string;
           pinned_by?: string;
         };
@@ -806,6 +812,14 @@ export type Database = {
         };
         Returns: string;
       };
+      create_group_chat_poll: {
+        Args: {
+          group_id_input: string;
+          option_inputs: string[];
+          question_input: string;
+        };
+        Returns: string;
+      };
       create_group: {
         Args: {
           module_code_input: string;
@@ -908,6 +922,12 @@ export type Database = {
         };
         Returns: void;
       };
+      pin_group_chat_message: {
+        Args: {
+          message_id_input: string;
+        };
+        Returns: void;
+      };
       respond_to_connection_request: {
         Args: {
           decision_input: string;
@@ -958,6 +978,18 @@ export type Database = {
       unpin_direct_chat_message: {
         Args: {
           message_id_input: string;
+        };
+        Returns: void;
+      };
+      unpin_group_chat_message: {
+        Args: {
+          message_id_input: string;
+        };
+        Returns: void;
+      };
+      unvote_chat_poll: {
+        Args: {
+          poll_id_input: string;
         };
         Returns: void;
       };

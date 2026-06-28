@@ -264,8 +264,11 @@ export function subscribeToGroupMessages(groupId: string, onChange: () => void) 
   }
 
   const supabaseClient = supabase;
+  const channelId = `group:${groupId}:${Date.now()}:${Math.random()
+    .toString(36)
+    .slice(2)}`;
   const channel = supabaseClient
-    .channel(`group-messages:${groupId}`)
+    .channel(`group-messages:${channelId}`)
     .on(
       "postgres_changes",
       {
