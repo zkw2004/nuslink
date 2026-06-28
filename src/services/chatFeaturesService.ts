@@ -9,17 +9,39 @@ type ChatPinnedMessageRow =
   Database["public"]["Tables"]["chat_pinned_messages"]["Row"];
 
 function getMessageColumn(kind: ChatKind) {
-  return kind === "direct" ? "direct_message_id" : "community_message_id";
+  if (kind === "direct") {
+    return "direct_message_id";
+  }
+
+  if (kind === "community") {
+    return "community_message_id";
+  }
+
+  return "group_message_id";
 }
 
 function getPollMessageId(kind: ChatKind, poll: ChatPollRow) {
-  return kind === "direct" ? poll.direct_message_id : poll.community_message_id;
+  if (kind === "direct") {
+    return poll.direct_message_id;
+  }
+
+  if (kind === "community") {
+    return poll.community_message_id;
+  }
+
+  return poll.group_message_id;
 }
 
 function getPinnedMessageId(kind: ChatKind, pinnedMessage: ChatPinnedMessageRow) {
-  return kind === "direct"
-    ? pinnedMessage.direct_message_id
-    : pinnedMessage.community_message_id;
+  if (kind === "direct") {
+    return pinnedMessage.direct_message_id;
+  }
+
+  if (kind === "community") {
+    return pinnedMessage.community_message_id;
+  }
+
+  return pinnedMessage.group_message_id;
 }
 
 export async function fetchChatPollsForMessages(
@@ -176,7 +198,11 @@ export async function createChatPoll(
   }
 
   const rpcName =
-    kind === "direct" ? "create_direct_chat_poll" : "create_community_chat_poll";
+    kind === "direct"
+      ? "create_direct_chat_poll"
+      : kind === "community"
+        ? "create_community_chat_poll"
+        : "create_group_chat_poll";
   const args =
     kind === "direct"
       ? {
@@ -184,11 +210,17 @@ export async function createChatPoll(
           question_input: question,
           option_inputs: options,
         }
-      : {
-          community_id_input: chatId,
-          question_input: question,
-          option_inputs: options,
-        };
+      : kind === "community"
+        ? {
+            community_id_input: chatId,
+            question_input: question,
+            option_inputs: options,
+          }
+        : {
+            group_id_input: chatId,
+            question_input: question,
+            option_inputs: options,
+          };
   const { data, error } = await supabase.rpc(rpcName, args);
 
   if (error) {
@@ -241,9 +273,13 @@ export async function setChatMessagePinned(
       ? pinned
         ? "pin_direct_chat_message"
         : "unpin_direct_chat_message"
-      : pinned
-        ? "pin_community_chat_message"
-        : "unpin_community_chat_message";
+      : kind === "community"
+        ? pinned
+          ? "pin_community_chat_message"
+          : "unpin_community_chat_message"
+        : pinned
+          ? "pin_group_chat_message"
+          : "unpin_group_chat_message";
   const { error } = await supabase.rpc(rpcName, {
     message_id_input: messageId,
   });
