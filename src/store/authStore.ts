@@ -51,9 +51,8 @@ function mapProfileRowToUserProfile(
     ...row,
     intents: row.intents ?? [],
     interests: normalizeInterestTags(row.interests ?? []),
-    project_tags: normalizeProfileTags(row.project_tags ?? []),
     cca_tags: normalizeProfileTags(row.cca_tags ?? []),
-    skills: row.skills ?? [],
+    skills: normalizeProfileTags(row.skills ?? []),
     study_mode: studyMode,
     study_style: studyStyle,
   };

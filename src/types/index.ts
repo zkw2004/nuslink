@@ -54,13 +54,13 @@ export interface UserProfile {
   major: string | null;
   year_of_study: number | null;
   graduation_date: string | null;
+  hall_residence: string | null;
   study_mode: StudyMode | null;
   study_style: StudyStyle | null;
   preferred_group_size: number | null;
   is_sso_verified: boolean;
   intents: Intent[];
   interests: string[];
-  project_tags: string[];
   cca_tags: string[];
   skills: string[];
   badge_tier: BadgeTier | null;
@@ -125,7 +125,6 @@ export interface MatchBreakdown {
   interest_overlap: number | null;
   study_mode: number | null;
   preferred_group_size: number | null;
-  project_tag_overlap: number | null;
   cca_tag_overlap: number | null;
 }
 
@@ -138,9 +137,10 @@ export interface PeopleMatch {
   major: string | null;
   year_of_study: number | null;
   badge_tier: BadgeTier | null;
+  hall_residence: string | null;
   interests: string[];
-  project_tags: string[];
   cca_tags: string[];
+  skills: string[];
   intents: string[];
   shared_modules: string[];
   compatibility_percentage: number;

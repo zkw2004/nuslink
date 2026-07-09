@@ -174,9 +174,8 @@ export async function saveProfileSetup(input: ProfileSetupInput): Promise<UserPr
     ...data,
     intents: data.intents ?? [],
     interests: normalizeInterestTags(data.interests ?? []),
-    project_tags: normalizeProfileTags(data.project_tags ?? []),
     cca_tags: normalizeProfileTags(data.cca_tags ?? []),
-    skills: data.skills ?? [],
+    skills: normalizeProfileTags(data.skills ?? []),
     study_mode: studyMode,
     study_style: studyStyle,
   };
