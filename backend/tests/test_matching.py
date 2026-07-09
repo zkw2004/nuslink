@@ -3,7 +3,12 @@ from fastapi.testclient import TestClient
 
 from app.auth import AuthenticatedUser
 from app.main import app
-from app.matching.models import ModuleRegistration, ProfileSummary, TimetableSlot
+from app.matching.models import (
+    ConnectionEdge,
+    ModuleRegistration,
+    ProfileSummary,
+    TimetableSlot,
+)
 from app.matching.scoring import (
     CandidateScore,
     calculate_interest_overlap_score,
@@ -147,6 +152,19 @@ class FakeMatchRepository:
         ]
         return [slot for slot in slots if slot.user_id in user_ids]
 
+    def list_connections(self, *, user_ids: list[str]) -> list[ConnectionEdge]:
+        edges = [
+            ConnectionEdge("user-1", "friend-1"),
+            ConnectionEdge("user-2", "friend-1"),
+            ConnectionEdge("user-1", "friend-2"),
+            ConnectionEdge("user-2", "friend-3"),
+        ]
+        return [
+            edge
+            for edge in edges
+            if edge.user_a_id in user_ids or edge.user_b_id in user_ids
+        ]
+
     def create_high_match_notifications(
         self,
         *,
@@ -208,15 +226,25 @@ def test_people_matches_returns_ranked_candidates():
         > body["candidates"][1]["compatibility_percentage"]
     )
     assert body["candidates"][0]["shared_modules"] == ["CS2040S"]
+    assert body["candidates"][0]["breakdown"]["same_intent"] is not None
     assert body["candidates"][0]["breakdown"]["module_overlap"] is not None
-    assert body["candidates"][0]["breakdown"]["faculty_major"] is not None
+    assert body["candidates"][0]["breakdown"]["shared_skills"] is not None
+    assert body["candidates"][0]["breakdown"]["same_major"] is not None
     assert body["candidates"][0]["breakdown"]["year_proximity"] is not None
+    assert body["candidates"][0]["breakdown"]["same_faculty"] is not None
+    assert body["candidates"][0]["breakdown"]["same_hall_or_residence"] is not None
     assert body["candidates"][0]["breakdown"]["interest_overlap"] is not None
     assert body["candidates"][0]["breakdown"]["study_mode"] is not None
     assert body["candidates"][0]["breakdown"]["preferred_group_size"] is not None
     assert body["candidates"][0]["breakdown"]["cca_tag_overlap"] is not None
+    assert body["candidates"][0]["breakdown"]["mutual_connections"] is not None
     assert body["candidates"][0]["hall_residence"] == "Temasek Hall"
     assert "react native" in body["candidates"][0]["skills"]
+    assert body["candidates"][0]["top_signals"] == [
+        "Here for the same kind of collaboration",
+        "Shared skills and working strengths",
+        "Share CS2040S this semester",
+    ]
     assert len(body["candidates"][0]["match_reasons"]) > 0
 
 
@@ -273,7 +301,7 @@ def test_people_matches_keeps_missing_optional_fields_matchable():
 
     assert candidate["breakdown"]["schedule_overlap"] == 0
     assert candidate["breakdown"]["module_overlap"] is not None
-    assert candidate["breakdown"]["faculty_major"] is not None
+    assert candidate["breakdown"]["same_major"] == 0
     assert candidate["compatibility_percentage"] > 0
 
 
@@ -288,15 +316,21 @@ def test_people_matches_never_rounds_positive_match_to_zero():
 def test_overall_score_redistributes_missing_optional_dimensions():
     score = calculate_overall_score(
         CandidateScore(
+            same_intent=None,
             module_overlap=1.0,
+            shared_skills=None,
             schedule_overlap=None,
-            faculty_major=None,
+            same_major=None,
             year_proximity=None,
+            same_faculty=None,
             interest_overlap=None,
             study_mode=None,
             preferred_group_size=None,
+            same_hall_or_residence=None,
             cca_tag_overlap=None,
+            mutual_connections=None,
             overlap_minutes=0,
+            mutual_connection_count=0,
         )
     )
 

@@ -118,14 +118,19 @@ export interface TimetableClassSlot {
 }
 
 export interface MatchBreakdown {
+  same_intent: number | null;
   module_overlap: number | null;
+  shared_skills: number | null;
   schedule_overlap: number | null;
-  faculty_major: number | null;
+  same_major: number | null;
   year_proximity: number | null;
+  same_faculty: number | null;
+  same_hall_or_residence: number | null;
   interest_overlap: number | null;
   study_mode: number | null;
   preferred_group_size: number | null;
   cca_tag_overlap: number | null;
+  mutual_connections: number | null;
 }
 
 export interface PeopleMatch {
@@ -145,6 +150,7 @@ export interface PeopleMatch {
   shared_modules: string[];
   compatibility_percentage: number;
   breakdown: MatchBreakdown;
+  top_signals: string[];
   match_reasons: string[];
   schedule_summary: string;
 }

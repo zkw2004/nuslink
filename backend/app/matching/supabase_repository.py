@@ -4,7 +4,12 @@ from urllib import error, parse, request
 from fastapi import HTTPException, status
 
 from app.core.config import settings
-from app.matching.models import ModuleRegistration, ProfileSummary, TimetableSlot
+from app.matching.models import (
+    ConnectionEdge,
+    ModuleRegistration,
+    ProfileSummary,
+    TimetableSlot,
+)
 from app.matching.repository import MatchRepository
 
 PROFILE_SELECT_FIELDS = (
@@ -188,6 +193,48 @@ class SupabaseMatchRepository(MatchRepository):
             )
             for row in rows
         ]
+
+    def list_connections(self, *, user_ids: list[str]) -> list[ConnectionEdge]:
+        if not user_ids:
+            return []
+
+        rows = [
+            *self._get(
+                "connections",
+                {
+                    "select": "user_a_id,user_b_id",
+                    "user_a_id": _build_in_filter(user_ids),
+                },
+            ),
+            *self._get(
+                "connections",
+                {
+                    "select": "user_a_id,user_b_id",
+                    "user_b_id": _build_in_filter(user_ids),
+                },
+            ),
+        ]
+
+        seen_pairs: set[tuple[str, str]] = set()
+        edges: list[ConnectionEdge] = []
+
+        for row in rows:
+            user_a_id = row["user_a_id"]
+            user_b_id = row["user_b_id"]
+            normalized_pair = tuple(sorted((user_a_id, user_b_id)))
+
+            if normalized_pair in seen_pairs:
+                continue
+
+            seen_pairs.add(normalized_pair)
+            edges.append(
+                ConnectionEdge(
+                    user_a_id=user_a_id,
+                    user_b_id=user_b_id,
+                )
+            )
+
+        return edges
 
     def create_high_match_notifications(
         self,

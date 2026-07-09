@@ -1,6 +1,11 @@
 from typing import Protocol
 
-from app.matching.models import ModuleRegistration, ProfileSummary, TimetableSlot
+from app.matching.models import (
+    ConnectionEdge,
+    ModuleRegistration,
+    ProfileSummary,
+    TimetableSlot,
+)
 
 
 class MatchRepository(Protocol):
@@ -29,6 +34,8 @@ class MatchRepository(Protocol):
         user_ids: list[str],
         semester: str,
     ) -> list[TimetableSlot]: ...
+
+    def list_connections(self, *, user_ids: list[str]) -> list[ConnectionEdge]: ...
 
     def create_high_match_notifications(
         self,

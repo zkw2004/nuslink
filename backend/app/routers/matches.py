@@ -69,6 +69,9 @@ def get_people_matches(
         user_ids=[current_user.id, *candidate_ids],
         semester=semester,
     )
+    connections = repository.list_connections(
+        user_ids=[current_user.id, *candidate_ids]
+    )
 
     ranked_candidates = rank_candidates(
         current_user_id=current_user.id,
@@ -81,6 +84,7 @@ def get_people_matches(
         ],
         candidate_registrations=candidate_registrations,
         timetable_slots=timetable_slots,
+        connections=connections,
     )
     try:
         repository.create_high_match_notifications(
