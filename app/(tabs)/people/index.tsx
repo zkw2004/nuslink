@@ -51,35 +51,123 @@ function toIntentText(intents: string[]) {
 function toMetaSignal(reason: string): MatchSignal {
   const normalized = reason.toLowerCase();
 
-  if (normalized.includes("same major") || normalized.includes("same faculty")) {
-    return { icon: "🎓", text: reason };
+  if (
+    normalized.includes("same major") ||
+    normalized.includes("same faculty") ||
+    normalized.includes("year-of-study") ||
+    normalized.includes("year of study")
+  ) {
+    return { icon: "🎓", text: "Academic fit" };
+  }
+
+  const sharedModuleCountMatch = normalized.match(
+    /share (\d+) current-semester modules/,
+  );
+  if (sharedModuleCountMatch) {
+    const count = sharedModuleCountMatch[1];
+    return {
+      icon: "📚",
+      text: count === "1" ? "Common mod" : `${count} common mods`,
+    };
+  }
+
+  const sharedSingleModuleMatch = reason.match(/^Share\s+([A-Z0-9]+)\s+this semester\.?$/i);
+  if (sharedSingleModuleMatch) {
+    return { icon: "📚", text: "Common mod" };
   }
 
   if (normalized.includes("module") || normalized.includes("semester")) {
-    return { icon: "📚", text: reason };
+    return { icon: "📚", text: "Common mods" };
   }
 
   if (normalized.includes("timetable") || normalized.includes("availability")) {
-    return { icon: "⏰", text: reason };
+    return { icon: "⏰", text: "Similar schedule" };
+  }
+
+  if (
+    normalized.includes("same kind of collaboration") ||
+    normalized.includes("same goal") ||
+    normalized.includes("here for")
+  ) {
+    return { icon: "🎯", text: "Shared goals" };
+  }
+
+  if (normalized.includes("skills") || normalized.includes("strengths")) {
+    return { icon: "🛠️", text: "Similar skills" };
+  }
+
+  if (normalized.includes("hall") || normalized.includes("residence")) {
+    return { icon: "🏠", text: "Shared residence" };
+  }
+
+  const mutualConnectionCountMatch = normalized.match(/^(\d+)\s+mutual connections?$/);
+  if (mutualConnectionCountMatch) {
+    const count = mutualConnectionCountMatch[1];
+    return {
+      icon: "🤝",
+      text: count === "1" ? "1 mutual" : `${count} mutuals`,
+    };
+  }
+
+  if (normalized.includes("mutual connection")) {
+    return { icon: "🤝", text: "Mutuals" };
   }
 
   if (normalized.includes("study mode")) {
-    return { icon: "💬", text: reason };
+    return { icon: "💬", text: "Similar study mode" };
   }
 
   if (normalized.includes("cca")) {
-    return { icon: "🏃", text: reason };
+    return { icon: "🏃", text: "Shared CCA" };
   }
 
   if (normalized.includes("group size")) {
-    return { icon: "👥", text: reason };
+    return { icon: "👥", text: "Similar group size" };
   }
 
   if (normalized.includes("interest")) {
-    return { icon: "✨", text: reason };
+    return { icon: "✨", text: "Similar interests" };
   }
 
-  return { icon: "🎯", text: reason };
+  return { icon: "🎯", text: "Good match" };
+}
+
+function isAcademicSignal(reason: string) {
+  const normalized = reason.toLowerCase();
+
+  return (
+    normalized.includes("same major") ||
+    normalized.includes("same faculty") ||
+    normalized.includes("year-of-study") ||
+    normalized.includes("year of study") ||
+    normalized.includes("academic context")
+  );
+}
+
+function dedupeSignals(signals: string[]) {
+  const seen = new Set<string>();
+
+  return signals.filter((signal) => {
+    const normalized = signal.trim().toLowerCase();
+    if (!normalized || seen.has(normalized)) {
+      return false;
+    }
+
+    seen.add(normalized);
+    return true;
+  });
+}
+
+function selectZoneFiveSignals(candidate: PeopleMatch) {
+  const prioritizedSignals = dedupeSignals(candidate.top_signals ?? []);
+  const fallbackSignals = dedupeSignals(candidate.match_reasons ?? []);
+  const combinedSignals = dedupeSignals([...prioritizedSignals, ...fallbackSignals]);
+  const nonAcademicSignals = combinedSignals.filter(
+    (signal) => !isAcademicSignal(signal),
+  );
+  const academicSignals = combinedSignals.filter((signal) => isAcademicSignal(signal));
+
+  return [...nonAcademicSignals, ...academicSignals].slice(0, 3).map(toMetaSignal);
 }
 
 function toProfileCardData(candidate: PeopleMatch): ProfileCardData {
@@ -98,7 +186,7 @@ function toProfileCardData(candidate: PeopleMatch): ProfileCardData {
     bio: candidate.bio.trim() || "No bio added yet.",
     modules: candidate.shared_modules ?? [],
     skills: candidate.skills ?? [],
-    metaSignals: (candidate.match_reasons ?? []).slice(0, 3).map(toMetaSignal),
+    metaSignals: selectZoneFiveSignals(candidate),
   };
 }
 
