@@ -519,7 +519,11 @@ def _signal_candidates(
             )
         )
 
-    if score.same_major is not None and score.same_major >= 1.0 and candidate_profile.major:
+    if (
+        score.same_major is not None
+        and score.same_major >= 1.0
+        and candidate_profile.major
+    ):
         signals.append(
             SignalCandidate(
                 key="same_major",
