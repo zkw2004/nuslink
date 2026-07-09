@@ -16,6 +16,12 @@ class TimetableSlot:
 
 
 @dataclass(frozen=True)
+class ConnectionEdge:
+    user_a_id: str
+    user_b_id: str
+
+
+@dataclass(frozen=True)
 class ProfileSummary:
     id: str
     display_name: str

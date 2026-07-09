@@ -4,14 +4,19 @@ from pydantic import BaseModel
 
 
 class MatchBreakdownResponse(BaseModel):
+    same_intent: int | None = None
     module_overlap: int | None = None
+    shared_skills: int | None = None
     schedule_overlap: int | None
-    faculty_major: int | None = None
+    same_major: int | None = None
     year_proximity: int | None = None
+    same_faculty: int | None = None
+    same_hall_or_residence: int | None = None
     interest_overlap: int | None = None
     study_mode: int | None = None
     preferred_group_size: int | None = None
     cca_tag_overlap: int | None = None
+    mutual_connections: int | None = None
 
 
 class PeopleMatchResponseItem(BaseModel):
@@ -31,6 +36,7 @@ class PeopleMatchResponseItem(BaseModel):
     shared_modules: list[str]
     compatibility_percentage: int
     breakdown: MatchBreakdownResponse
+    top_signals: list[str] = []
     match_reasons: list[str] = []
     schedule_summary: str
 
