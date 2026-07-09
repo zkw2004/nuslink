@@ -114,11 +114,11 @@ function InnerProfileCard({ data, onConnect, onViewProfile }: ProfileCardProps) 
       {data.metaSignals.length > 0 ? (
         <View style={styles.metaStrip}>
           {data.metaSignals.map((signal, index) => (
-            <View key={`${signal.text}-${index}`} style={styles.metaSignalRow}>
-              <View style={styles.metaIconBadge}>
-                <Text style={styles.metaIcon}>{signal.icon}</Text>
-              </View>
-              <Text style={styles.metaText}>{signal.text}</Text>
+            <View key={`${signal.text}-${index}`} style={styles.metaPill}>
+              <Text style={styles.metaIcon}>{signal.icon}</Text>
+              <Text style={styles.metaText} numberOfLines={1}>
+                {signal.text}
+              </Text>
             </View>
           ))}
         </View>
@@ -313,33 +313,26 @@ const styles = StyleSheet.create({
   metaStrip: {
     flexDirection: "row",
     flexWrap: "wrap",
-    columnGap: 14,
-    rowGap: 7,
-    paddingVertical: 2,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(117,123,146,0.22)",
-    paddingTop: 12,
-    paddingBottom: 10,
+    gap: 8,
+    paddingTop: 2,
   },
-  metaSignalRow: {
+  metaPill: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-  },
-  metaIconBadge: {
-    width: 16,
-    height: 16,
-    borderRadius: 5,
-    backgroundColor: "#F0F0F3",
-    alignItems: "center",
-    justifyContent: "center",
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: "rgba(255,255,255,0.72)",
+    borderWidth: 1,
+    borderColor: "rgba(117,123,146,0.18)",
   },
   metaIcon: {
-    fontSize: 9,
+    fontSize: 11,
   },
   metaText: {
-    fontSize: 12,
+    fontSize: 11,
+    fontWeight: "500",
     color: "#54545F",
   },
   actionsRow: {
