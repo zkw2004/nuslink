@@ -3,8 +3,8 @@ import type { Session } from "@supabase/supabase-js";
 
 import { supabase } from "@lib/supabase";
 import type { Database } from "@appTypes/database";
-import type { StudyStyle, UserProfile } from "@appTypes/index";
-import { normalizeInterestTags } from "@utils/interestTags";
+import type { StudyMode, StudyStyle, UserProfile } from "@appTypes/index";
+import { normalizeInterestTags, normalizeProfileTags } from "@utils/interestTags";
 
 type ProfileUpdate = Database["public"]["Tables"]["profiles"]["Update"];
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
@@ -34,6 +34,12 @@ interface AuthState {
 function mapProfileRowToUserProfile(
   row: ProfileRow,
 ): UserProfile {
+  const studyMode =
+    row.study_mode === "online" ||
+    row.study_mode === "in_person" ||
+    row.study_mode === "flexible"
+      ? (row.study_mode as StudyMode)
+      : null;
   const studyStyle =
     row.study_style === "online" ||
     row.study_style === "in_person" ||
@@ -45,7 +51,10 @@ function mapProfileRowToUserProfile(
     ...row,
     intents: row.intents ?? [],
     interests: normalizeInterestTags(row.interests ?? []),
+    project_tags: normalizeProfileTags(row.project_tags ?? []),
+    cca_tags: normalizeProfileTags(row.cca_tags ?? []),
     skills: row.skills ?? [],
+    study_mode: studyMode,
     study_style: studyStyle,
   };
 }

@@ -1,0 +1,33 @@
+export const PROJECT_TAG_OPTIONS = [
+  "AI Tools",
+  "Backend Systems",
+  "Data Analytics",
+  "Design Systems",
+  "EdTech",
+  "FinTech",
+  "HealthTech",
+  "Mobile Apps",
+  "Product Design",
+  "Research",
+  "Robotics",
+  "SaaS",
+  "Sustainability",
+  "Web Platforms",
+] as const;
+
+export const CCA_TAG_OPTIONS = [
+  "Adventure Club",
+  "Arts & Culture",
+  "Basketball",
+  "Case Competitions",
+  "Community Service",
+  "Dance",
+  "Debate",
+  "Entrepreneurship",
+  "Hackathons",
+  "Music",
+  "NUS Hackers",
+  "Photography",
+  "Sports",
+  "Student Leadership",
+] as const;

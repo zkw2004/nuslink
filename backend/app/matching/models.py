@@ -26,7 +26,10 @@ class ProfileSummary:
     year_of_study: int | None
     badge_tier: str | None
     interests: list[str]
+    project_tags: list[str]
+    cca_tags: list[str]
     intents: list[str]
     onboarding_completed: bool
+    study_mode: str | None = None
     study_style: str | None = None
     preferred_group_size: int | None = None

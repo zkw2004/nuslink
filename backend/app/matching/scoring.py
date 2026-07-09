@@ -5,13 +5,15 @@ from dataclasses import dataclass
 from app.matching.models import ModuleRegistration, ProfileSummary, TimetableSlot
 
 MATCH_WEIGHTS = {
-    "module_overlap": 0.24,
-    "schedule_overlap": 0.20,
-    "faculty_major": 0.14,
-    "year_proximity": 0.08,
-    "interest_overlap": 0.12,
-    "study_style": 0.11,
-    "preferred_group_size": 0.08,
+    "module_overlap": 0.22,
+    "schedule_overlap": 0.18,
+    "faculty_major": 0.12,
+    "year_proximity": 0.07,
+    "interest_overlap": 0.11,
+    "study_mode": 0.08,
+    "preferred_group_size": 0.06,
+    "project_tag_overlap": 0.08,
+    "cca_tag_overlap": 0.05,
 }
 
 CANONICAL_INTEREST_ALIASES = {
@@ -54,15 +56,17 @@ class CandidateScore:
     faculty_major: float | None
     year_proximity: float | None
     interest_overlap: float | None
-    study_style: float | None
+    study_mode: float | None
     preferred_group_size: float | None
+    project_tag_overlap: float | None
+    cca_tag_overlap: float | None
     overlap_minutes: int
 
 
 def get_current_semester_string() -> str:
-    from datetime import datetime
+    from datetime import UTC, datetime
 
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     year = now.year
     month = now.month
     academic_year_start = year if month >= 8 else year - 1
@@ -100,6 +104,20 @@ def normalize_interest_tags(interests: list[str]) -> set[str]:
 
     for interest in interests:
         normalized_tags.update(_expand_interest_tag(interest))
+
+    return normalized_tags
+
+
+def normalize_profile_tags(tags: list[str]) -> set[str]:
+    normalized_tags: set[str] = set()
+
+    for tag in tags:
+        simplified_tag = _simplify_tag(tag)
+        normalized_tag = re.sub(r"[^a-z0-9/+ ]", " ", simplified_tag)
+        normalized_tag = re.sub(r"\s+", " ", normalized_tag).strip()
+
+        if normalized_tag:
+            normalized_tags.add(normalized_tag)
 
     return normalized_tags
 
@@ -213,7 +231,24 @@ def calculate_interest_overlap_score(
     return len(normalized_current.intersection(normalized_candidate)) / union_count
 
 
-def calculate_study_style_score(
+def calculate_tag_overlap_score(
+    current_tags: list[str],
+    candidate_tags: list[str],
+) -> float | None:
+    normalized_current = normalize_profile_tags(current_tags)
+    normalized_candidate = normalize_profile_tags(candidate_tags)
+
+    if not normalized_current or not normalized_candidate:
+        return None
+
+    union_count = len(normalized_current.union(normalized_candidate))
+    if union_count == 0:
+        return None
+
+    return len(normalized_current.intersection(normalized_candidate)) / union_count
+
+
+def calculate_study_mode_score(
     current_style: str | None,
     candidate_style: str | None,
 ) -> float | None:
@@ -271,8 +306,10 @@ def calculate_overall_score(score: CandidateScore) -> int:
             "faculty_major": score.faculty_major,
             "year_proximity": score.year_proximity,
             "interest_overlap": score.interest_overlap,
-            "study_style": score.study_style,
+            "study_mode": score.study_mode,
             "preferred_group_size": score.preferred_group_size,
+            "project_tag_overlap": score.project_tag_overlap,
+            "cca_tag_overlap": score.cca_tag_overlap,
         }.items()
         if value is not None
     }
@@ -341,11 +378,17 @@ def build_match_reasons(
     if score.interest_overlap is not None and score.interest_overlap >= 0.34:
         reasons.append("Shared academic interests.")
 
-    if score.study_style is not None and score.study_style >= 0.7:
+    if score.study_mode is not None and score.study_mode >= 0.7:
         reasons.append("Compatible study mode preferences.")
 
     if score.preferred_group_size is not None and score.preferred_group_size >= 0.8:
         reasons.append("Prefer a similar group size.")
+
+    if score.project_tag_overlap is not None and score.project_tag_overlap >= 0.34:
+        reasons.append("Overlapping project interests.")
+
+    if score.cca_tag_overlap is not None and score.cca_tag_overlap >= 0.34:
+        reasons.append("Shared CCA context.")
 
     return reasons[:3]
 
@@ -394,13 +437,21 @@ def rank_candidates(
             current_user_profile.interests,
             profile.interests,
         )
-        study_style_score = calculate_study_style_score(
-            current_user_profile.study_style,
-            profile.study_style,
+        study_mode_score = calculate_study_mode_score(
+            current_user_profile.study_mode or current_user_profile.study_style,
+            profile.study_mode or profile.study_style,
         )
         preferred_group_size_score = calculate_preferred_group_size_score(
             current_user_profile.preferred_group_size,
             profile.preferred_group_size,
+        )
+        project_tag_overlap_score = calculate_tag_overlap_score(
+            current_user_profile.project_tags,
+            profile.project_tags,
+        )
+        cca_tag_overlap_score = calculate_tag_overlap_score(
+            current_user_profile.cca_tags,
+            profile.cca_tags,
         )
 
         candidate_score = CandidateScore(
@@ -409,8 +460,10 @@ def rank_candidates(
             faculty_major=faculty_major_score,
             year_proximity=year_proximity_score,
             interest_overlap=interest_overlap_score,
-            study_style=study_style_score,
+            study_mode=study_mode_score,
             preferred_group_size=preferred_group_size_score,
+            project_tag_overlap=project_tag_overlap_score,
+            cca_tag_overlap=cca_tag_overlap_score,
             overlap_minutes=overlap_minutes,
         )
         compatibility_percentage = calculate_overall_score(candidate_score)
@@ -426,6 +479,8 @@ def rank_candidates(
                 "year_of_study": profile.year_of_study,
                 "badge_tier": profile.badge_tier,
                 "interests": profile.interests,
+                "project_tags": profile.project_tags,
+                "cca_tags": profile.cca_tags,
                 "intents": profile.intents,
                 "shared_modules": shared_modules,
                 "compatibility_percentage": compatibility_percentage,
@@ -445,12 +500,18 @@ def rank_candidates(
                     "interest_overlap": None
                     if interest_overlap_score is None
                     else round(interest_overlap_score * 100),
-                    "study_style": None
-                    if study_style_score is None
-                    else round(study_style_score * 100),
+                    "study_mode": None
+                    if study_mode_score is None
+                    else round(study_mode_score * 100),
                     "preferred_group_size": None
                     if preferred_group_size_score is None
                     else round(preferred_group_size_score * 100),
+                    "project_tag_overlap": None
+                    if project_tag_overlap_score is None
+                    else round(project_tag_overlap_score * 100),
+                    "cca_tag_overlap": None
+                    if cca_tag_overlap_score is None
+                    else round(cca_tag_overlap_score * 100),
                 },
                 "match_reasons": build_match_reasons(
                     shared_modules=shared_modules,

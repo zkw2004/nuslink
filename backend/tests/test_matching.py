@@ -9,7 +9,8 @@ from app.matching.scoring import (
     calculate_interest_overlap_score,
     calculate_overall_score,
     calculate_schedule_overlap_score,
-    calculate_study_style_score,
+    calculate_study_mode_score,
+    calculate_tag_overlap_score,
     normalize_interest_tags,
 )
 from app.routers.matches import get_current_user as get_matches_current_user
@@ -32,8 +33,11 @@ class FakeMatchRepository:
                 year_of_study=2,
                 badge_tier="bronze",
                 interests=["AI / ML"],
+                project_tags=["AI Tools", "EdTech"],
+                cca_tags=["NUS Hackers", "Basketball"],
                 intents=["study_group"],
                 onboarding_completed=True,
+                study_mode="in_person",
                 study_style="in_person",
                 preferred_group_size=4,
             ),
@@ -47,8 +51,11 @@ class FakeMatchRepository:
                 year_of_study=3,
                 badge_tier="gold",
                 interests=["Artificial Intelligence", "Algorithms"],
+                project_tags=["AI tools", "Product Design"],
+                cca_tags=["NUS Hackers"],
                 intents=["study_group"],
                 onboarding_completed=True,
+                study_mode="in_person",
                 study_style="in_person",
                 preferred_group_size=4,
             ),
@@ -62,8 +69,11 @@ class FakeMatchRepository:
                 year_of_study=3,
                 badge_tier="bronze",
                 interests=["Backend"],
+                project_tags=["Backend Systems"],
+                cca_tags=["Debate"],
                 intents=["study_group"],
                 onboarding_completed=True,
+                study_mode="online",
                 study_style="online",
                 preferred_group_size=2,
             ),
@@ -199,8 +209,10 @@ def test_people_matches_returns_ranked_candidates():
     assert body["candidates"][0]["breakdown"]["faculty_major"] is not None
     assert body["candidates"][0]["breakdown"]["year_proximity"] is not None
     assert body["candidates"][0]["breakdown"]["interest_overlap"] is not None
-    assert body["candidates"][0]["breakdown"]["study_style"] is not None
+    assert body["candidates"][0]["breakdown"]["study_mode"] is not None
     assert body["candidates"][0]["breakdown"]["preferred_group_size"] is not None
+    assert body["candidates"][0]["breakdown"]["project_tag_overlap"] is not None
+    assert body["candidates"][0]["breakdown"]["cca_tag_overlap"] is not None
     assert len(body["candidates"][0]["match_reasons"]) > 0
 
 
@@ -277,8 +289,10 @@ def test_overall_score_redistributes_missing_optional_dimensions():
             faculty_major=None,
             year_proximity=None,
             interest_overlap=None,
-            study_style=None,
+            study_mode=None,
             preferred_group_size=None,
+            project_tag_overlap=None,
+            cca_tag_overlap=None,
             overlap_minutes=0,
         )
     )
@@ -309,8 +323,17 @@ def test_interest_overlap_handles_case_and_common_aliases():
     assert round(score, 2) == 0.67
 
 
-def test_study_style_flexible_matches_both_modes():
-    score = calculate_study_style_score("flexible", "online")
+def test_study_mode_flexible_matches_both_modes():
+    score = calculate_study_mode_score("flexible", "online")
+
+    assert score == 1.0
+
+
+def test_project_and_cca_tag_overlap_is_case_insensitive():
+    score = calculate_tag_overlap_score(
+        ["NUS Hackers", "Product Design"],
+        ["nus hackers", "PRODUCT design"],
+    )
 
     assert score == 1.0
 

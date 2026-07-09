@@ -1,6 +1,6 @@
 import { isSupabaseConfigured, supabase } from "@lib/supabase";
-import type { StudyStyle, UserProfile } from "@appTypes/index";
-import { normalizeInterestTags } from "@utils/interestTags";
+import type { StudyMode, StudyStyle, UserProfile } from "@appTypes/index";
+import { normalizeInterestTags, normalizeProfileTags } from "@utils/interestTags";
 import type { SelectedModule } from "./types";
 
 type AcademicProfileInput = {
@@ -163,12 +163,21 @@ export async function saveProfileSetup(input: ProfileSetupInput): Promise<UserPr
     data.study_style === "flexible"
       ? (data.study_style as StudyStyle)
       : null;
+  const studyMode =
+    data.study_mode === "online" ||
+    data.study_mode === "in_person" ||
+    data.study_mode === "flexible"
+      ? (data.study_mode as StudyMode)
+      : null;
 
   return {
     ...data,
     intents: data.intents ?? [],
     interests: normalizeInterestTags(data.interests ?? []),
+    project_tags: normalizeProfileTags(data.project_tags ?? []),
+    cca_tags: normalizeProfileTags(data.cca_tags ?? []),
     skills: data.skills ?? [],
+    study_mode: studyMode,
     study_style: studyStyle,
   };
 }

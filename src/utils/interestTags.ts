@@ -9,6 +9,16 @@ export function normalizeInterestTag(value: string) {
   return trimmed;
 }
 
+export function normalizeProfileTag(value: string) {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return null;
+  }
+
+  return trimmed.replace(/\s+/g, " ");
+}
+
 export function normalizeInterestTags(interests: string[]) {
   const deduped = new Set<string>();
 
@@ -44,6 +54,22 @@ export function normalizeInterestTags(interests: string[]) {
 
     return left.localeCompare(right);
   });
+}
+
+export function normalizeProfileTags(tags: string[]) {
+  const deduped = new Set<string>();
+
+  tags.forEach((tag) => {
+    const normalized = normalizeProfileTag(tag);
+
+    if (!normalized) {
+      return;
+    }
+
+    deduped.add(normalized);
+  });
+
+  return Array.from(deduped).sort((left, right) => left.localeCompare(right));
 }
 
 export function isCanonicalInterestTag(interest: string) {
