@@ -16,8 +16,11 @@ export type Database = {
           is_sso_verified: boolean;
           major: string | null;
           onboarding_completed: boolean;
+          cca_tags: string[];
           preferred_group_size: number | null;
+          project_tags: string[];
           skills: string[];
+          study_mode: string | null;
           study_style: string | null;
           updated_at: string;
           year_of_study: number | null;
@@ -36,8 +39,11 @@ export type Database = {
           is_sso_verified?: boolean;
           major?: string | null;
           onboarding_completed?: boolean;
+          cca_tags?: string[];
           preferred_group_size?: number | null;
+          project_tags?: string[];
           skills?: string[];
+          study_mode?: string | null;
           study_style?: string | null;
           updated_at?: string;
           year_of_study?: number | null;
@@ -56,8 +62,11 @@ export type Database = {
           is_sso_verified?: boolean;
           major?: string | null;
           onboarding_completed?: boolean;
+          cca_tags?: string[];
           preferred_group_size?: number | null;
+          project_tags?: string[];
           skills?: string[];
+          study_mode?: string | null;
           study_style?: string | null;
           updated_at?: string;
           year_of_study?: number | null;

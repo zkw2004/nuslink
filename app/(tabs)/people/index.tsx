@@ -65,8 +65,10 @@ export default function PeopleScreen() {
         faculty_major: candidate.breakdown?.faculty_major ?? null,
         year_proximity: candidate.breakdown?.year_proximity ?? null,
         interest_overlap: candidate.breakdown?.interest_overlap ?? null,
-        study_style: candidate.breakdown?.study_style ?? null,
+        study_mode: candidate.breakdown?.study_mode ?? null,
         preferred_group_size: candidate.breakdown?.preferred_group_size ?? null,
+        project_tag_overlap: candidate.breakdown?.project_tag_overlap ?? null,
+        cca_tag_overlap: candidate.breakdown?.cca_tag_overlap ?? null,
       },
       compatibility_percentage: Math.max(
         0,

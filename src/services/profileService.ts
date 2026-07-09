@@ -1,7 +1,12 @@
 import { supabase } from "@lib/supabase";
 import { getCurrentSemester } from "@lib/nusmods";
-import type { StudyStyle, TimetableSlot, UserProfile } from "@appTypes/index";
-import { normalizeInterestTag, normalizeInterestTags } from "@utils/interestTags";
+import type { Database } from "@appTypes/database";
+import type { StudyMode, StudyStyle, TimetableSlot, UserProfile } from "@appTypes/index";
+import {
+  normalizeInterestTag,
+  normalizeInterestTags,
+  normalizeProfileTags,
+} from "@utils/interestTags";
 import type { SelectedModule } from "@features/onboarding/types";
 import { replaceCurrentSemesterTimetableSlots } from "./timetableService";
 
@@ -19,9 +24,12 @@ type EditableProfileInput = {
   faculty: string;
   major: string;
   yearOfStudy: number;
+  studyMode?: StudyMode | null;
   studyStyle: StudyStyle;
   preferredGroupSize: number;
   interests: string[];
+  projectTags?: string[];
+  ccaTags?: string[];
   intents: UserProfile["intents"];
   modules: SelectedModule[];
   timetableSlots: TimetableSlot[];
@@ -187,19 +195,33 @@ export async function updateEditableProfile(
 
   const { semester } = getCurrentSemester();
 
+  const profileUpdates: Database["public"]["Tables"]["profiles"]["Update"] = {
+    display_name: input.displayName.trim(),
+    bio: input.bio.trim(),
+    faculty: input.faculty.trim(),
+    major: input.major.trim(),
+    year_of_study: input.yearOfStudy,
+    study_style: input.studyStyle,
+    preferred_group_size: input.preferredGroupSize,
+    interests: normalizeInterestTags(input.interests),
+    intents: input.intents,
+  };
+
+  if (input.studyMode !== undefined) {
+    profileUpdates.study_mode = input.studyMode;
+  }
+
+  if (input.projectTags !== undefined) {
+    profileUpdates.project_tags = normalizeProfileTags(input.projectTags);
+  }
+
+  if (input.ccaTags !== undefined) {
+    profileUpdates.cca_tags = normalizeProfileTags(input.ccaTags);
+  }
+
   const { error: profileError } = await supabase
     .from("profiles")
-    .update({
-      display_name: input.displayName.trim(),
-      bio: input.bio.trim(),
-      faculty: input.faculty.trim(),
-      major: input.major.trim(),
-      year_of_study: input.yearOfStudy,
-      study_style: input.studyStyle,
-      preferred_group_size: input.preferredGroupSize,
-      interests: normalizeInterestTags(input.interests),
-      intents: input.intents,
-    })
+    .update(profileUpdates)
     .eq("id", userId);
 
   if (profileError) {

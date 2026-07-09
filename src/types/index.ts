@@ -22,6 +22,7 @@ export type CommunityType = "official" | "user_created";
 
 export type JoinPolicy = "open" | "request_approval";
 export type StudyStyle = "online" | "in_person" | "flexible";
+export type StudyMode = StudyStyle;
 export type ChatAttachmentKind = "image" | "file" | "audio" | "video";
 
 export type UserRole = "member" | "co_admin" | "admin";
@@ -53,11 +54,14 @@ export interface UserProfile {
   major: string | null;
   year_of_study: number | null;
   graduation_date: string | null;
+  study_mode: StudyMode | null;
   study_style: StudyStyle | null;
   preferred_group_size: number | null;
   is_sso_verified: boolean;
   intents: Intent[];
   interests: string[];
+  project_tags: string[];
+  cca_tags: string[];
   skills: string[];
   badge_tier: BadgeTier | null;
   onboarding_completed: boolean;
@@ -119,8 +123,10 @@ export interface MatchBreakdown {
   faculty_major: number | null;
   year_proximity: number | null;
   interest_overlap: number | null;
-  study_style: number | null;
+  study_mode: number | null;
   preferred_group_size: number | null;
+  project_tag_overlap: number | null;
+  cca_tag_overlap: number | null;
 }
 
 export interface PeopleMatch {
@@ -133,6 +139,8 @@ export interface PeopleMatch {
   year_of_study: number | null;
   badge_tier: BadgeTier | null;
   interests: string[];
+  project_tags: string[];
+  cca_tags: string[];
   intents: string[];
   shared_modules: string[];
   compatibility_percentage: number;

@@ -9,8 +9,8 @@ from app.matching.repository import MatchRepository
 
 PROFILE_SELECT_FIELDS = (
     "id,display_name,bio,avatar_url,faculty,major,"
-    "year_of_study,study_style,preferred_group_size,"
-    "badge_tier,interests,intents,onboarding_completed"
+    "year_of_study,study_mode,study_style,preferred_group_size,"
+    "badge_tier,interests,project_tags,cca_tags,intents,onboarding_completed"
 )
 
 
@@ -246,8 +246,11 @@ def _map_profile(row: dict) -> ProfileSummary:
         year_of_study=row.get("year_of_study"),
         badge_tier=row.get("badge_tier"),
         interests=row.get("interests") or [],
+        project_tags=row.get("project_tags") or [],
+        cca_tags=row.get("cca_tags") or [],
         intents=row.get("intents") or [],
         onboarding_completed=bool(row.get("onboarding_completed")),
+        study_mode=row.get("study_mode"),
         study_style=row.get("study_style"),
         preferred_group_size=row.get("preferred_group_size"),
     )
