@@ -13,7 +13,11 @@ import { router } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { SymbolView } from "expo-symbols";
 
-import { INTEREST_TAG_OPTIONS } from "@constants/index";
+import {
+  CCA_TAG_OPTIONS,
+  INTEREST_TAG_OPTIONS,
+  PROJECT_TAG_OPTIONS,
+} from "@constants/index";
 import {
   AppAvatar,
   AppButton,
@@ -24,6 +28,7 @@ import {
   SectionCard,
   SectionHeader,
 } from "@components/shared";
+import { ProfileTagEditor } from "@features/profile/ProfileTagEditor";
 import { saveProfileSetup, uploadProfileImage } from "@features/onboarding/onboardingService";
 import { toSelectedModule, type SelectedModule } from "@features/onboarding/types";
 import { searchNusmodsModules } from "@lib/nusmods";
@@ -40,12 +45,13 @@ import {
   updateEditableProfile,
 } from "@services/index";
 import { WeeklyTimetableView } from "@features/profile/WeeklyTimetableView";
-import type { StudyStyle, TimetableClassSlot, TimetableSlot } from "@appTypes/index";
+import type { StudyMode, StudyStyle, TimetableClassSlot, TimetableSlot } from "@appTypes/index";
 import { useAuthStore } from "@store/index";
 import {
   normalizeInterestTag,
   normalizeInterestTags,
-  splitInterestTags,
+  normalizeProfileTag,
+  normalizeProfileTags,
 } from "@utils/interestTags";
 
 const YEAR_OPTIONS = [1, 2, 3, 4, 5];
@@ -97,9 +103,12 @@ export default function ProfileScreen() {
   const [facultyDraft, setFacultyDraft] = useState("");
   const [majorDraft, setMajorDraft] = useState("");
   const [yearOfStudyDraft, setYearOfStudyDraft] = useState(1);
+  const [studyModeDraft, setStudyModeDraft] = useState<StudyMode>("in_person");
   const [studyStyleDraft, setStudyStyleDraft] = useState<StudyStyle>("in_person");
   const [preferredGroupSizeDraft, setPreferredGroupSizeDraft] = useState(4);
   const [interestsDraft, setInterestsDraft] = useState<string[]>([]);
+  const [projectTagsDraft, setProjectTagsDraft] = useState<string[]>([]);
+  const [ccaTagsDraft, setCcaTagsDraft] = useState<string[]>([]);
   const [intentsDraft, setIntentsDraft] = useState<NonNullable<typeof profile>["intents"]>([]);
   const [moduleQuery, setModuleQuery] = useState("");
   const [moduleResults, setModuleResults] = useState<SelectedModule[]>([]);
@@ -108,6 +117,8 @@ export default function ProfileScreen() {
   const [manualStartDraft, setManualStartDraft] = useState("09:00");
   const [manualEndDraft, setManualEndDraft] = useState("11:00");
   const [customInterestInput, setCustomInterestInput] = useState("");
+  const [customProjectTagInput, setCustomProjectTagInput] = useState("");
+  const [customCcaTagInput, setCustomCcaTagInput] = useState("");
   const [interestSuggestions, setInterestSuggestions] = useState<string[]>([]);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -158,9 +169,12 @@ export default function ProfileScreen() {
           setFacultyDraft(profile.faculty ?? "");
           setMajorDraft(profile.major ?? "");
           setYearOfStudyDraft(profile.year_of_study ?? 1);
+          setStudyModeDraft(profile.study_mode ?? profile.study_style ?? "in_person");
           setStudyStyleDraft(profile.study_style ?? "in_person");
           setPreferredGroupSizeDraft(profile.preferred_group_size ?? 4);
           setInterestsDraft(normalizeInterestTags(profile.interests));
+          setProjectTagsDraft(normalizeProfileTags(profile.project_tags));
+          setCcaTagsDraft(normalizeProfileTags(profile.cca_tags));
           setIntentsDraft(profile.intents);
           setTimetableSlotsDraft(timetableSlots);
         }
@@ -262,9 +276,12 @@ export default function ProfileScreen() {
     setFacultyDraft(profile.faculty ?? "");
     setMajorDraft(profile.major ?? "");
     setYearOfStudyDraft(profile.year_of_study ?? 1);
+    setStudyModeDraft(profile.study_mode ?? profile.study_style ?? "in_person");
     setStudyStyleDraft(profile.study_style ?? "in_person");
     setPreferredGroupSizeDraft(profile.preferred_group_size ?? 4);
     setInterestsDraft(normalizeInterestTags(profile.interests));
+    setProjectTagsDraft(normalizeProfileTags(profile.project_tags));
+    setCcaTagsDraft(normalizeProfileTags(profile.cca_tags));
     setIntentsDraft(profile.intents);
     setModuleQuery("");
     setModuleResults([]);
@@ -276,6 +293,8 @@ export default function ProfileScreen() {
     setImportedClassSlotsPreview([]);
     setImportedAvailabilityPreview([]);
     setCustomInterestInput("");
+    setCustomProjectTagInput("");
+    setCustomCcaTagInput("");
   }
 
   function handleToggleEdit() {
@@ -444,6 +463,52 @@ export default function ProfileScreen() {
     setInterestsDraft((current) => normalizeInterestTags([...current, trimmedInterest]));
     setCustomInterestInput("");
     setInterestSuggestions([]);
+  }
+
+  function toggleProjectTag(tag: string) {
+    setProjectTagsDraft((current) =>
+      current.includes(tag)
+        ? current.filter((item) => item !== tag)
+        : normalizeProfileTags([...current, tag]),
+    );
+  }
+
+  function addCustomProjectTag() {
+    const trimmedTag = normalizeProfileTag(customProjectTagInput);
+
+    if (!trimmedTag || projectTagsDraft.includes(trimmedTag)) {
+      return;
+    }
+
+    setProjectTagsDraft((current) => normalizeProfileTags([...current, trimmedTag]));
+    setCustomProjectTagInput("");
+  }
+
+  function removeProjectTag(tag: string) {
+    setProjectTagsDraft((current) => current.filter((item) => item !== tag));
+  }
+
+  function toggleCcaTag(tag: string) {
+    setCcaTagsDraft((current) =>
+      current.includes(tag)
+        ? current.filter((item) => item !== tag)
+        : normalizeProfileTags([...current, tag]),
+    );
+  }
+
+  function addCustomCcaTag() {
+    const trimmedTag = normalizeProfileTag(customCcaTagInput);
+
+    if (!trimmedTag || ccaTagsDraft.includes(trimmedTag)) {
+      return;
+    }
+
+    setCcaTagsDraft((current) => normalizeProfileTags([...current, trimmedTag]));
+    setCustomCcaTagInput("");
+  }
+
+  function removeCcaTag(tag: string) {
+    setCcaTagsDraft((current) => current.filter((item) => item !== tag));
   }
 
   function removeInterest(interest: string) {
@@ -623,9 +688,12 @@ export default function ProfileScreen() {
         faculty: facultyDraft,
         major: majorDraft,
         yearOfStudy: yearOfStudyDraft,
+        studyMode: studyModeDraft,
         studyStyle: studyStyleDraft,
         preferredGroupSize: preferredGroupSizeDraft,
         interests: interestsDraft,
+        projectTags: projectTagsDraft,
+        ccaTags: ccaTagsDraft,
         intents: intentsDraft,
         modules: editableModules,
         timetableSlots: timetableSlotsDraft,
@@ -664,6 +732,8 @@ export default function ProfileScreen() {
     .join(" · ");
 
   const visibleInterests = isEditing ? interestsDraft : profile.interests;
+  const visibleProjectTags = isEditing ? projectTagsDraft : profile.project_tags;
+  const visibleCcaTags = isEditing ? ccaTagsDraft : profile.cca_tags;
   const visibleIntents = isEditing ? intentsDraft : profile.intents;
   const visibleModules = isEditing
     ? editableModules.map((module) => module.moduleCode)
@@ -868,12 +938,15 @@ export default function ProfileScreen() {
                 </Text>
                 <View className="flex-row flex-wrap gap-2">
                   {STUDY_STYLE_OPTIONS.map((option) => {
-                    const isSelected = option.value === studyStyleDraft;
+                    const isSelected = option.value === studyModeDraft;
 
                     return (
                       <Pressable
                         key={option.value}
-                        onPress={() => setStudyStyleDraft(option.value)}
+                        onPress={() => {
+                          setStudyModeDraft(option.value);
+                          setStudyStyleDraft(option.value);
+                        }}
                       >
                         <AppChip
                           label={option.label}
@@ -912,9 +985,10 @@ export default function ProfileScreen() {
             <View className="gap-2">
               <Text className="text-[14px] leading-6 text-[#0F1115]">
                 {`Study mode: ${
-                  profile.study_style
-                    ? STUDY_STYLE_OPTIONS.find((option) => option.value === profile.study_style)?.label ??
-                      profile.study_style
+                  (profile.study_mode ?? profile.study_style)
+                    ? STUDY_STYLE_OPTIONS.find(
+                        (option) => option.value === (profile.study_mode ?? profile.study_style),
+                      )?.label ?? (profile.study_mode ?? profile.study_style)
                     : "Not set"
                 }`}
               </Text>
@@ -1041,89 +1115,20 @@ export default function ProfileScreen() {
         <SectionCard className="mb-3">
           <SectionHeader title="Interests" />
           {isEditing ? (
-            <View>
-              <View className="flex-row flex-wrap gap-2">
-                {Array.from(new Set([...INTEREST_TAG_OPTIONS, ...interestsDraft])).map(
-                  (interest) => {
-                    const isSelected = interestsDraft.includes(interest);
-
-                    return (
-                      <Pressable
-                        key={interest}
-                        className={`rounded-full border px-4 py-2 ${
-                          isSelected
-                            ? "border-[#0F1115] bg-[#0F1115]"
-                            : "border-[#E4E9F1] bg-white"
-                        }`}
-                        onPress={() => toggleInterest(interest)}
-                      >
-                        <Text
-                          className={`text-[13px] font-semibold ${
-                            isSelected ? "text-white" : "text-[#5C6370]"
-                          }`}
-                        >
-                          {interest}
-                        </Text>
-                      </Pressable>
-                    );
-                  },
-                )}
-              </View>
-
-              <View className="mt-3 flex-row items-center gap-2">
-                <TextInput
-                  value={customInterestInput}
-                  onChangeText={setCustomInterestInput}
-                  className="flex-1 rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-4 text-[15px] text-[#0F1115]"
-                  placeholder="Add a niche custom interest"
-                  placeholderTextColor="#9AA0AB"
-                />
-                <Pressable
-                  className="rounded-full bg-[#0F1115] px-4 py-3"
-                  onPress={addCustomInterest}
-                >
-                  <Text className="text-[13px] font-semibold text-white">Add</Text>
-                </Pressable>
-              </View>
-
-              {interestsDraft.length > 0 ? (
-                <View className="mt-3 flex-row flex-wrap gap-2">
-                  {splitInterestTags(interestsDraft).custom
-                    .map((interest) => (
-                      <Pressable
-                        key={interest}
-                        className="rounded-full border border-[#E4E9F1] bg-white px-3 py-2"
-                        onPress={() => removeInterest(interest)}
-                      >
-                        <Text className="text-[13px] font-medium text-[#5C6370]">
-                          {interest} ×
-                        </Text>
-                      </Pressable>
-                    ))}
-                </View>
-              ) : null}
-
-              {interestSuggestions.length > 0 ? (
-                <View className="mt-3">
-                  <Text className="mb-2 text-[12px] font-semibold uppercase tracking-[0.5px] text-[#7A8594]">
-                    Similar existing tags
-                  </Text>
-                  <View className="flex-row flex-wrap gap-2">
-                    {interestSuggestions.map((suggestion) => (
-                      <Pressable
-                        key={suggestion}
-                        className="rounded-full border border-[#D0D7E2] bg-white px-4 py-2"
-                        onPress={() => applyInterestSuggestion(suggestion)}
-                      >
-                        <Text className="text-[13px] font-semibold text-[#415A77]">
-                          {suggestion}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                </View>
-              ) : null}
-            </View>
+            <ProfileTagEditor
+              title="Academic interest tags"
+              description="Use the shared tag bank first, then add niche custom interests only when you need them."
+              selectedTags={interestsDraft}
+              optionTags={INTEREST_TAG_OPTIONS}
+              customInput={customInterestInput}
+              customPlaceholder="Add a niche custom interest"
+              onCustomInputChange={setCustomInterestInput}
+              onToggleTag={toggleInterest}
+              onAddCustomTag={addCustomInterest}
+              onRemoveCustomTag={removeInterest}
+              suggestions={interestSuggestions}
+              onApplySuggestion={applyInterestSuggestion}
+            />
           ) : (
             <View className="flex-row flex-wrap gap-2">
               {visibleInterests.length > 0 ? (
@@ -1132,6 +1137,66 @@ export default function ProfileScreen() {
                 ))
               ) : (
                 <Text className="text-[13px] text-[#5C6370]">No interests saved yet.</Text>
+              )}
+            </View>
+          )}
+        </SectionCard>
+
+        <SectionCard className="mb-3">
+          <SectionHeader title="Project Topics" />
+          {isEditing ? (
+            <ProfileTagEditor
+              title="Project tags"
+              description="These act as softer collaboration signals for project-team and hackathon matching."
+              selectedTags={projectTagsDraft}
+              optionTags={PROJECT_TAG_OPTIONS}
+              customInput={customProjectTagInput}
+              customPlaceholder="Add a project topic"
+              onCustomInputChange={setCustomProjectTagInput}
+              onToggleTag={toggleProjectTag}
+              onAddCustomTag={addCustomProjectTag}
+              onRemoveCustomTag={removeProjectTag}
+            />
+          ) : (
+            <View className="flex-row flex-wrap gap-2">
+              {visibleProjectTags.length > 0 ? (
+                visibleProjectTags.map((tag) => (
+                  <AppChip key={tag} label={tag} variant="outline" />
+                ))
+              ) : (
+                <Text className="text-[13px] text-[#5C6370]">
+                  No project tags saved yet.
+                </Text>
+              )}
+            </View>
+          )}
+        </SectionCard>
+
+        <SectionCard className="mb-3">
+          <SectionHeader title="CCA Context" />
+          {isEditing ? (
+            <ProfileTagEditor
+              title="CCA tags"
+              description="Keep these broad and honest so the matching service can use them as lightweight shared-context signals."
+              selectedTags={ccaTagsDraft}
+              optionTags={CCA_TAG_OPTIONS}
+              customInput={customCcaTagInput}
+              customPlaceholder="Add a club, sport, or activity"
+              onCustomInputChange={setCustomCcaTagInput}
+              onToggleTag={toggleCcaTag}
+              onAddCustomTag={addCustomCcaTag}
+              onRemoveCustomTag={removeCcaTag}
+            />
+          ) : (
+            <View className="flex-row flex-wrap gap-2">
+              {visibleCcaTags.length > 0 ? (
+                visibleCcaTags.map((tag) => (
+                  <AppChip key={tag} label={tag} variant="outline" />
+                ))
+              ) : (
+                <Text className="text-[13px] text-[#5C6370]">
+                  No CCA tags saved yet.
+                </Text>
               )}
             </View>
           )}
