@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
 
 import {
   AppAvatar,
@@ -8,9 +9,13 @@ import {
   AppChip,
   AppScreenHeader,
   BadgeTierPill,
-  CompatibilityBadge,
   SectionCard,
 } from "@components/shared";
+import ProfileCard, {
+  type MatchSignal,
+  type ProfileCardData,
+} from "@features/matching/ProfileCard";
+import type { PeopleMatch } from "@appTypes/index";
 import { useAuthStore, useConnectionsStore, useMatchesStore } from "@store/index";
 
 function toBadgeTierLabel(tier: "bronze" | "silver" | "gold" | null) {
@@ -24,6 +29,77 @@ function toBadgeTierLabel(tier: "bronze" | "silver" | "gold" | null) {
     default:
       return null;
   }
+}
+
+function toIntentText(intents: string[]) {
+  const primaryIntent = intents[0];
+
+  switch (primaryIntent) {
+    case "study_group":
+      return "Looking for a study group";
+    case "hackathon":
+      return "Looking for a hackathon teammate";
+    case "tutoring":
+      return "Looking for tutoring connections";
+    case "internship_networking":
+      return "Looking for internship networking";
+    default:
+      return "Open to connecting";
+  }
+}
+
+function toMetaSignal(reason: string): MatchSignal {
+  const normalized = reason.toLowerCase();
+
+  if (normalized.includes("same major") || normalized.includes("same faculty")) {
+    return { icon: "🎓", text: reason };
+  }
+
+  if (normalized.includes("module") || normalized.includes("semester")) {
+    return { icon: "📚", text: reason };
+  }
+
+  if (normalized.includes("timetable") || normalized.includes("availability")) {
+    return { icon: "⏰", text: reason };
+  }
+
+  if (normalized.includes("study mode")) {
+    return { icon: "💬", text: reason };
+  }
+
+  if (normalized.includes("cca")) {
+    return { icon: "🏃", text: reason };
+  }
+
+  if (normalized.includes("group size")) {
+    return { icon: "👥", text: reason };
+  }
+
+  if (normalized.includes("interest")) {
+    return { icon: "✨", text: reason };
+  }
+
+  return { icon: "🎯", text: reason };
+}
+
+function toProfileCardData(candidate: PeopleMatch): ProfileCardData {
+  return {
+    name: candidate.display_name,
+    avatar: candidate.avatar_url
+      ? { uri: candidate.avatar_url }
+      : { uri: "https://placehold.co/88x88" },
+    degree: candidate.major ?? candidate.faculty ?? "NUS student",
+    year: candidate.year_of_study ? `Year ${candidate.year_of_study}` : "",
+    hall: candidate.hall_residence ?? "",
+    isActive: false,
+    activityLabel: "",
+    matchPct: candidate.compatibility_percentage,
+    intentText: toIntentText(candidate.intents ?? []),
+    bio: candidate.bio.trim() || "No bio added yet.",
+    modules: candidate.shared_modules ?? [],
+    skills: candidate.skills ?? [],
+    metaSignals: (candidate.match_reasons ?? []).slice(0, 3).map(toMetaSignal),
+  };
 }
 
 export default function PeopleScreen() {
@@ -54,8 +130,10 @@ export default function PeopleScreen() {
     return peopleMatches.map((candidate) => ({
       ...candidate,
       bio: candidate.bio ?? "",
+      hall_residence: candidate.hall_residence ?? null,
       shared_modules: candidate.shared_modules ?? [],
       interests: candidate.interests ?? [],
+      skills: candidate.skills ?? [],
       intents: candidate.intents ?? [],
       match_reasons: candidate.match_reasons ?? [],
       schedule_summary: candidate.schedule_summary ?? "No timetable overlap summary yet.",
@@ -179,7 +257,13 @@ export default function PeopleScreen() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#EEF3F9" }}>
+    <LinearGradient
+      colors={["#F6F8FD", "#E7EBF7", "#C6D0E8"]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={{ flex: 1 }}
+    >
+    <SafeAreaView style={{ flex: 1, backgroundColor: "transparent" }}>
       <AppScreenHeader
         title="People"
         subtitle="Discover module-mates for the current semester, ranked by shared modules, academic alignment, availability, and profile fit."
@@ -340,56 +424,23 @@ export default function PeopleScreen() {
 
         <View className="gap-4">
           {filteredMatches.map((candidate) => (
-            <SectionCard key={candidate.user_id}>
-              <View className="flex-row items-start justify-between gap-4">
-                <View className="flex-1 flex-row gap-3">
-                  <AppAvatar
-                    name={candidate.display_name}
-                    imageUri={candidate.avatar_url}
-                    size={54}
-                  />
-                  <View className="flex-1">
-                    <View className="flex-row flex-wrap items-center gap-2">
-                      <Text className="text-[17px] font-bold text-[#0F1115]">
-                        {candidate.display_name}
-                      </Text>
-                      {toBadgeTierLabel(candidate.badge_tier) ? (
-                        <BadgeTierPill tier={toBadgeTierLabel(candidate.badge_tier)!} />
-                      ) : null}
-                    </View>
-                    <Text className="mt-1 text-[13px] text-[#5C6370]">
-                      {[candidate.major, candidate.year_of_study ? `Year ${candidate.year_of_study}` : null]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </Text>
-                  </View>
-                </View>
-                <CompatibilityBadge score={candidate.compatibility_percentage} />
-              </View>
-
-              <Text className="mt-4 text-[14px] leading-6 text-[#303744]">
-                {candidate.bio.trim() || "No bio added yet."}
-              </Text>
-
-              <View className="mt-4 flex-row flex-wrap gap-2">
-                {candidate.shared_modules.map((moduleCode) => (
-                  <AppChip key={`${candidate.user_id}-${moduleCode}`} label={moduleCode} variant="module" />
-                ))}
-              </View>
-
-              <Text className="mt-3 text-[13px] leading-5 text-[#5C6370]">
-                {candidate.shared_modules.length === 1
-                  ? `Taking ${candidate.shared_modules[0]} with you this semester.`
-                  : `${candidate.shared_modules.length} shared modules this semester.`}
-              </Text>
-
-              <View className="mt-4 items-start">
-                {renderConnectionAction(candidate.user_id)}
-              </View>
-            </SectionCard>
+            <ProfileCard
+              key={candidate.user_id}
+              data={toProfileCardData(candidate)}
+              onConnect={() => {
+                void handleSendRequest(candidate.user_id);
+              }}
+              onViewProfile={() => {
+                Alert.alert(
+                  candidate.display_name,
+                  "Full profile drill-down can be added in the next People-card slice.",
+                );
+              }}
+            />
           ))}
         </View>
       </ScrollView>
     </SafeAreaView>
+    </LinearGradient>
   );
 }
