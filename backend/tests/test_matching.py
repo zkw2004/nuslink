@@ -31,10 +31,11 @@ class FakeMatchRepository:
                 faculty="Computing",
                 major="Computer Science",
                 year_of_study=2,
+                hall_residence="Temasek Hall",
                 badge_tier="bronze",
                 interests=["AI / ML"],
-                project_tags=["AI Tools", "EdTech"],
                 cca_tags=["NUS Hackers", "Basketball"],
+                skills=["React Native", "Python"],
                 intents=["study_group"],
                 onboarding_completed=True,
                 study_mode="in_person",
@@ -49,10 +50,11 @@ class FakeMatchRepository:
                 faculty="Computing",
                 major="Computer Science",
                 year_of_study=3,
+                hall_residence="Temasek Hall",
                 badge_tier="gold",
                 interests=["Artificial Intelligence", "Algorithms"],
-                project_tags=["AI tools", "Product Design"],
                 cca_tags=["NUS Hackers"],
+                skills=["react native", "Algorithms"],
                 intents=["study_group"],
                 onboarding_completed=True,
                 study_mode="in_person",
@@ -67,10 +69,11 @@ class FakeMatchRepository:
                 faculty="Computing",
                 major="Information Systems",
                 year_of_study=3,
+                hall_residence="Kent Ridge Hall",
                 badge_tier="bronze",
                 interests=["Backend"],
-                project_tags=["Backend Systems"],
                 cca_tags=["Debate"],
+                skills=["SQL"],
                 intents=["study_group"],
                 onboarding_completed=True,
                 study_mode="online",
@@ -211,8 +214,9 @@ def test_people_matches_returns_ranked_candidates():
     assert body["candidates"][0]["breakdown"]["interest_overlap"] is not None
     assert body["candidates"][0]["breakdown"]["study_mode"] is not None
     assert body["candidates"][0]["breakdown"]["preferred_group_size"] is not None
-    assert body["candidates"][0]["breakdown"]["project_tag_overlap"] is not None
     assert body["candidates"][0]["breakdown"]["cca_tag_overlap"] is not None
+    assert body["candidates"][0]["hall_residence"] == "Temasek Hall"
+    assert "react native" in body["candidates"][0]["skills"]
     assert len(body["candidates"][0]["match_reasons"]) > 0
 
 
@@ -291,7 +295,6 @@ def test_overall_score_redistributes_missing_optional_dimensions():
             interest_overlap=None,
             study_mode=None,
             preferred_group_size=None,
-            project_tag_overlap=None,
             cca_tag_overlap=None,
             overlap_minutes=0,
         )
@@ -329,10 +332,10 @@ def test_study_mode_flexible_matches_both_modes():
     assert score == 1.0
 
 
-def test_project_and_cca_tag_overlap_is_case_insensitive():
+def test_cca_tag_overlap_is_case_insensitive():
     score = calculate_tag_overlap_score(
-        ["NUS Hackers", "Product Design"],
-        ["nus hackers", "PRODUCT design"],
+        ["NUS Hackers", "Basketball"],
+        ["nus hackers", "BASKETBALL"],
     )
 
     assert score == 1.0

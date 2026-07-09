@@ -11,7 +11,6 @@ class MatchBreakdownResponse(BaseModel):
     interest_overlap: int | None = None
     study_mode: int | None = None
     preferred_group_size: int | None = None
-    project_tag_overlap: int | None = None
     cca_tag_overlap: int | None = None
 
 
@@ -23,10 +22,11 @@ class PeopleMatchResponseItem(BaseModel):
     faculty: str | None
     major: str | None
     year_of_study: int | None
+    hall_residence: str | None
     badge_tier: Literal["bronze", "silver", "gold"] | None
     interests: list[str]
-    project_tags: list[str]
     cca_tags: list[str]
+    skills: list[str]
     intents: list[str]
     shared_modules: list[str]
     compatibility_percentage: int

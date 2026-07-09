@@ -12,7 +12,6 @@ MATCH_WEIGHTS = {
     "interest_overlap": 0.11,
     "study_mode": 0.08,
     "preferred_group_size": 0.06,
-    "project_tag_overlap": 0.08,
     "cca_tag_overlap": 0.05,
 }
 
@@ -58,7 +57,6 @@ class CandidateScore:
     interest_overlap: float | None
     study_mode: float | None
     preferred_group_size: float | None
-    project_tag_overlap: float | None
     cca_tag_overlap: float | None
     overlap_minutes: int
 
@@ -308,7 +306,6 @@ def calculate_overall_score(score: CandidateScore) -> int:
             "interest_overlap": score.interest_overlap,
             "study_mode": score.study_mode,
             "preferred_group_size": score.preferred_group_size,
-            "project_tag_overlap": score.project_tag_overlap,
             "cca_tag_overlap": score.cca_tag_overlap,
         }.items()
         if value is not None
@@ -384,9 +381,6 @@ def build_match_reasons(
     if score.preferred_group_size is not None and score.preferred_group_size >= 0.8:
         reasons.append("Prefer a similar group size.")
 
-    if score.project_tag_overlap is not None and score.project_tag_overlap >= 0.34:
-        reasons.append("Overlapping project interests.")
-
     if score.cca_tag_overlap is not None and score.cca_tag_overlap >= 0.34:
         reasons.append("Shared CCA context.")
 
@@ -445,10 +439,6 @@ def rank_candidates(
             current_user_profile.preferred_group_size,
             profile.preferred_group_size,
         )
-        project_tag_overlap_score = calculate_tag_overlap_score(
-            current_user_profile.project_tags,
-            profile.project_tags,
-        )
         cca_tag_overlap_score = calculate_tag_overlap_score(
             current_user_profile.cca_tags,
             profile.cca_tags,
@@ -462,7 +452,6 @@ def rank_candidates(
             interest_overlap=interest_overlap_score,
             study_mode=study_mode_score,
             preferred_group_size=preferred_group_size_score,
-            project_tag_overlap=project_tag_overlap_score,
             cca_tag_overlap=cca_tag_overlap_score,
             overlap_minutes=overlap_minutes,
         )
@@ -478,9 +467,10 @@ def rank_candidates(
                 "major": profile.major,
                 "year_of_study": profile.year_of_study,
                 "badge_tier": profile.badge_tier,
+                "hall_residence": profile.hall_residence,
                 "interests": profile.interests,
-                "project_tags": profile.project_tags,
                 "cca_tags": profile.cca_tags,
+                "skills": profile.skills,
                 "intents": profile.intents,
                 "shared_modules": shared_modules,
                 "compatibility_percentage": compatibility_percentage,
@@ -506,9 +496,6 @@ def rank_candidates(
                     "preferred_group_size": None
                     if preferred_group_size_score is None
                     else round(preferred_group_size_score * 100),
-                    "project_tag_overlap": None
-                    if project_tag_overlap_score is None
-                    else round(project_tag_overlap_score * 100),
                     "cca_tag_overlap": None
                     if cca_tag_overlap_score is None
                     else round(cca_tag_overlap_score * 100),

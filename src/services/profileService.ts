@@ -24,12 +24,13 @@ type EditableProfileInput = {
   faculty: string;
   major: string;
   yearOfStudy: number;
+  hallResidence: string;
   studyMode?: StudyMode | null;
   studyStyle: StudyStyle;
   preferredGroupSize: number;
   interests: string[];
-  projectTags?: string[];
   ccaTags?: string[];
+  skills?: string[];
   intents: UserProfile["intents"];
   modules: SelectedModule[];
   timetableSlots: TimetableSlot[];
@@ -201,6 +202,7 @@ export async function updateEditableProfile(
     faculty: input.faculty.trim(),
     major: input.major.trim(),
     year_of_study: input.yearOfStudy,
+    hall_residence: input.hallResidence.trim() || null,
     study_style: input.studyStyle,
     preferred_group_size: input.preferredGroupSize,
     interests: normalizeInterestTags(input.interests),
@@ -211,12 +213,12 @@ export async function updateEditableProfile(
     profileUpdates.study_mode = input.studyMode;
   }
 
-  if (input.projectTags !== undefined) {
-    profileUpdates.project_tags = normalizeProfileTags(input.projectTags);
-  }
-
   if (input.ccaTags !== undefined) {
     profileUpdates.cca_tags = normalizeProfileTags(input.ccaTags);
+  }
+
+  if (input.skills !== undefined) {
+    profileUpdates.skills = normalizeProfileTags(input.skills);
   }
 
   const { error: profileError } = await supabase

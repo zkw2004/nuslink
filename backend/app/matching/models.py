@@ -24,10 +24,11 @@ class ProfileSummary:
     faculty: str | None
     major: str | None
     year_of_study: int | None
+    hall_residence: str | None
     badge_tier: str | None
     interests: list[str]
-    project_tags: list[str]
     cca_tags: list[str]
+    skills: list[str]
     intents: list[str]
     onboarding_completed: bool
     study_mode: str | None = None

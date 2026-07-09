@@ -16,7 +16,6 @@ import { SymbolView } from "expo-symbols";
 import {
   CCA_TAG_OPTIONS,
   INTEREST_TAG_OPTIONS,
-  PROJECT_TAG_OPTIONS,
 } from "@constants/index";
 import {
   AppAvatar,
@@ -103,12 +102,13 @@ export default function ProfileScreen() {
   const [facultyDraft, setFacultyDraft] = useState("");
   const [majorDraft, setMajorDraft] = useState("");
   const [yearOfStudyDraft, setYearOfStudyDraft] = useState(1);
+  const [hallResidenceDraft, setHallResidenceDraft] = useState("");
   const [studyModeDraft, setStudyModeDraft] = useState<StudyMode>("in_person");
   const [studyStyleDraft, setStudyStyleDraft] = useState<StudyStyle>("in_person");
   const [preferredGroupSizeDraft, setPreferredGroupSizeDraft] = useState(4);
   const [interestsDraft, setInterestsDraft] = useState<string[]>([]);
-  const [projectTagsDraft, setProjectTagsDraft] = useState<string[]>([]);
   const [ccaTagsDraft, setCcaTagsDraft] = useState<string[]>([]);
+  const [skillsDraft, setSkillsDraft] = useState<string[]>([]);
   const [intentsDraft, setIntentsDraft] = useState<NonNullable<typeof profile>["intents"]>([]);
   const [moduleQuery, setModuleQuery] = useState("");
   const [moduleResults, setModuleResults] = useState<SelectedModule[]>([]);
@@ -117,8 +117,8 @@ export default function ProfileScreen() {
   const [manualStartDraft, setManualStartDraft] = useState("09:00");
   const [manualEndDraft, setManualEndDraft] = useState("11:00");
   const [customInterestInput, setCustomInterestInput] = useState("");
-  const [customProjectTagInput, setCustomProjectTagInput] = useState("");
   const [customCcaTagInput, setCustomCcaTagInput] = useState("");
+  const [customSkillInput, setCustomSkillInput] = useState("");
   const [interestSuggestions, setInterestSuggestions] = useState<string[]>([]);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -169,12 +169,13 @@ export default function ProfileScreen() {
           setFacultyDraft(profile.faculty ?? "");
           setMajorDraft(profile.major ?? "");
           setYearOfStudyDraft(profile.year_of_study ?? 1);
+          setHallResidenceDraft(profile.hall_residence ?? "");
           setStudyModeDraft(profile.study_mode ?? profile.study_style ?? "in_person");
           setStudyStyleDraft(profile.study_style ?? "in_person");
           setPreferredGroupSizeDraft(profile.preferred_group_size ?? 4);
           setInterestsDraft(normalizeInterestTags(profile.interests));
-          setProjectTagsDraft(normalizeProfileTags(profile.project_tags));
           setCcaTagsDraft(normalizeProfileTags(profile.cca_tags));
+          setSkillsDraft(normalizeProfileTags(profile.skills));
           setIntentsDraft(profile.intents);
           setTimetableSlotsDraft(timetableSlots);
         }
@@ -276,12 +277,13 @@ export default function ProfileScreen() {
     setFacultyDraft(profile.faculty ?? "");
     setMajorDraft(profile.major ?? "");
     setYearOfStudyDraft(profile.year_of_study ?? 1);
+    setHallResidenceDraft(profile.hall_residence ?? "");
     setStudyModeDraft(profile.study_mode ?? profile.study_style ?? "in_person");
     setStudyStyleDraft(profile.study_style ?? "in_person");
     setPreferredGroupSizeDraft(profile.preferred_group_size ?? 4);
     setInterestsDraft(normalizeInterestTags(profile.interests));
-    setProjectTagsDraft(normalizeProfileTags(profile.project_tags));
     setCcaTagsDraft(normalizeProfileTags(profile.cca_tags));
+    setSkillsDraft(normalizeProfileTags(profile.skills));
     setIntentsDraft(profile.intents);
     setModuleQuery("");
     setModuleResults([]);
@@ -293,8 +295,8 @@ export default function ProfileScreen() {
     setImportedClassSlotsPreview([]);
     setImportedAvailabilityPreview([]);
     setCustomInterestInput("");
-    setCustomProjectTagInput("");
     setCustomCcaTagInput("");
+    setCustomSkillInput("");
   }
 
   function handleToggleEdit() {
@@ -465,29 +467,6 @@ export default function ProfileScreen() {
     setInterestSuggestions([]);
   }
 
-  function toggleProjectTag(tag: string) {
-    setProjectTagsDraft((current) =>
-      current.includes(tag)
-        ? current.filter((item) => item !== tag)
-        : normalizeProfileTags([...current, tag]),
-    );
-  }
-
-  function addCustomProjectTag() {
-    const trimmedTag = normalizeProfileTag(customProjectTagInput);
-
-    if (!trimmedTag || projectTagsDraft.includes(trimmedTag)) {
-      return;
-    }
-
-    setProjectTagsDraft((current) => normalizeProfileTags([...current, trimmedTag]));
-    setCustomProjectTagInput("");
-  }
-
-  function removeProjectTag(tag: string) {
-    setProjectTagsDraft((current) => current.filter((item) => item !== tag));
-  }
-
   function toggleCcaTag(tag: string) {
     setCcaTagsDraft((current) =>
       current.includes(tag)
@@ -509,6 +488,29 @@ export default function ProfileScreen() {
 
   function removeCcaTag(tag: string) {
     setCcaTagsDraft((current) => current.filter((item) => item !== tag));
+  }
+
+  function toggleSkill(tag: string) {
+    setSkillsDraft((current) =>
+      current.includes(tag)
+        ? current.filter((item) => item !== tag)
+        : normalizeProfileTags([...current, tag]),
+    );
+  }
+
+  function addCustomSkill() {
+    const trimmedTag = normalizeProfileTag(customSkillInput);
+
+    if (!trimmedTag || skillsDraft.includes(trimmedTag)) {
+      return;
+    }
+
+    setSkillsDraft((current) => normalizeProfileTags([...current, trimmedTag]));
+    setCustomSkillInput("");
+  }
+
+  function removeSkill(tag: string) {
+    setSkillsDraft((current) => current.filter((item) => item !== tag));
   }
 
   function removeInterest(interest: string) {
@@ -688,12 +690,13 @@ export default function ProfileScreen() {
         faculty: facultyDraft,
         major: majorDraft,
         yearOfStudy: yearOfStudyDraft,
+        hallResidence: hallResidenceDraft,
         studyMode: studyModeDraft,
         studyStyle: studyStyleDraft,
         preferredGroupSize: preferredGroupSizeDraft,
         interests: interestsDraft,
-        projectTags: projectTagsDraft,
         ccaTags: ccaTagsDraft,
+        skills: skillsDraft,
         intents: intentsDraft,
         modules: editableModules,
         timetableSlots: timetableSlotsDraft,
@@ -732,8 +735,8 @@ export default function ProfileScreen() {
     .join(" · ");
 
   const visibleInterests = isEditing ? interestsDraft : profile.interests;
-  const visibleProjectTags = isEditing ? projectTagsDraft : profile.project_tags;
   const visibleCcaTags = isEditing ? ccaTagsDraft : profile.cca_tags;
+  const visibleSkills = isEditing ? skillsDraft : profile.skills;
   const visibleIntents = isEditing ? intentsDraft : profile.intents;
   const visibleModules = isEditing
     ? editableModules.map((module) => module.moduleCode)
@@ -920,7 +923,11 @@ export default function ProfileScreen() {
           ) : (
             <View className="gap-2">
               <Text className="text-[14px] leading-6 text-[#0F1115]">
-                {[profile.faculty, profile.major, profile.year_of_study ? `Year ${profile.year_of_study}` : null]
+                {[
+                  profile.faculty,
+                  profile.major,
+                  profile.year_of_study ? `Year ${profile.year_of_study}` : null,
+                ]
                   .filter(Boolean)
                   .join(" · ") || "No academic details saved yet."}
               </Text>
@@ -1143,29 +1150,29 @@ export default function ProfileScreen() {
         </SectionCard>
 
         <SectionCard className="mb-3">
-          <SectionHeader title="Project Topics" />
+          <SectionHeader title="Skills" />
           {isEditing ? (
             <ProfileTagEditor
-              title="Project tags"
-              description="These act as softer collaboration signals for project-team and hackathon matching."
-              selectedTags={projectTagsDraft}
-              optionTags={PROJECT_TAG_OPTIONS}
-              customInput={customProjectTagInput}
-              customPlaceholder="Add a project topic"
-              onCustomInputChange={setCustomProjectTagInput}
-              onToggleTag={toggleProjectTag}
-              onAddCustomTag={addCustomProjectTag}
-              onRemoveCustomTag={removeProjectTag}
+              title="Skills"
+              description="Add concrete skills you can actually contribute, such as coding languages, design tools, writing, analysis, or facilitation."
+              selectedTags={skillsDraft}
+              optionTags={[]}
+              customInput={customSkillInput}
+              customPlaceholder="Add a skill"
+              onCustomInputChange={setCustomSkillInput}
+              onToggleTag={toggleSkill}
+              onAddCustomTag={addCustomSkill}
+              onRemoveCustomTag={removeSkill}
             />
           ) : (
             <View className="flex-row flex-wrap gap-2">
-              {visibleProjectTags.length > 0 ? (
-                visibleProjectTags.map((tag) => (
+              {visibleSkills.length > 0 ? (
+                visibleSkills.map((tag) => (
                   <AppChip key={tag} label={tag} variant="outline" />
                 ))
               ) : (
                 <Text className="text-[13px] text-[#5C6370]">
-                  No project tags saved yet.
+                  No skills saved yet.
                 </Text>
               )}
             </View>
@@ -1173,31 +1180,45 @@ export default function ProfileScreen() {
         </SectionCard>
 
         <SectionCard className="mb-3">
-          <SectionHeader title="CCA Context" />
+          <SectionHeader title="CCA / Residence Context" />
           {isEditing ? (
-            <ProfileTagEditor
-              title="CCA tags"
-              description="Keep these broad and honest so the matching service can use them as lightweight shared-context signals."
-              selectedTags={ccaTagsDraft}
-              optionTags={CCA_TAG_OPTIONS}
-              customInput={customCcaTagInput}
-              customPlaceholder="Add a club, sport, or activity"
-              onCustomInputChange={setCustomCcaTagInput}
-              onToggleTag={toggleCcaTag}
-              onAddCustomTag={addCustomCcaTag}
-              onRemoveCustomTag={removeCcaTag}
-            />
+            <View className="gap-4">
+              <TextInput
+                value={hallResidenceDraft}
+                onChangeText={setHallResidenceDraft}
+                className="rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-4 text-[15px] text-[#0F1115]"
+                placeholder="Hall / residence"
+                placeholderTextColor="#9AA0AB"
+              />
+              <ProfileTagEditor
+                title="CCA tags"
+                description="Keep these broad and honest so the matching service can use them as lightweight shared-context signals."
+                selectedTags={ccaTagsDraft}
+                optionTags={CCA_TAG_OPTIONS}
+                customInput={customCcaTagInput}
+                customPlaceholder="Add a club, sport, or activity"
+                onCustomInputChange={setCustomCcaTagInput}
+                onToggleTag={toggleCcaTag}
+                onAddCustomTag={addCustomCcaTag}
+                onRemoveCustomTag={removeCcaTag}
+              />
+            </View>
           ) : (
-            <View className="flex-row flex-wrap gap-2">
-              {visibleCcaTags.length > 0 ? (
-                visibleCcaTags.map((tag) => (
-                  <AppChip key={tag} label={tag} variant="outline" />
-                ))
-              ) : (
-                <Text className="text-[13px] text-[#5C6370]">
-                  No CCA tags saved yet.
-                </Text>
-              )}
+            <View className="gap-3">
+              <Text className="text-[14px] leading-6 text-[#0F1115]">
+                {`Hall / residence: ${profile.hall_residence ?? "Not set"}`}
+              </Text>
+              <View className="flex-row flex-wrap gap-2">
+                {visibleCcaTags.length > 0 ? (
+                  visibleCcaTags.map((tag) => (
+                    <AppChip key={tag} label={tag} variant="outline" />
+                  ))
+                ) : (
+                  <Text className="text-[13px] text-[#5C6370]">
+                    No CCA tags saved yet.
+                  </Text>
+                )}
+              </View>
             </View>
           )}
         </SectionCard>
@@ -1424,21 +1445,6 @@ export default function ProfileScreen() {
               )}
             </View>
           )}
-        </SectionCard>
-
-        <SectionCard className="mb-3">
-          <SectionHeader title="Skills" />
-          <View className="flex-row flex-wrap gap-2">
-            {profile.skills.length > 0 ? (
-              profile.skills.map((skill) => (
-                <AppChip key={skill} label={skill} variant="outline" />
-              ))
-            ) : (
-              <Text className="text-[13px] text-[#5C6370]">
-                Skills and richer profile editing are intentionally deferred beyond M1.
-              </Text>
-            )}
-          </View>
         </SectionCard>
 
         {isEditing ? (
