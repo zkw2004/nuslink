@@ -16,6 +16,7 @@
     "test": "npm run test:mobile && npm run test:backend"
   },
   "dependencies": {
+    "@expo/vector-icons": "^15.0.2",
     "@react-native-async-storage/async-storage": "^3.1.0",
     "@supabase/supabase-js": "^2.106.1",
     "expo": "~56.0.3",

@@ -493,21 +493,24 @@ export function subscribeToDirectMessages(
   }
 
   const supabaseClient = supabase;
-  const channel = supabaseClient
-    .channel(`direct-messages:${conversationId}`)
-    .on(
-      "postgres_changes",
-      {
-        event: "INSERT",
-        schema: "public",
-        table: "direct_messages",
-        filter: `conversation_id=eq.${conversationId}`,
-      },
-      (payload) => {
-        onMessage(mapDirectMessage(payload.new as DirectMessageRow));
-      },
-    )
-    .subscribe();
+  const channel = supabaseClient.channel(
+    `direct-messages:${conversationId}:${Date.now()}`,
+  );
+
+  channel.on(
+    "postgres_changes",
+    {
+      event: "INSERT",
+      schema: "public",
+      table: "direct_messages",
+      filter: `conversation_id=eq.${conversationId}`,
+    },
+    (payload) => {
+      onMessage(mapDirectMessage(payload.new as DirectMessageRow));
+    },
+  );
+
+  channel.subscribe();
 
   return () => {
     void supabaseClient.removeChannel(channel);

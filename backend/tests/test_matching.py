@@ -25,6 +25,7 @@ from app.routers.matches import get_match_repository
 class FakeMatchRepository:
     def __init__(self) -> None:
         self.current_user_id = "user-1"
+        self.feedback_events: list[dict] = []
 
     def get_profile(self, user_id: str) -> ProfileSummary | None:
         profiles = {
@@ -174,6 +175,33 @@ class FakeMatchRepository:
     ) -> None:
         return None
 
+    def create_match_feedback_event(
+        self,
+        *,
+        actor_user_id: str,
+        target_user_id: str,
+        event_type: str,
+        semester: str | None,
+        module_code: str | None,
+        compatibility_percentage: int | None,
+        top_signals: list[str],
+        shared_modules: list[str],
+        metadata: dict,
+    ) -> None:
+        self.feedback_events.append(
+            {
+                "actor_user_id": actor_user_id,
+                "target_user_id": target_user_id,
+                "event_type": event_type,
+                "semester": semester,
+                "module_code": module_code,
+                "compatibility_percentage": compatibility_percentage,
+                "top_signals": top_signals,
+                "shared_modules": shared_modules,
+                "metadata": metadata,
+            }
+        )
+
 
 class MissingProfileRepository(FakeMatchRepository):
     def get_profile(self, user_id: str) -> ProfileSummary | None:
@@ -291,6 +319,57 @@ def test_people_matches_returns_404_when_profile_is_missing():
 
     assert response.status_code == 404
     assert response.json()["detail"] == "Profile not found for the current user."
+
+
+def test_match_feedback_endpoint_persists_authenticated_event():
+    repository = FakeMatchRepository()
+    app.dependency_overrides[get_match_repository] = lambda: repository
+
+    try:
+        response = client.post(
+            "/v1/matches/feedback",
+            json={
+                "target_user_id": "user-2",
+                "event_type": "accept",
+                "semester": "AY2526S1",
+                "module_code": "CS2040S",
+                "compatibility_percentage": 88,
+                "top_signals": ["Shared goals", "Similar skills"],
+                "shared_modules": ["CS2040S"],
+                "metadata": {"source": "people_card"},
+            },
+        )
+    finally:
+        app.dependency_overrides[get_match_repository] = override_repository
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True}
+    assert repository.feedback_events == [
+        {
+            "actor_user_id": "user-1",
+            "target_user_id": "user-2",
+            "event_type": "accept",
+            "semester": "AY2526S1",
+            "module_code": "CS2040S",
+            "compatibility_percentage": 88,
+            "top_signals": ["Shared goals", "Similar skills"],
+            "shared_modules": ["CS2040S"],
+            "metadata": {"source": "people_card"},
+        }
+    ]
+
+
+def test_match_feedback_endpoint_rejects_self_feedback():
+    response = client.post(
+        "/v1/matches/feedback",
+        json={
+            "target_user_id": "user-1",
+            "event_type": "view",
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Cannot log match feedback for yourself."
 
 
 def test_people_matches_keeps_missing_optional_fields_matchable():

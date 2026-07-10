@@ -37,6 +37,20 @@ class MatchRepository(Protocol):
 
     def list_connections(self, *, user_ids: list[str]) -> list[ConnectionEdge]: ...
 
+    def create_match_feedback_event(
+        self,
+        *,
+        actor_user_id: str,
+        target_user_id: str,
+        event_type: str,
+        semester: str | None,
+        module_code: str | None,
+        compatibility_percentage: int | None,
+        top_signals: list[str],
+        shared_modules: list[str],
+        metadata: dict,
+    ) -> None: ...
+
     def create_high_match_notifications(
         self,
         *,

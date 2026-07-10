@@ -2,7 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.auth import AuthenticatedUser, get_current_user
 from app.matching.repository import MatchRepository
-from app.matching.schemas import PeopleMatchesResponse
+from app.matching.schemas import (
+    MatchFeedbackEventCreate,
+    MatchFeedbackEventResponse,
+    PeopleMatchesResponse,
+)
 from app.matching.scoring import get_current_semester_string, rank_candidates
 from app.matching.supabase_repository import SupabaseMatchRepository
 
@@ -100,3 +104,30 @@ def get_people_matches(
         available_modules=available_modules,
         candidates=ranked_candidates,
     )
+
+
+@router.post("/feedback", response_model=MatchFeedbackEventResponse)
+def create_match_feedback_event(
+    payload: MatchFeedbackEventCreate,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    repository: MatchRepository = Depends(get_match_repository),
+) -> MatchFeedbackEventResponse:
+    if payload.target_user_id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot log match feedback for yourself.",
+        )
+
+    repository.create_match_feedback_event(
+        actor_user_id=current_user.id,
+        target_user_id=payload.target_user_id,
+        event_type=payload.event_type,
+        semester=payload.semester,
+        module_code=payload.module_code,
+        compatibility_percentage=payload.compatibility_percentage,
+        top_signals=payload.top_signals,
+        shared_modules=payload.shared_modules,
+        metadata=payload.metadata,
+    )
+
+    return MatchFeedbackEventResponse()
