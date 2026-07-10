@@ -8,6 +8,7 @@ import {
   type ImageSourcePropType,
 } from "react-native";
 import { BlurView } from "expo-blur";
+import { SymbolView, type SymbolViewProps } from "expo-symbols";
 
 export interface MatchSignal {
   icon: string;
@@ -33,12 +34,26 @@ export interface ProfileCardData {
 interface ProfileCardProps {
   data: ProfileCardData;
   onConnect?: () => void;
+  primaryActionLabel?: string;
+  primaryActionVariant?: "filled" | "outline" | "passive";
+  secondaryActionLabel?: string;
+  secondaryActionIcon?: SymbolViewProps["name"];
+  onSecondaryAction?: () => void;
   onViewProfile?: () => void;
 }
 
 const ACCENT = "#5B4FE0";
 
-function InnerProfileCard({ data, onConnect, onViewProfile }: ProfileCardProps) {
+function InnerProfileCard({
+  data,
+  onConnect,
+  primaryActionLabel = "Connect",
+  primaryActionVariant = "filled",
+  secondaryActionLabel,
+  secondaryActionIcon,
+  onSecondaryAction,
+  onViewProfile,
+}: ProfileCardProps) {
   const [expanded, setExpanded] = useState(false);
 
   const chips = [
@@ -125,9 +140,52 @@ function InnerProfileCard({ data, onConnect, onViewProfile }: ProfileCardProps) 
       ) : null}
 
       <View style={styles.actionsRow}>
-        <Pressable style={styles.connectButton} onPress={onConnect}>
-          <Text style={styles.connectText}>Connect</Text>
-        </Pressable>
+        {primaryActionVariant === "passive" ? (
+          <View style={styles.passiveStatePill}>
+            <Text style={styles.passiveStateText}>{primaryActionLabel}</Text>
+          </View>
+        ) : (
+          <Pressable
+            style={
+              primaryActionVariant === "outline"
+                ? styles.secondaryButton
+                : styles.connectButton
+            }
+            onPress={onConnect}
+          >
+            <Text
+              style={
+                primaryActionVariant === "outline"
+                  ? styles.secondaryButtonText
+                  : styles.connectText
+              }
+            >
+              {primaryActionLabel}
+            </Text>
+          </Pressable>
+        )}
+        {secondaryActionLabel ? (
+          <Pressable
+            style={
+              secondaryActionIcon
+                ? styles.iconActionButton
+                : styles.secondaryButton
+            }
+            onPress={onSecondaryAction}
+          >
+            {secondaryActionIcon ? (
+              <SymbolView
+                name={secondaryActionIcon}
+                size={18}
+                tintColor="#5D6270"
+              />
+            ) : (
+              <Text style={styles.secondaryButtonText}>
+                {secondaryActionLabel}
+              </Text>
+            )}
+          </Pressable>
+        ) : null}
         <Pressable style={styles.viewButton} onPress={onViewProfile}>
           <Text style={styles.viewArrow}>›</Text>
         </Pressable>
@@ -349,6 +407,42 @@ const styles = StyleSheet.create({
   },
   connectText: {
     color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  secondaryButton: {
+    borderRadius: 100,
+    borderWidth: 1,
+    borderColor: "#DADAE2",
+    paddingVertical: 13,
+    paddingHorizontal: 18,
+    alignItems: "center",
+  },
+  secondaryButtonText: {
+    color: "#5D6270",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  iconActionButton: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    borderWidth: 1,
+    borderColor: "#DADAE2",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFFFFF",
+  },
+  passiveStatePill: {
+    borderRadius: 100,
+    backgroundColor: "#EEF1F6",
+    paddingVertical: 13,
+    paddingHorizontal: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  passiveStateText: {
+    color: "#6C7380",
     fontSize: 14,
     fontWeight: "600",
   },

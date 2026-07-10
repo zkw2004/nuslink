@@ -1,5 +1,8 @@
 import { api } from "@lib/api";
-import type { PeopleMatchesResponse } from "@appTypes/index";
+import type {
+  MatchFeedbackEventInput,
+  PeopleMatchesResponse,
+} from "@appTypes/index";
 
 export async function fetchPeopleMatches(moduleCode?: string) {
   const searchParams = new URLSearchParams();
@@ -13,4 +16,8 @@ export async function fetchPeopleMatches(moduleCode?: string) {
     : "/v1/matches/people";
 
   return api.get<PeopleMatchesResponse>(path);
+}
+
+export async function logMatchFeedbackEvent(input: MatchFeedbackEventInput) {
+  return api.post<{ ok: boolean }>("/v1/matches/feedback", input);
 }

@@ -28,6 +28,7 @@ export type ChatAttachmentKind = "image" | "file" | "audio" | "video";
 export type UserRole = "member" | "co_admin" | "admin";
 export type TimetableSource = "manual" | "nusmods";
 export type ConnectionRequestStatus = "pending" | "accepted" | "declined";
+export type MatchFeedbackEventType = "view" | "skip" | "accept" | "chat_start";
 export type ConnectionRelationshipStatus =
   | "none"
   | "incoming_request"
@@ -159,6 +160,17 @@ export interface PeopleMatchesResponse {
   semester: string;
   available_modules: string[];
   candidates: PeopleMatch[];
+}
+
+export interface MatchFeedbackEventInput {
+  target_user_id: string;
+  event_type: MatchFeedbackEventType;
+  semester?: string | null;
+  module_code?: string | null;
+  compatibility_percentage?: number | null;
+  top_signals?: string[];
+  shared_modules?: string[];
+  metadata?: Record<string, unknown>;
 }
 
 export interface ConnectionPreviewProfile {

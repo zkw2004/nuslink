@@ -1,6 +1,8 @@
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+MatchFeedbackEventType = Literal["view", "skip", "accept", "chat_start"]
 
 
 class MatchBreakdownResponse(BaseModel):
@@ -45,3 +47,18 @@ class PeopleMatchesResponse(BaseModel):
     semester: str
     available_modules: list[str]
     candidates: list[PeopleMatchResponseItem]
+
+
+class MatchFeedbackEventCreate(BaseModel):
+    target_user_id: str
+    event_type: MatchFeedbackEventType
+    semester: str | None = None
+    module_code: str | None = None
+    compatibility_percentage: int | None = Field(default=None, ge=0, le=100)
+    top_signals: list[str] = Field(default_factory=list)
+    shared_modules: list[str] = Field(default_factory=list)
+    metadata: dict[str, object] = Field(default_factory=dict)
+
+
+class MatchFeedbackEventResponse(BaseModel):
+    ok: bool = True

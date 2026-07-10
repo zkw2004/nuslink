@@ -15,6 +15,7 @@ export type InboxItem = {
   unreadCount: number;
   avatarUri?: string | null;
   roundedAvatar?: boolean;
+  targetUserId?: string;
 };
 
 export function formatGroupTypeLabel(type: string) {
@@ -44,6 +45,7 @@ export function buildUnifiedInboxItems({
     unreadCount: conversation.unread_count,
     avatarUri: conversation.other_user.avatar_url,
     roundedAvatar: true,
+    targetUserId: conversation.other_user.id,
   }));
 
   const groupItems: InboxItem[] = groupChats.map((group) => ({

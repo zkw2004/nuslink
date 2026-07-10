@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
 
 import {
   AppAvatar,
@@ -16,7 +17,13 @@ import ProfileCard, {
   type ProfileCardData,
 } from "@features/matching/ProfileCard";
 import type { PeopleMatch } from "@appTypes/index";
-import { useAuthStore, useConnectionsStore, useMatchesStore } from "@store/index";
+import { logMatchFeedbackEvent } from "@services/matchingService";
+import {
+  useAuthStore,
+  useConnectionsStore,
+  useDirectMessagesStore,
+  useMatchesStore,
+} from "@store/index";
 
 function toBadgeTierLabel(tier: "bronze" | "silver" | "gold" | null) {
   switch (tier) {
@@ -198,6 +205,9 @@ export default function PeopleScreen() {
   const isLoading = useMatchesStore((state) => state.isLoading);
   const error = useMatchesStore((state) => state.error);
   const refreshPeopleMatches = useMatchesStore((state) => state.refreshPeopleMatches);
+  const openConversationWithUser = useDirectMessagesStore(
+    (state) => state.openConversationWithUser,
+  );
   const incomingRequests = useConnectionsStore((state) => state.incomingRequests);
   const connectionError = useConnectionsStore((state) => state.error);
   const refreshConnections = useConnectionsStore((state) => state.refreshConnections);
@@ -213,6 +223,8 @@ export default function PeopleScreen() {
 
   const [query, setQuery] = useState("");
   const [activeModule, setActiveModule] = useState<string>("all");
+  const [skippedUserIds, setSkippedUserIds] = useState<string[]>([]);
+  const loggedViewKeys = useRef(new Set<string>());
 
   const normalizedMatches = useMemo(() => {
     return peopleMatches.map((candidate) => ({
@@ -264,23 +276,73 @@ export default function PeopleScreen() {
   const normalizedQuery = query.trim().toLowerCase();
 
   const filteredMatches = useMemo(() => {
-    if (!normalizedQuery) {
-      return normalizedMatches;
-    }
+    const visibleMatches = normalizedMatches.filter(
+      (candidate) => !skippedUserIds.includes(candidate.user_id),
+    );
+    const matchingCandidates = !normalizedQuery
+      ? visibleMatches
+      : visibleMatches.filter((candidate) => {
+          return (
+            candidate.display_name.toLowerCase().includes(normalizedQuery) ||
+            candidate.major?.toLowerCase().includes(normalizedQuery) ||
+            candidate.faculty?.toLowerCase().includes(normalizedQuery) ||
+            candidate.shared_modules.some((moduleCode) =>
+              moduleCode.toLowerCase().includes(normalizedQuery),
+            )
+          );
+        });
+    const unconnectedCandidates = matchingCandidates.filter(
+      (candidate) => getRelationshipStatus(candidate.user_id) !== "connected",
+    );
+    const connectedCandidates = matchingCandidates.filter(
+      (candidate) => getRelationshipStatus(candidate.user_id) === "connected",
+    );
 
-    return normalizedMatches.filter((candidate) => {
-      return (
-        candidate.display_name.toLowerCase().includes(normalizedQuery) ||
-        candidate.major?.toLowerCase().includes(normalizedQuery) ||
-        candidate.faculty?.toLowerCase().includes(normalizedQuery) ||
-        candidate.shared_modules.some((moduleCode) =>
-          moduleCode.toLowerCase().includes(normalizedQuery),
-        )
-      );
+    return [...unconnectedCandidates, ...connectedCandidates];
+  }, [getRelationshipStatus, normalizedMatches, normalizedQuery, skippedUserIds]);
+  const incomingRequestByRequesterId = useMemo(
+    () =>
+      new Map(
+        incomingRequests.map((request) => [request.requester_id, request] as const),
+      ),
+    [incomingRequests],
+  );
+
+  function logFeedbackEvent(
+    candidate: PeopleMatch,
+    eventType: "view" | "skip" | "accept",
+  ) {
+    void logMatchFeedbackEvent({
+      target_user_id: candidate.user_id,
+      event_type: eventType,
+      semester,
+      module_code: activeModule === "all" ? null : activeModule,
+      compatibility_percentage: candidate.compatibility_percentage,
+      top_signals: candidate.top_signals ?? [],
+      shared_modules: candidate.shared_modules ?? [],
+      metadata: {
+        source: "people_card",
+        active_module: activeModule,
+      },
+    }).catch(() => {
+      // Feedback logging should never block the main People flow.
     });
-  }, [normalizedMatches, normalizedQuery]);
+  }
 
-  async function handleSendRequest(recipientId: string) {
+  useEffect(() => {
+    for (const candidate of filteredMatches) {
+      const viewKey = `${semester ?? "unknown"}:${activeModule}:${candidate.user_id}`;
+
+      if (loggedViewKeys.current.has(viewKey)) {
+        continue;
+      }
+
+      loggedViewKeys.current.add(viewKey);
+      logFeedbackEvent(candidate, "view");
+    }
+  }, [activeModule, filteredMatches, semester]);
+
+  async function handleSendRequest(candidate: PeopleMatch) {
     if (!session?.user.id) {
       Alert.alert(
         "Sign in required",
@@ -290,7 +352,8 @@ export default function PeopleScreen() {
     }
 
     try {
-      await sendConnectionRequest(recipientId, session.user.id);
+      await sendConnectionRequest(candidate.user_id, session.user.id);
+      logFeedbackEvent(candidate, "accept");
     } catch (requestError) {
       Alert.alert(
         "Could not send request",
@@ -299,6 +362,52 @@ export default function PeopleScreen() {
           : "Please try again.",
       );
     }
+  }
+
+  async function handleMessageConnectedCandidate(candidate: PeopleMatch) {
+    if (!session?.user.id) {
+      Alert.alert(
+        "Sign in required",
+        "Please sign in again before opening chats.",
+      );
+      return;
+    }
+
+    try {
+      const conversationId = await openConversationWithUser(
+        candidate.user_id,
+        session.user.id,
+      );
+      void logMatchFeedbackEvent({
+        target_user_id: candidate.user_id,
+        event_type: "chat_start",
+        semester,
+        module_code: activeModule === "all" ? null : activeModule,
+        compatibility_percentage: candidate.compatibility_percentage,
+        top_signals: candidate.top_signals ?? [],
+        shared_modules: candidate.shared_modules ?? [],
+        metadata: {
+          source: "people_card_connected_message",
+          active_module: activeModule,
+          conversation_id: conversationId,
+        },
+      }).catch(() => {
+        // Feedback logging should never block opening a direct message.
+      });
+      router.push(`/chats/${conversationId}` as never);
+    } catch (openError) {
+      Alert.alert(
+        "Could not open chat",
+        openError instanceof Error ? openError.message : "Please try again.",
+      );
+    }
+  }
+
+  function handleSkipCandidate(candidate: PeopleMatch) {
+    setSkippedUserIds((current) =>
+      current.includes(candidate.user_id) ? current : [...current, candidate.user_id],
+    );
+    logFeedbackEvent(candidate, "skip");
   }
 
   async function handleIncomingRequest(
@@ -323,32 +432,6 @@ export default function PeopleScreen() {
           : "Please try again.",
       );
     }
-  }
-
-  function renderConnectionAction(candidateUserId: string) {
-    const relationshipStatus = getRelationshipStatus(candidateUserId);
-
-    if (relationshipStatus === "connected") {
-      return <AppChip label="Connected" variant="solid" />;
-    }
-
-    if (relationshipStatus === "outgoing_request") {
-      return <AppChip label="Requested" variant="outline" />;
-    }
-
-    if (relationshipStatus === "incoming_request") {
-      return <AppChip label="Respond above" variant="outline" />;
-    }
-
-    return (
-      <AppButton
-        label="Connect"
-        variant="secondary"
-        onPress={() => {
-          void handleSendRequest(candidateUserId);
-        }}
-      />
-    );
   }
 
   return (
@@ -518,21 +601,77 @@ export default function PeopleScreen() {
         ) : null}
 
         <View className="gap-4">
-          {filteredMatches.map((candidate) => (
-            <ProfileCard
-              key={candidate.user_id}
-              data={toProfileCardData(candidate)}
-              onConnect={() => {
-                void handleSendRequest(candidate.user_id);
-              }}
-              onViewProfile={() => {
-                Alert.alert(
-                  candidate.display_name,
-                  "Full profile drill-down can be added in the next People-card slice.",
-                );
-              }}
-            />
-          ))}
+          {filteredMatches.map((candidate) => {
+            const relationshipStatus = getRelationshipStatus(candidate.user_id);
+            const incomingRequest = incomingRequestByRequesterId.get(candidate.user_id);
+
+            return (
+              <ProfileCard
+                key={candidate.user_id}
+                data={toProfileCardData(candidate)}
+                primaryActionLabel={
+                  relationshipStatus === "connected"
+                    ? "Connected"
+                    : relationshipStatus === "incoming_request"
+                      ? "Accept"
+                    : relationshipStatus === "outgoing_request"
+                      ? "Requested"
+                      : "Connect"
+                }
+                primaryActionVariant={
+                  relationshipStatus === "none" ||
+                  relationshipStatus === "incoming_request"
+                    ? "filled"
+                    : "passive"
+                }
+                secondaryActionLabel={
+                  relationshipStatus === "connected"
+                    ? "Message"
+                    : relationshipStatus === "incoming_request"
+                      ? "Decline"
+                    : relationshipStatus === "none"
+                      ? "Skip"
+                      : undefined
+                }
+                secondaryActionIcon={
+                  relationshipStatus === "connected"
+                    ? "message.fill"
+                    : undefined
+                }
+                onConnect={() => {
+                  if (relationshipStatus === "none") {
+                    void handleSendRequest(candidate);
+                    return;
+                  }
+
+                  if (relationshipStatus === "incoming_request" && incomingRequest) {
+                    void handleIncomingRequest(incomingRequest.id, "accepted");
+                  }
+                }}
+                onSecondaryAction={() => {
+                  if (relationshipStatus === "connected") {
+                    void handleMessageConnectedCandidate(candidate);
+                    return;
+                  }
+
+                  if (relationshipStatus === "none") {
+                    handleSkipCandidate(candidate);
+                    return;
+                  }
+
+                  if (relationshipStatus === "incoming_request" && incomingRequest) {
+                    void handleIncomingRequest(incomingRequest.id, "declined");
+                  }
+                }}
+                onViewProfile={() => {
+                  Alert.alert(
+                    candidate.display_name,
+                    "Full profile drill-down can be added in the next People-card slice.",
+                  );
+                }}
+              />
+            );
+          })}
         </View>
       </ScrollView>
     </SafeAreaView>

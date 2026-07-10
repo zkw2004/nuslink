@@ -23,6 +23,7 @@ import {
   useDirectMessagesStore,
   useGroupMessagesStore,
 } from "@store/index";
+import { logMatchFeedbackEvent } from "@services/matchingService";
 import { buildUnifiedInboxItems } from "@utils/chatInbox";
 
 function formatInboxTime(value: string | null) {
@@ -120,6 +121,16 @@ export default function ChatsScreen() {
         otherUserId,
         session.user.id,
       );
+      void logMatchFeedbackEvent({
+        target_user_id: otherUserId,
+        event_type: "chat_start",
+        metadata: {
+          source: "direct_chat_picker",
+          conversation_id: conversationId,
+        },
+      }).catch(() => {
+        // Feedback logging should never block opening a direct message.
+      });
       setIsCreateChatOpen(false);
       setChatSearchQuery("");
       router.push(`/chats/${conversationId}` as never);
@@ -301,6 +312,18 @@ export default function ChatsScreen() {
                   key={`${item.kind}:${item.id}`}
                   onPress={() => {
                     if (item.kind === "direct") {
+                      if (item.targetUserId) {
+                        void logMatchFeedbackEvent({
+                          target_user_id: item.targetUserId,
+                          event_type: "chat_start",
+                          metadata: {
+                            source: "direct_inbox",
+                            conversation_id: item.id,
+                          },
+                        }).catch(() => {
+                          // Feedback logging should never block chat navigation.
+                        });
+                      }
                       router.push(`/chats/${item.id}` as never);
                       return;
                     }

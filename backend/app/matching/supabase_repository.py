@@ -236,6 +236,36 @@ class SupabaseMatchRepository(MatchRepository):
 
         return edges
 
+    def create_match_feedback_event(
+        self,
+        *,
+        actor_user_id: str,
+        target_user_id: str,
+        event_type: str,
+        semester: str | None,
+        module_code: str | None,
+        compatibility_percentage: int | None,
+        top_signals: list[str],
+        shared_modules: list[str],
+        metadata: dict,
+    ) -> None:
+        self._post(
+            "match_feedback_events",
+            [
+                {
+                    "actor_user_id": actor_user_id,
+                    "target_user_id": target_user_id,
+                    "event_type": event_type,
+                    "semester": semester,
+                    "module_code": module_code,
+                    "compatibility_percentage": compatibility_percentage,
+                    "top_signals": top_signals,
+                    "shared_modules": shared_modules,
+                    "metadata": metadata,
+                }
+            ],
+        )
+
     def create_high_match_notifications(
         self,
         *,
