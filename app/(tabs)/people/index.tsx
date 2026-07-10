@@ -300,6 +300,13 @@ export default function PeopleScreen() {
 
     return [...unconnectedCandidates, ...connectedCandidates];
   }, [getRelationshipStatus, normalizedMatches, normalizedQuery, skippedUserIds]);
+  const incomingRequestByRequesterId = useMemo(
+    () =>
+      new Map(
+        incomingRequests.map((request) => [request.requester_id, request] as const),
+      ),
+    [incomingRequests],
+  );
 
   function logFeedbackEvent(
     candidate: PeopleMatch,
@@ -596,6 +603,7 @@ export default function PeopleScreen() {
         <View className="gap-4">
           {filteredMatches.map((candidate) => {
             const relationshipStatus = getRelationshipStatus(candidate.user_id);
+            const incomingRequest = incomingRequestByRequesterId.get(candidate.user_id);
 
             return (
               <ProfileCard
@@ -604,18 +612,23 @@ export default function PeopleScreen() {
                 primaryActionLabel={
                   relationshipStatus === "connected"
                     ? "Connected"
+                    : relationshipStatus === "incoming_request"
+                      ? "Accept"
                     : relationshipStatus === "outgoing_request"
                       ? "Requested"
-                      : relationshipStatus === "incoming_request"
-                        ? "Respond above"
-                        : "Connect"
+                      : "Connect"
                 }
                 primaryActionVariant={
-                  relationshipStatus === "none" ? "filled" : "passive"
+                  relationshipStatus === "none" ||
+                  relationshipStatus === "incoming_request"
+                    ? "filled"
+                    : "passive"
                 }
                 secondaryActionLabel={
                   relationshipStatus === "connected"
                     ? "Message"
+                    : relationshipStatus === "incoming_request"
+                      ? "Decline"
                     : relationshipStatus === "none"
                       ? "Skip"
                       : undefined
@@ -628,6 +641,11 @@ export default function PeopleScreen() {
                 onConnect={() => {
                   if (relationshipStatus === "none") {
                     void handleSendRequest(candidate);
+                    return;
+                  }
+
+                  if (relationshipStatus === "incoming_request" && incomingRequest) {
+                    void handleIncomingRequest(incomingRequest.id, "accepted");
                   }
                 }}
                 onSecondaryAction={() => {
@@ -638,6 +656,11 @@ export default function PeopleScreen() {
 
                   if (relationshipStatus === "none") {
                     handleSkipCandidate(candidate);
+                    return;
+                  }
+
+                  if (relationshipStatus === "incoming_request" && incomingRequest) {
+                    void handleIncomingRequest(incomingRequest.id, "declined");
                   }
                 }}
                 onViewProfile={() => {

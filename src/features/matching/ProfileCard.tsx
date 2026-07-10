@@ -34,7 +34,6 @@ export interface ProfileCardData {
 interface ProfileCardProps {
   data: ProfileCardData;
   onConnect?: () => void;
-  onSkip?: () => void;
   primaryActionLabel?: string;
   primaryActionVariant?: "filled" | "outline" | "passive";
   secondaryActionLabel?: string;
@@ -48,10 +47,9 @@ const ACCENT = "#5B4FE0";
 function InnerProfileCard({
   data,
   onConnect,
-  onSkip,
   primaryActionLabel = "Connect",
   primaryActionVariant = "filled",
-  secondaryActionLabel = "Skip",
+  secondaryActionLabel,
   secondaryActionIcon,
   onSecondaryAction,
   onViewProfile,
@@ -173,7 +171,7 @@ function InnerProfileCard({
                 ? styles.iconActionButton
                 : styles.secondaryButton
             }
-            onPress={onSecondaryAction ?? onSkip}
+            onPress={onSecondaryAction}
           >
             {secondaryActionIcon ? (
               <SymbolView
