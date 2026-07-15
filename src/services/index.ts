@@ -4,6 +4,7 @@ export * from "./communitiesService";
 export * from "./connectionsService";
 export * from "./directMessagesService";
 export * from "./groupMessagesService";
+export * from "./groupDraftingService";
 export * from "./matchingService";
 export * from "./notificationsService";
 export * from "./profileService";

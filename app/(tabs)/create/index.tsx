@@ -21,9 +21,12 @@ import {
 import { getCurrentSemester, searchNusmodsModules } from "@lib/nusmods";
 import { useAuthStore, useCommunitiesStore, useGroupsStore } from "@store/index";
 import { toSelectedModule, type SelectedModule } from "@features/onboarding/types";
+import { AiGroupDraftPanel } from "@features/groups/AiGroupDraftPanel";
+import type { GroupDraft } from "@services/groupDraftingService";
 import type { Database } from "@appTypes/database";
 
 type CreateMode = "group" | "community";
+type GroupEntryMode = "manual" | "ai";
 type GroupType = Database["public"]["Tables"]["groups"]["Row"]["type"];
 type PrivacySetting = Database["public"]["Tables"]["groups"]["Row"]["privacy"];
 type SemiPrivateRestriction =
@@ -108,6 +111,7 @@ export default function CreateScreen() {
   const createGroup = useGroupsStore((state) => state.createGroup);
   const createCommunity = useCommunitiesStore((state) => state.createCommunity);
   const [createMode, setCreateMode] = useState<CreateMode>("group");
+  const [groupEntryMode, setGroupEntryMode] = useState<GroupEntryMode>("manual");
 
   const [groupName, setGroupName] = useState("");
   const [description, setDescription] = useState("");
@@ -199,6 +203,56 @@ export default function CreateScreen() {
     setSelectedModule(module);
     setModuleQuery(module.moduleCode);
     setModuleResults([]);
+  }
+
+  async function handleDraftReady(draft: GroupDraft) {
+    if (draft.name) {
+      setGroupName(draft.name);
+    }
+    if (draft.description) {
+      setDescription(draft.description);
+    }
+    if (draft.venue) {
+      setVenue(draft.venue);
+    }
+    if (draft.type) {
+      setSelectedGroupType(draft.type);
+    }
+    if (draft.privacy) {
+      setSelectedPrivacy(draft.privacy);
+    }
+    if (draft.restriction) {
+      setSelectedRestriction(draft.restriction);
+    }
+    if (draft.min_size !== null) {
+      setMinSize(String(draft.min_size));
+    }
+    if (draft.max_size !== null) {
+      setMaxSize(String(draft.max_size));
+    }
+
+    let moduleWasResolved = true;
+    if (draft.module_code) {
+      setModuleQuery(draft.module_code);
+      try {
+        const modules = await searchNusmodsModules(draft.module_code);
+        const exactModule = modules
+          .map(toSelectedModule)
+          .find((module) => module.moduleCode === draft.module_code);
+        setSelectedModule(exactModule ?? null);
+        moduleWasResolved = exactModule !== undefined;
+      } catch {
+        setSelectedModule(null);
+        moduleWasResolved = false;
+      }
+    }
+
+    Alert.alert(
+      "Draft added",
+      moduleWasResolved
+        ? "Review the suggested fields, complete anything missing, then create the group."
+        : "The fields were added, but the suggested module was not found in NUSMods. Choose the module manually before creating the group.",
+    );
   }
 
   function handleAddCommunityTag() {
@@ -405,6 +459,43 @@ export default function CreateScreen() {
         {isGroupMode ? (
           <>
             <SectionCard className="mb-4">
+              <SectionHeader title="How do you want to start?" />
+              <View className="flex-row rounded-full bg-[#EEF2F7] p-1">
+                {(
+                  [
+                    { label: "Manual", value: "manual" },
+                    { label: "AI draft", value: "ai" },
+                  ] as const
+                ).map((mode) => {
+                  const isSelected = groupEntryMode === mode.value;
+
+                  return (
+                    <Pressable
+                      key={mode.value}
+                      accessibilityRole="button"
+                      onPress={() => setGroupEntryMode(mode.value)}
+                      className={`flex-1 rounded-full px-4 py-3 ${
+                        isSelected ? "bg-[#315E8A]" : "bg-transparent"
+                      }`}
+                    >
+                      <Text
+                        className={`text-center text-[13px] font-semibold ${
+                          isSelected ? "text-white" : "text-[#5C6370]"
+                        }`}
+                      >
+                        {mode.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </SectionCard>
+
+            {groupEntryMode === "ai" ? (
+              <AiGroupDraftPanel onDraftReady={handleDraftReady} />
+            ) : null}
+
+            <SectionCard className="mb-4">
               <SectionHeader title="Group Name" />
               <TextInput
                 value={groupName}
@@ -610,7 +701,9 @@ export default function CreateScreen() {
             </SectionCard>
 
             <View className="mb-3 flex-row flex-wrap gap-2">
-              <AppChip label="Manual flow" />
+              <AppChip
+                label={groupEntryMode === "ai" ? "AI-assisted draft" : "Manual flow"}
+              />
               <AppChip label="NUSMods search" variant="outline" />
               <AppChip label={currentSemester.semester} variant="outline" />
             </View>

@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     supabase_service_key: str = ""
     allowed_origins: list[str] = ["http://localhost:8081", "exp://localhost:8081"]
     app_version: str = "0.1.0"
+    openai_api_key: str = ""
+    openai_model: str = "gpt-5-mini"
 
 
 settings = Settings()
