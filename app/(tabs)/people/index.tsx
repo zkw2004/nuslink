@@ -10,11 +10,11 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
 
 import {
   AppAvatar,
   AppButton,
+  AppNotificationBell,
   BadgeTierPill,
   GlassButton,
   GlassSurface,
@@ -450,29 +450,12 @@ export default function PeopleScreen() {
               modules, alignment, and profile fit.
             </Text>
           </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Open notifications"
+          <AppNotificationBell
+            unreadCount={unreadCount}
             onPress={() => {
               router.push("/(tabs)/notifications");
             }}
-          >
-            <GlassSurface
-              radius={21}
-              intensity={40}
-              fill="rgba(255,255,255,0.4)"
-              style={styles.bell}
-            >
-              <Ionicons name="notifications-outline" size={19} color="#33333F" />
-              {unreadCount > 0 ? (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>
-                    {unreadCount > 9 ? "9+" : unreadCount}
-                  </Text>
-                </View>
-              ) : null}
-            </GlassSurface>
-          </Pressable>
+          />
         </View>
 
         {connectionError ? (
@@ -716,31 +699,6 @@ const styles = StyleSheet.create({
     fontSize: 13.5,
     lineHeight: 19,
     maxWidth: 290,
-  },
-  bell: {
-    alignItems: "center",
-    height: 42,
-    justifyContent: "center",
-    width: 42,
-  },
-  badge: {
-    alignItems: "center",
-    backgroundColor: "#E5484D",
-    borderColor: "#EEF1FA",
-    borderRadius: 9,
-    borderWidth: 2,
-    height: 18,
-    justifyContent: "center",
-    minWidth: 18,
-    paddingHorizontal: 4,
-    position: "absolute",
-    right: -3,
-    top: -3,
-  },
-  badgeText: {
-    color: "#FFFFFF",
-    fontSize: 10,
-    fontWeight: "700",
   },
   statePanel: {
     marginBottom: 16,

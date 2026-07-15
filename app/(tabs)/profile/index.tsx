@@ -1,14 +1,19 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState, type ComponentProps, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Alert,
   Pressable,
   ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   View,
+  type StyleProp,
+  type ViewStyle,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { BlurView } from "expo-blur";
+import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { SymbolView } from "expo-symbols";
@@ -21,11 +26,10 @@ import {
   AppAvatar,
   AppButton,
   AppChip,
-  AppScreenHeader,
-  BadgeTierPill,
+  AppNotificationBell,
+  GlassButton,
+  GlassSurface,
   ProgressBar,
-  SectionCard,
-  SectionHeader,
 } from "@components/shared";
 import { ProfileTagEditor } from "@features/profile/ProfileTagEditor";
 import { saveProfileSetup, uploadProfileImage } from "@features/onboarding/onboardingService";
@@ -45,7 +49,7 @@ import {
 } from "@services/index";
 import { WeeklyTimetableView } from "@features/profile/WeeklyTimetableView";
 import type { StudyMode, StudyStyle, TimetableClassSlot, TimetableSlot } from "@appTypes/index";
-import { useAuthStore } from "@store/index";
+import { useAuthStore, useNotificationsStore } from "@store/index";
 import {
   normalizeInterestTag,
   normalizeInterestTags,
@@ -80,11 +84,57 @@ const STUDY_STYLE_OPTIONS: { value: StudyStyle; label: string }[] = [
 
 const GROUP_SIZE_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8];
 
+type GlassFieldProps = Omit<ComponentProps<typeof TextInput>, "style"> & {
+  tall?: boolean;
+  style?: StyleProp<ViewStyle>;
+};
+
+function SectionCard({
+  children,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <GlassSurface tint="light" radius={22} intensity={35} style={styles.section}>
+      <View style={styles.sectionInner}>{children}</View>
+    </GlassSurface>
+  );
+}
+
+function SectionHeader({ title }: { title: string }) {
+  return <Text style={styles.sectionLabel}>{title.toUpperCase()}</Text>;
+}
+
+function GlassField({ tall = false, style, ...props }: GlassFieldProps) {
+  return (
+    <View style={[styles.field, tall ? styles.fieldTall : null, style]}>
+      <BlurView
+        intensity={30}
+        tint="systemChromeMaterialLight"
+        style={StyleSheet.absoluteFill}
+      />
+      <View
+        style={[
+          StyleSheet.absoluteFill,
+          { backgroundColor: "rgba(255,255,255,0.42)" },
+        ]}
+      />
+      <TextInput
+        {...props}
+        placeholderTextColor="#8A8A9C"
+        style={[styles.fieldInput, tall ? styles.fieldInputTall : null]}
+      />
+    </View>
+  );
+}
+
 export default function ProfileScreen() {
   const profile = useAuthStore((state) => state.profile);
   const refreshProfile = useAuthStore((state) => state.refreshProfile);
   const setProfile = useAuthStore((state) => state.setProfile);
   const signOut = useAuthStore((state) => state.signOut);
+  const unreadCount = useNotificationsStore((state) => state.unreadCount);
 
   const [moduleCodes, setModuleCodes] = useState<string[]>([]);
   const [savedTimetableSlots, setSavedTimetableSlots] = useState<TimetableSlot[]>([]);
@@ -126,19 +176,6 @@ export default function ProfileScreen() {
   const [isUpdatingPhoto, setIsUpdatingPhoto] = useState(false);
   const [isSearchingModules, setIsSearchingModules] = useState(false);
   const [avatarPreviewUri, setAvatarPreviewUri] = useState<string | null>(null);
-
-  const badgeTierLabel = useMemo(() => {
-    switch (profile?.badge_tier) {
-      case "gold":
-        return "Standout" as const;
-      case "silver":
-        return "Trusted" as const;
-      case "bronze":
-        return "Reliable" as const;
-      default:
-        return "New" as const;
-    }
-  }, [profile?.badge_tier]);
 
   useEffect(() => {
     async function loadProfileDetails() {
@@ -716,14 +753,17 @@ export default function ProfileScreen() {
 
   if (!profile) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: "#EEF3F9" }}>
-        <AppScreenHeader title="Profile" />
-        <View className="flex-1 items-center justify-center px-6">
-          <Text className="text-base text-[#5C6370]">
-            Sign in to view your M1 profile.
-          </Text>
-        </View>
-      </SafeAreaView>
+      <LinearGradient
+        colors={["#F6F8FD", "#E7EBF7", "#D3DBEE", "#C6D0E8"]}
+        locations={[0, 0.44, 0.8, 1]}
+        style={styles.root}
+      >
+        <SafeAreaView style={{ flex: 1, backgroundColor: "transparent" }}>
+          <View style={styles.emptyState}>
+            <Text style={styles.bodyText}>Sign in to view your M1 profile.</Text>
+          </View>
+        </SafeAreaView>
+      </LinearGradient>
     );
   }
 
@@ -750,31 +790,62 @@ export default function ProfileScreen() {
   );
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#EEF3F9" }}>
-      <AppScreenHeader
-        title="Profile"
-        actions={[
-          {
-            icon: "pencil",
-            accessibilityLabel: isEditing ? "Stop editing" : "Edit profile",
-            onPress: handleToggleEdit,
-          },
-          {
-            icon: "gearshape.fill",
-            accessibilityLabel: "Sign out",
-            onPress: () => {
-              void handleSignOut();
-            },
-          },
-        ]}
-      />
-
+    <LinearGradient
+      colors={["#F6F8FD", "#E7EBF7", "#D3DBEE", "#C6D0E8"]}
+      locations={[0, 0.44, 0.8, 1]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.root}
+    >
+    <SafeAreaView style={{ flex: 1, backgroundColor: "transparent" }}>
       <ScrollView
-        className="flex-1 px-5"
-        contentContainerStyle={{ paddingBottom: 120 }}
+        className="flex-1"
+        contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
+        <View style={styles.header}>
+          <Text style={styles.title}>Profile</Text>
+          <View style={styles.headerActions}>
+            <AppNotificationBell
+              unreadCount={unreadCount}
+              onPress={() => {
+                router.push("/(tabs)/notifications");
+              }}
+            />
+            <GlassButton
+              variant="light"
+              style={styles.iconButton}
+              accessibilityLabel={isEditing ? "Stop editing" : "Edit profile"}
+              onPress={handleToggleEdit}
+            >
+              <SymbolView
+                name={{ ios: "pencil", android: "edit", web: "edit" }}
+                size={16}
+                tintColor="#33333F"
+              />
+            </GlassButton>
+            <GlassButton
+              variant="light"
+              style={styles.iconButton}
+              accessibilityLabel="Sign out"
+              onPress={() => {
+                void handleSignOut();
+              }}
+            >
+              <SymbolView
+                name={{
+                  ios: "gearshape",
+                  android: "settings",
+                  web: "settings",
+                }}
+                size={17}
+                tintColor="#33333F"
+              />
+            </GlassButton>
+          </View>
+        </View>
+
         <View className="mb-4 flex-row items-center gap-[14px] px-[2px] pb-4 pt-2">
           <View className="items-center">
             <Pressable
@@ -805,14 +876,11 @@ export default function ProfileScreen() {
           </View>
 
           <View className="flex-1">
-            <View className="flex-row items-center gap-2">
-              <Text className="flex-1 text-[22px] font-bold tracking-[-0.6px] text-[#0F1115]">
-                {isEditing
-                  ? displayNameDraft || "Set your display name"
-                  : profile.display_name || "Set your display name"}
-              </Text>
-              <BadgeTierPill tier={badgeTierLabel} />
-            </View>
+            <Text className="text-[22px] font-bold tracking-[-0.6px] text-[#0F1115]">
+              {isEditing
+                ? displayNameDraft || "Set your display name"
+                : profile.display_name || "Set your display name"}
+            </Text>
             <Text className="mt-[3px] text-[14px] text-[#5C6370]">
               {isEditing
                 ? [majorDraft, `Y${yearOfStudyDraft}`].filter(Boolean).join(" · ")
@@ -834,36 +902,24 @@ export default function ProfileScreen() {
           </View>
 
           <ProgressBar value={completion} />
-
-          <View className="mt-3 flex-row items-center gap-[10px] rounded-xl bg-[#E7EEF7] px-3 py-[10px]">
-            <View className="h-4 w-4 items-center justify-center rounded-full bg-[#0F1115]">
-              <Text className="text-[10px] font-bold text-white">+</Text>
-            </View>
-            <Text className="flex-1 text-[12px] font-medium leading-[17px] text-[#0F1115]">
-              Milestone 1 completion is based on your core onboarding fields and current-semester modules.
-            </Text>
-          </View>
         </SectionCard>
 
         <SectionCard className="mb-3">
           <SectionHeader title="Profile Basics" />
           {isEditing ? (
             <View className="gap-3">
-              <TextInput
+              <GlassField
                 value={displayNameDraft}
                 onChangeText={setDisplayNameDraft}
-                className="rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-4 text-[15px] text-[#0F1115]"
                 placeholder="Display name"
-                placeholderTextColor="#9AA0AB"
               />
-              <TextInput
+              <GlassField
                 value={bioDraft}
                 onChangeText={setBioDraft}
                 multiline
+                tall
                 textAlignVertical="top"
-                className="min-h-[110px] rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-3 text-[15px] leading-6 text-[#0F1115]"
                 placeholder="What you're studying and what you're looking for."
-                placeholderTextColor="#9AA0AB"
               />
             </View>
           ) : (
@@ -883,19 +939,15 @@ export default function ProfileScreen() {
           <SectionHeader title="Academics" />
           {isEditing ? (
             <View className="gap-3">
-              <TextInput
+              <GlassField
                 value={facultyDraft}
                 onChangeText={setFacultyDraft}
-                className="rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-4 text-[15px] text-[#0F1115]"
                 placeholder="Faculty"
-                placeholderTextColor="#9AA0AB"
               />
-              <TextInput
+              <GlassField
                 value={majorDraft}
                 onChangeText={setMajorDraft}
-                className="rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-4 text-[15px] text-[#0F1115]"
                 placeholder="Major"
-                placeholderTextColor="#9AA0AB"
               />
               <View className="flex-row gap-1 rounded-2xl bg-[#EEF2F7] p-1">
                 {YEAR_OPTIONS.map((year) => {
@@ -1056,13 +1108,11 @@ export default function ProfileScreen() {
           <SectionHeader title={`This Semester · ${visibleModules.length}`} />
           {isEditing ? (
             <View>
-              <TextInput
+              <GlassField
                 value={moduleQuery}
                 onChangeText={(nextValue) => setModuleQuery(nextValue.toUpperCase())}
                 autoCapitalize="characters"
-                className="rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-4 text-[15px] uppercase text-[#0F1115]"
                 placeholder="Search NUSMods e.g. CS2040S"
-                placeholderTextColor="#9AA0AB"
               />
 
               {isSearchingModules ? (
@@ -1183,12 +1233,10 @@ export default function ProfileScreen() {
           <SectionHeader title="CCA / Residence Context" />
           {isEditing ? (
             <View className="gap-4">
-              <TextInput
+              <GlassField
                 value={hallResidenceDraft}
                 onChangeText={setHallResidenceDraft}
-                className="rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-4 text-[15px] text-[#0F1115]"
                 placeholder="Hall / residence"
-                placeholderTextColor="#9AA0AB"
               />
               <ProfileTagEditor
                 title="CCA tags"
@@ -1236,14 +1284,13 @@ export default function ProfileScreen() {
                 <Text className="mt-1 text-[13px] leading-5 text-[#5C6370]">
                   Paste your NUSMods timetable share URL. We will show the lesson slots we matched, then save the derived availability behind the scenes for matching.
                 </Text>
-                <TextInput
+                <GlassField
                   value={timetableShareUrlDraft}
                   onChangeText={setTimetableShareUrlDraft}
                   autoCapitalize="none"
                   autoCorrect={false}
-                  className="mt-3 rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-4 text-[14px] text-[#0F1115]"
+                  style={{ marginTop: 12 }}
                   placeholder="https://nusmods.com/timetable/sem-1/share?..."
-                  placeholderTextColor="#9AA0AB"
                 />
                 <View className="mt-3">
                   <AppButton
@@ -1343,19 +1390,17 @@ export default function ProfileScreen() {
                 </View>
 
                 <View className="mt-3 flex-row gap-2">
-                  <TextInput
+                  <GlassField
                     value={manualStartDraft}
                     onChangeText={setManualStartDraft}
-                    className="flex-1 rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-4 text-[15px] text-[#0F1115]"
+                    style={{ flex: 1 }}
                     placeholder="09:00"
-                    placeholderTextColor="#9AA0AB"
                   />
-                  <TextInput
+                  <GlassField
                     value={manualEndDraft}
                     onChangeText={setManualEndDraft}
-                    className="flex-1 rounded-[14px] border border-[#E4E9F1] bg-white px-4 py-4 text-[15px] text-[#0F1115]"
+                    style={{ flex: 1 }}
                     placeholder="11:00"
-                    placeholderTextColor="#9AA0AB"
                   />
                 </View>
 
@@ -1463,17 +1508,89 @@ export default function ProfileScreen() {
               onPress={handleToggleEdit}
             />
           </View>
-        ) : (
-          <View className="mt-1 rounded-2xl bg-[#E1EAF5] px-[14px] py-3">
-            <Text className="text-[13px] font-semibold text-[#5B7BA3]">
-              Milestone 2 status
-            </Text>
-            <Text className="mt-1 text-[13px] leading-5 text-[#5B7BA3]">
-              People matching is now live. Add timetable availability here to improve schedule overlap, and target-grade controls can follow in the next matching pass.
-            </Text>
-          </View>
-        )}
+        ) : null}
       </ScrollView>
     </SafeAreaView>
+    </LinearGradient>
   );
 }
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: "#E7EBF7",
+  },
+  emptyState: {
+    alignItems: "center",
+    flex: 1,
+    justifyContent: "center",
+    paddingHorizontal: 24,
+  },
+  scrollContent: {
+    gap: 16,
+    paddingBottom: 120,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+  },
+  header: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  title: {
+    color: "#1A1A26",
+    fontSize: 30,
+    fontWeight: "700",
+    letterSpacing: -0.5,
+  },
+  headerActions: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 9,
+  },
+  iconButton: {
+    height: 40,
+    width: 40,
+  },
+  section: {
+    marginBottom: 0,
+    width: "100%",
+  },
+  sectionInner: {
+    gap: 12,
+    padding: 18,
+  },
+  sectionLabel: {
+    color: "#7A7A8C",
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.6,
+  },
+  bodyText: {
+    color: "#54546A",
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  field: {
+    borderColor: "rgba(255,255,255,0.7)",
+    borderRadius: 14,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: 50,
+    overflow: "hidden",
+  },
+  fieldTall: {
+    minHeight: 110,
+  },
+  fieldInput: {
+    color: "#22222E",
+    fontSize: 14,
+    paddingHorizontal: 15,
+    paddingVertical: 13,
+  },
+  fieldInputTall: {
+    lineHeight: 21,
+    minHeight: 104,
+    textAlignVertical: "top",
+  },
+});

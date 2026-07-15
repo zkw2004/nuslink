@@ -1,8 +1,10 @@
 import { SymbolView } from "expo-symbols";
+import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { Image, Pressable, Text, View } from "react-native";
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { useNotificationsStore } from "@store/index";
+import { GlassSurface } from "./liquid-glass";
 
 type HeaderAction = {
   icon: "sparkles" | "gearshape.fill" | "pencil";
@@ -60,6 +62,11 @@ type CompatibilityBadgeProps = {
   score: number;
 };
 
+type AppNotificationBellProps = {
+  unreadCount: number;
+  onPress: () => void;
+};
+
 const avatarPalette = [
   { background: "#A5BBD5", foreground: "#F8FBFF" },
   { background: "#8AA1BC", foreground: "#F8FBFF" },
@@ -81,6 +88,44 @@ function getInitials(name: string) {
 function getAvatarColors(name: string) {
   const hash = Array.from(name).reduce((total, char) => total + char.charCodeAt(0), 0);
   return avatarPalette[hash % avatarPalette.length];
+}
+
+function formatUnreadCount(count: number) {
+  return count > 9 ? "9+" : String(count);
+}
+
+export function AppNotificationBell({
+  unreadCount,
+  onPress,
+}: AppNotificationBellProps) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={
+        unreadCount > 0
+          ? `Open notifications, ${formatUnreadCount(unreadCount)} unread`
+          : "Open notifications"
+      }
+      onPress={onPress}
+      style={styles.notificationButton}
+    >
+      <GlassSurface
+        radius={21}
+        intensity={40}
+        fill="rgba(255,255,255,0.4)"
+        style={styles.notificationGlass}
+      >
+        <Ionicons name="notifications-outline" size={19} color="#33333F" />
+      </GlassSurface>
+      {unreadCount > 0 ? (
+        <View style={styles.notificationBadge}>
+          <Text style={styles.notificationBadgeText}>
+            {formatUnreadCount(unreadCount)}
+          </Text>
+        </View>
+      ) : null}
+    </Pressable>
+  );
 }
 
 export function AppScreenHeader({
@@ -109,31 +154,12 @@ export function AppScreenHeader({
         {!hideNotificationsAction || actions.length > 0 ? (
           <View className="flex-row gap-2">
             {!hideNotificationsAction ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Open notifications"
-                className="relative h-10 w-10 items-center justify-center rounded-full bg-[#EEF2F7]"
+              <AppNotificationBell
+                unreadCount={unreadCount}
                 onPress={() => {
                   router.push("/(tabs)/notifications");
                 }}
-              >
-                <SymbolView
-                  name={{
-                    ios: "bell.fill",
-                    android: "notifications",
-                    web: "notifications",
-                  }}
-                  size={18}
-                  tintColor="#0F1115"
-                />
-                {unreadCount > 0 ? (
-                  <View className="absolute -right-1 -top-1 min-w-[16px] items-center rounded-full bg-red-600 px-1">
-                    <Text className="text-[10px] font-bold text-white">
-                      {unreadCount > 9 ? "9+" : unreadCount}
-                    </Text>
-                  </View>
-                ) : null}
-              </Pressable>
+              />
             ) : null}
             {actions.map((action) => (
               <Pressable
@@ -156,6 +182,47 @@ export function AppScreenHeader({
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  notificationButton: {
+    alignItems: "flex-start",
+    height: 46,
+    justifyContent: "center",
+    position: "relative",
+    width: 50,
+  },
+  notificationGlass: {
+    alignItems: "center",
+    height: 42,
+    justifyContent: "center",
+    width: 42,
+  },
+  notificationBadge: {
+    alignItems: "center",
+    backgroundColor: "#E5484D",
+    borderColor: "#F4F6FD",
+    borderRadius: 11,
+    borderWidth: 2,
+    minWidth: 22,
+    height: 20,
+    justifyContent: "center",
+    paddingHorizontal: 5,
+    position: "absolute",
+    right: 2,
+    top: 2,
+    shadowColor: "#7A2230",
+    shadowOpacity: 0.18,
+    shadowRadius: 7,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
+  },
+  notificationBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontWeight: "800",
+    lineHeight: 12,
+  },
+});
 
 export function AppAvatar({
   name,
