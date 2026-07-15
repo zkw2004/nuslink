@@ -7,8 +7,9 @@ import {
   View,
   type ImageSourcePropType,
 } from "react-native";
-import { BlurView } from "expo-blur";
-import { SymbolView, type SymbolViewProps } from "expo-symbols";
+import { Ionicons } from "@expo/vector-icons";
+
+import { GlassButton, GlassSurface } from "@components/shared";
 
 export interface MatchSignal {
   icon: string;
@@ -37,7 +38,7 @@ interface ProfileCardProps {
   primaryActionLabel?: string;
   primaryActionVariant?: "filled" | "outline" | "passive";
   secondaryActionLabel?: string;
-  secondaryActionIcon?: SymbolViewProps["name"];
+  secondaryActionIcon?: keyof typeof Ionicons.glyphMap;
   onSecondaryAction?: () => void;
   onViewProfile?: () => void;
 }
@@ -66,7 +67,7 @@ function InnerProfileCard({
   const hiddenCount = chips.length - maxVisible;
 
   return (
-    <View style={styles.card}>
+    <View style={styles.inner}>
       <View style={styles.identityRow}>
         <View style={styles.identityLeft}>
           <Image source={data.avatar} style={styles.avatar} />
@@ -76,7 +77,7 @@ function InnerProfileCard({
               {data.isActive ? <View style={styles.liveDot} /> : null}
             </View>
             <Text style={styles.metaLine}>
-              {[data.degree, data.year, data.hall].filter(Boolean).join(" · ")}
+              {[data.degree, data.year].filter(Boolean).join(" · ")}
             </Text>
             {data.isActive ? (
               <Text style={styles.activityLabel}>{data.activityLabel}</Text>
@@ -129,11 +130,11 @@ function InnerProfileCard({
       {data.metaSignals.length > 0 ? (
         <View style={styles.metaStrip}>
           {data.metaSignals.map((signal, index) => (
-            <View key={`${signal.text}-${index}`} style={styles.metaPill}>
-              <Text style={styles.metaIcon}>{signal.icon}</Text>
-              <Text style={styles.metaText} numberOfLines={1}>
-                {signal.text}
-              </Text>
+            <View key={`${signal.text}-${index}`} style={styles.metaSignalRow}>
+              <View style={styles.metaIconBadge}>
+                <Text style={styles.metaIcon}>{signal.icon}</Text>
+              </View>
+              <Text style={styles.metaText}>{signal.text}</Text>
             </View>
           ))}
         </View>
@@ -145,50 +146,32 @@ function InnerProfileCard({
             <Text style={styles.passiveStateText}>{primaryActionLabel}</Text>
           </View>
         ) : (
-          <Pressable
-            style={
-              primaryActionVariant === "outline"
-                ? styles.secondaryButton
-                : styles.connectButton
-            }
+          <GlassButton
+            label={primaryActionLabel}
+            variant={primaryActionVariant === "outline" ? "light" : "dark"}
             onPress={onConnect}
-          >
-            <Text
-              style={
-                primaryActionVariant === "outline"
-                  ? styles.secondaryButtonText
-                  : styles.connectText
-              }
-            >
-              {primaryActionLabel}
-            </Text>
-          </Pressable>
+            style={primaryActionVariant === "outline" ? undefined : styles.connectButton}
+          />
         )}
         {secondaryActionLabel ? (
-          <Pressable
-            style={
-              secondaryActionIcon
-                ? styles.iconActionButton
-                : styles.secondaryButton
-            }
+          <GlassButton
+            variant="light"
+            label={secondaryActionIcon ? undefined : secondaryActionLabel}
+            style={secondaryActionIcon ? styles.iconActionButton : undefined}
             onPress={onSecondaryAction}
           >
             {secondaryActionIcon ? (
-              <SymbolView
+              <Ionicons
                 name={secondaryActionIcon}
                 size={18}
-                tintColor="#5D6270"
+                color="#5D6270"
               />
-            ) : (
-              <Text style={styles.secondaryButtonText}>
-                {secondaryActionLabel}
-              </Text>
-            )}
-          </Pressable>
+            ) : null}
+          </GlassButton>
         ) : null}
-        <Pressable style={styles.viewButton} onPress={onViewProfile}>
+        <GlassButton variant="light" style={styles.viewButton} onPress={onViewProfile}>
           <Text style={styles.viewArrow}>›</Text>
-        </Pressable>
+        </GlassButton>
       </View>
     </View>
   );
@@ -196,9 +179,9 @@ function InnerProfileCard({
 
 export default function ProfileCard(props: ProfileCardProps) {
   return (
-    <BlurView intensity={40} tint="light" style={styles.blurShell}>
+    <GlassSurface tint="light" radius={26} intensity={35} style={styles.card}>
       <InnerProfileCard {...props} />
-    </BlurView>
+    </GlassSurface>
   );
 }
 
@@ -223,23 +206,12 @@ export const SAMPLE_PROFILE: ProfileCardData = {
 };
 
 const styles = StyleSheet.create({
-  blurShell: {
-    borderRadius: 26,
-    overflow: "hidden",
-  },
   card: {
     width: "100%",
-    backgroundColor: "rgba(255,255,255,0.55)",
-    borderRadius: 26,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.75)",
-    padding: 24,
-    gap: 18,
-    shadowColor: "#465AAA",
-    shadowOpacity: 0.4,
-    shadowRadius: 34,
-    shadowOffset: { width: 0, height: 20 },
-    elevation: 6,
+  },
+  inner: {
+    gap: 16,
+    padding: 20,
   },
   identityRow: {
     flexDirection: "row",
@@ -272,7 +244,7 @@ const styles = StyleSheet.create({
   },
   name: {
     fontSize: 15,
-    fontWeight: "500",
+    fontWeight: "600",
     color: "#242430",
   },
   liveDot: {
@@ -345,7 +317,7 @@ const styles = StyleSheet.create({
     color: "#3A5FA8",
   },
   chipOutlined: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "rgba(255,255,255,0.55)",
     borderRadius: 100,
     paddingVertical: 3,
     paddingHorizontal: 8,
@@ -371,67 +343,41 @@ const styles = StyleSheet.create({
   metaStrip: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
-    paddingTop: 2,
+    columnGap: 14,
+    paddingVertical: 2,
+    rowGap: 7,
   },
-  metaPill: {
+  metaSignalRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    borderRadius: 999,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    backgroundColor: "rgba(255,255,255,0.72)",
-    borderWidth: 1,
-    borderColor: "rgba(117,123,146,0.18)",
+  },
+  metaIconBadge: {
+    alignItems: "center",
+    backgroundColor: "#F0F0F3",
+    borderRadius: 5,
+    height: 16,
+    justifyContent: "center",
+    width: 16,
   },
   metaIcon: {
-    fontSize: 11,
+    fontSize: 9,
   },
   metaText: {
-    fontSize: 11,
-    fontWeight: "500",
     color: "#54545F",
+    fontSize: 12,
   },
   actionsRow: {
     flexDirection: "row",
+    alignItems: "center",
     gap: 8,
-    marginTop: -4,
   },
   connectButton: {
     flex: 1,
-    backgroundColor: "#232330",
-    borderRadius: 100,
-    paddingVertical: 13,
-    alignItems: "center",
-  },
-  connectText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  secondaryButton: {
-    borderRadius: 100,
-    borderWidth: 1,
-    borderColor: "#DADAE2",
-    paddingVertical: 13,
-    paddingHorizontal: 18,
-    alignItems: "center",
-  },
-  secondaryButtonText: {
-    color: "#5D6270",
-    fontSize: 14,
-    fontWeight: "600",
   },
   iconActionButton: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    borderWidth: 1,
-    borderColor: "#DADAE2",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#FFFFFF",
+    height: 44,
+    width: 44,
   },
   passiveStatePill: {
     borderRadius: 100,
@@ -449,11 +395,6 @@ const styles = StyleSheet.create({
   viewButton: {
     width: 44,
     height: 44,
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: "#E1E1E9",
-    alignItems: "center",
-    justifyContent: "center",
   },
   viewArrow: {
     fontSize: 18,

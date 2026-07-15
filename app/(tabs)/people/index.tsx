@@ -1,16 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 
 import {
   AppAvatar,
   AppButton,
-  AppChip,
-  AppScreenHeader,
   BadgeTierPill,
-  SectionCard,
+  GlassButton,
+  GlassSurface,
 } from "@components/shared";
 import ProfileCard, {
   type MatchSignal,
@@ -23,6 +30,7 @@ import {
   useConnectionsStore,
   useDirectMessagesStore,
   useMatchesStore,
+  useNotificationsStore,
 } from "@store/index";
 
 function toBadgeTierLabel(tier: "bronze" | "silver" | "gold" | null) {
@@ -199,6 +207,7 @@ function toProfileCardData(candidate: PeopleMatch): ProfileCardData {
 
 export default function PeopleScreen() {
   const session = useAuthStore((state) => state.session);
+  const unreadCount = useNotificationsStore((state) => state.unreadCount);
   const peopleMatches = useMatchesStore((state) => state.peopleMatches);
   const availableModules = useMatchesStore((state) => state.availableModules);
   const semester = useMatchesStore((state) => state.semester);
@@ -221,7 +230,6 @@ export default function PeopleScreen() {
     (state) => state.getRelationshipStatus,
   );
 
-  const [query, setQuery] = useState("");
   const [activeModule, setActiveModule] = useState<string>("all");
   const [skippedUserIds, setSkippedUserIds] = useState<string[]>([]);
   const loggedViewKeys = useRef(new Set<string>());
@@ -273,33 +281,19 @@ export default function PeopleScreen() {
     void refreshConnections(session.user.id);
   }, [refreshConnections, session?.user.id]);
 
-  const normalizedQuery = query.trim().toLowerCase();
-
   const filteredMatches = useMemo(() => {
     const visibleMatches = normalizedMatches.filter(
       (candidate) => !skippedUserIds.includes(candidate.user_id),
     );
-    const matchingCandidates = !normalizedQuery
-      ? visibleMatches
-      : visibleMatches.filter((candidate) => {
-          return (
-            candidate.display_name.toLowerCase().includes(normalizedQuery) ||
-            candidate.major?.toLowerCase().includes(normalizedQuery) ||
-            candidate.faculty?.toLowerCase().includes(normalizedQuery) ||
-            candidate.shared_modules.some((moduleCode) =>
-              moduleCode.toLowerCase().includes(normalizedQuery),
-            )
-          );
-        });
-    const unconnectedCandidates = matchingCandidates.filter(
+    const unconnectedCandidates = visibleMatches.filter(
       (candidate) => getRelationshipStatus(candidate.user_id) !== "connected",
     );
-    const connectedCandidates = matchingCandidates.filter(
+    const connectedCandidates = visibleMatches.filter(
       (candidate) => getRelationshipStatus(candidate.user_id) === "connected",
     );
 
     return [...unconnectedCandidates, ...connectedCandidates];
-  }, [getRelationshipStatus, normalizedMatches, normalizedQuery, skippedUserIds]);
+  }, [getRelationshipStatus, normalizedMatches, skippedUserIds]);
   const incomingRequestByRequesterId = useMemo(
     () =>
       new Map(
@@ -436,52 +430,64 @@ export default function PeopleScreen() {
 
   return (
     <LinearGradient
-      colors={["#F6F8FD", "#E7EBF7", "#C6D0E8"]}
+      colors={["#F6F8FD", "#E7EBF7", "#D3DBEE", "#C6D0E8"]}
+      locations={[0, 0.44, 0.8, 1]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
-      style={{ flex: 1 }}
+      style={styles.root}
     >
     <SafeAreaView style={{ flex: 1, backgroundColor: "transparent" }}>
-      <AppScreenHeader
-        title="People"
-        subtitle="Discover module-mates for the current semester, ranked by shared modules, academic alignment, availability, and profile fit."
-      />
-
       <ScrollView
-        className="flex-1 px-5"
-        contentContainerStyle={{ paddingBottom: 96 }}
+        className="flex-1"
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <SectionCard className="mb-4">
-          <TextInput
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Search people, majors, or module codes"
-            placeholderTextColor="#9AA0AB"
-            className="rounded-[14px] border border-[#E4E9F1] bg-[#F9FBFD] px-4 py-4 text-[15px] text-[#0F1115]"
-          />
-
-          <Text className="mt-4 text-[12px] font-semibold uppercase tracking-[0.5px] text-[#9AA0AB]">
-            {semester ? `${semester} people matches` : "People matches"}
-          </Text>
-          <Text className="mt-2 text-[14px] leading-6 text-[#5C6370]">
-            Send connection requests here first. Direct messages can open later once both users are mutually connected.
-          </Text>
-        </SectionCard>
+        <View style={styles.header}>
+          <View style={styles.headerText}>
+            <Text style={styles.title}>People</Text>
+            <Text style={styles.subtitle}>
+              Discover module-mates for the current semester, ranked by shared
+              modules, alignment, and profile fit.
+            </Text>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Open notifications"
+            onPress={() => {
+              router.push("/(tabs)/notifications");
+            }}
+          >
+            <GlassSurface
+              radius={21}
+              intensity={40}
+              fill="rgba(255,255,255,0.4)"
+              style={styles.bell}
+            >
+              <Ionicons name="notifications-outline" size={19} color="#33333F" />
+              {unreadCount > 0 ? (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </Text>
+                </View>
+              ) : null}
+            </GlassSurface>
+          </Pressable>
+        </View>
 
         {connectionError ? (
-          <SectionCard className="mb-4">
+          <GlassSurface radius={22} intensity={35} style={styles.statePanel}>
             <Text className="text-[15px] font-semibold text-[#0F1115]">
               Connection requests are not available yet
             </Text>
             <Text className="mt-2 text-[14px] leading-6 text-red-700">
               {connectionError}
             </Text>
-          </SectionCard>
+          </GlassSurface>
         ) : null}
 
         {incomingRequests.length > 0 ? (
-          <SectionCard className="mb-4">
+          <GlassSurface radius={22} intensity={35} style={styles.statePanel}>
             <Text className="text-[17px] font-bold text-[#0F1115]">
               Incoming requests
             </Text>
@@ -547,60 +553,61 @@ export default function PeopleScreen() {
                 </View>
               ))}
             </View>
-          </SectionCard>
+          </GlassSurface>
         ) : null}
 
-        <View className="mb-4 flex-row flex-wrap gap-2">
-          <Pressable onPress={() => setActiveModule("all")}>
-            <AppChip
-              label="All modules"
-              variant={activeModule === "all" ? "solid" : "default"}
-            />
-          </Pressable>
+        <View style={styles.filters}>
+          <GlassButton
+            label="All modules"
+            variant={activeModule === "all" ? "dark" : "light"}
+            onPress={() => setActiveModule("all")}
+            style={styles.filterChip}
+            textStyle={styles.filterText}
+          />
           {availableModules.map((moduleCode) => (
-            <Pressable key={moduleCode} onPress={() => setActiveModule(moduleCode)}>
-              <AppChip
-                label={moduleCode}
-                variant={activeModule === moduleCode ? "solid" : "module"}
-              />
-            </Pressable>
+            <GlassButton
+              key={moduleCode}
+              label={moduleCode}
+              variant={activeModule === moduleCode ? "dark" : "light"}
+              onPress={() => setActiveModule(moduleCode)}
+              style={styles.filterChip}
+              textStyle={styles.filterText}
+            />
           ))}
         </View>
 
         {error ? (
-          <SectionCard className="mb-4">
+          <GlassSurface radius={22} intensity={35} style={styles.statePanel}>
             <Text className="text-[15px] font-semibold text-[#0F1115]">
               People matches are not available yet
             </Text>
             <Text className="mt-2 text-[14px] leading-6 text-red-700">{error}</Text>
-          </SectionCard>
+          </GlassSurface>
         ) : null}
 
         {!error && availableModules.length === 0 && !isLoading ? (
-          <SectionCard className="mb-4">
+          <GlassSurface radius={22} intensity={35} style={styles.statePanel}>
             <Text className="text-[17px] font-bold text-[#0F1115]">
               Add your current modules first
             </Text>
             <Text className="mt-2 text-[14px] leading-6 text-[#5C6370]">
               The People tab only matches students who share at least one current-semester module with you.
             </Text>
-          </SectionCard>
+          </GlassSurface>
         ) : null}
 
         {!error && availableModules.length > 0 && filteredMatches.length === 0 && !isLoading ? (
-          <SectionCard className="mb-4">
+          <GlassSurface radius={22} intensity={35} style={styles.statePanel}>
             <Text className="text-[17px] font-bold text-[#0F1115]">
-              {normalizedQuery ? "No people match your search" : "No live matches yet"}
+              No live matches yet
             </Text>
             <Text className="mt-2 text-[14px] leading-6 text-[#5C6370]">
-              {normalizedQuery
-                ? "Try a shorter name, a major, or one of your module codes."
-                : "This can happen if no module-mates have completed onboarding yet for your current-semester modules."}
+              This can happen if no module-mates have completed onboarding yet for your current-semester modules.
             </Text>
-          </SectionCard>
+          </GlassSurface>
         ) : null}
 
-        <View className="gap-4">
+        <View style={styles.feed}>
           {filteredMatches.map((candidate) => {
             const relationshipStatus = getRelationshipStatus(candidate.user_id);
             const incomingRequest = incomingRequestByRequesterId.get(candidate.user_id);
@@ -635,7 +642,7 @@ export default function PeopleScreen() {
                 }
                 secondaryActionIcon={
                   relationshipStatus === "connected"
-                    ? "message.fill"
+                    ? "chatbubble-outline"
                     : undefined
                 }
                 onConnect={() => {
@@ -678,3 +685,81 @@ export default function PeopleScreen() {
     </LinearGradient>
   );
 }
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 110,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+  },
+  header: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 16,
+  },
+  headerText: {
+    flex: 1,
+    gap: 8,
+  },
+  title: {
+    color: "#1A1A26",
+    fontSize: 30,
+    fontWeight: "700",
+    letterSpacing: -0.5,
+  },
+  subtitle: {
+    color: "#5C5C72",
+    fontSize: 13.5,
+    lineHeight: 19,
+    maxWidth: 290,
+  },
+  bell: {
+    alignItems: "center",
+    height: 42,
+    justifyContent: "center",
+    width: 42,
+  },
+  badge: {
+    alignItems: "center",
+    backgroundColor: "#E5484D",
+    borderColor: "#EEF1FA",
+    borderRadius: 9,
+    borderWidth: 2,
+    height: 18,
+    justifyContent: "center",
+    minWidth: 18,
+    paddingHorizontal: 4,
+    position: "absolute",
+    right: -3,
+    top: -3,
+  },
+  badgeText: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontWeight: "700",
+  },
+  statePanel: {
+    marginBottom: 16,
+    padding: 16,
+  },
+  filters: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 18,
+  },
+  filterChip: {
+    borderRadius: 100,
+  },
+  filterText: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  feed: {
+    gap: 16,
+  },
+});
