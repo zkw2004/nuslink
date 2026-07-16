@@ -7,17 +7,24 @@ import type {
   DirectMessage,
 } from "@appTypes/index";
 import {
+  archiveDirectConversations,
+  deleteDirectConversations,
   fetchConnectedProfiles,
   fetchDirectConversations,
   fetchDirectMessages,
   getOrCreateDirectConversation,
   markDirectConversationRead,
+  markDirectConversationsRead,
+  muteDirectConversations,
+  restoreDirectConversation,
   sendDirectMessage,
   subscribeToDirectMessages,
+  unarchiveDirectConversations,
 } from "@services/directMessagesService";
 
 interface DirectMessagesState {
   conversations: DirectConversationSummary[];
+  archivedConversations: DirectConversationSummary[];
   connectedProfiles: ConnectedProfilePreview[];
   messagesByConversation: Record<string, DirectMessage[]>;
   isInboxLoading: boolean;
@@ -25,8 +32,18 @@ interface DirectMessagesState {
   isSending: boolean;
   error: string | null;
   refreshInbox: (userId: string) => Promise<void>;
+  refreshArchivedInbox: (userId: string) => Promise<void>;
   openConversationWithUser: (otherUserId: string, userId: string) => Promise<string>;
   loadConversationMessages: (conversationId: string, userId?: string) => Promise<void>;
+  markConversationsRead: (conversationIds: string[], userId: string) => Promise<void>;
+  archiveConversations: (conversationIds: string[], userId: string) => Promise<void>;
+  unarchiveConversations: (conversationIds: string[], userId: string) => Promise<void>;
+  deleteConversations: (conversationIds: string[], userId: string) => Promise<void>;
+  muteConversations: (
+    conversationIds: string[],
+    userId: string,
+    muted: boolean,
+  ) => Promise<void>;
   sendMessage: (
     conversationId: string,
     body: string,
@@ -40,6 +57,7 @@ interface DirectMessagesState {
 
 export const useDirectMessagesStore = create<DirectMessagesState>((set, get) => ({
   conversations: [],
+  archivedConversations: [],
   connectedProfiles: [],
   messagesByConversation: {},
   isInboxLoading: false,
@@ -58,6 +76,7 @@ export const useDirectMessagesStore = create<DirectMessagesState>((set, get) => 
 
       set({
         conversations,
+        archivedConversations: await fetchDirectConversations(userId, "archived"),
         connectedProfiles,
         isInboxLoading: false,
         error: null,
@@ -65,6 +84,7 @@ export const useDirectMessagesStore = create<DirectMessagesState>((set, get) => 
     } catch (error) {
       set({
         conversations: [],
+        archivedConversations: [],
         connectedProfiles: [],
         isInboxLoading: false,
         error:
@@ -75,16 +95,47 @@ export const useDirectMessagesStore = create<DirectMessagesState>((set, get) => 
     }
   },
 
+  async refreshArchivedInbox(userId) {
+    set({ isInboxLoading: true, error: null });
+
+    try {
+      const archivedConversations = await fetchDirectConversations(userId, "archived");
+
+      set({
+        archivedConversations,
+        isInboxLoading: false,
+        error: null,
+      });
+    } catch (error) {
+      set({
+        archivedConversations: [],
+        isInboxLoading: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Could not load archived direct messages right now.",
+      });
+    }
+  },
+
   async openConversationWithUser(otherUserId, userId) {
-    const existingConversation = get().conversations.find(
+    const existingConversation = [
+      ...get().conversations,
+      ...get().archivedConversations,
+    ].find(
       (conversation) => conversation.other_user.id === otherUserId,
     );
 
     if (existingConversation) {
+      if (existingConversation.archived_at || existingConversation.deleted_at) {
+        await restoreDirectConversation(existingConversation.id, userId);
+        await get().refreshInbox(userId);
+      }
       return existingConversation.id;
     }
 
     const conversationId = await getOrCreateDirectConversation(otherUserId);
+    await restoreDirectConversation(conversationId, userId);
     await get().refreshInbox(userId);
     return conversationId;
   },
@@ -115,6 +166,31 @@ export const useDirectMessagesStore = create<DirectMessagesState>((set, get) => 
             : "Could not load this conversation right now.",
       });
     }
+  },
+
+  async markConversationsRead(conversationIds, userId) {
+    await markDirectConversationsRead(conversationIds, userId);
+    await get().refreshInbox(userId);
+  },
+
+  async archiveConversations(conversationIds, userId) {
+    await archiveDirectConversations(conversationIds, userId);
+    await get().refreshInbox(userId);
+  },
+
+  async unarchiveConversations(conversationIds, userId) {
+    await unarchiveDirectConversations(conversationIds, userId);
+    await get().refreshInbox(userId);
+  },
+
+  async deleteConversations(conversationIds, userId) {
+    await deleteDirectConversations(conversationIds, userId);
+    await get().refreshInbox(userId);
+  },
+
+  async muteConversations(conversationIds, userId, muted) {
+    await muteDirectConversations(conversationIds, userId, muted);
+    await get().refreshInbox(userId);
   },
 
   async sendMessage(conversationId, body, userId, attachment) {
@@ -179,6 +255,7 @@ export const useDirectMessagesStore = create<DirectMessagesState>((set, get) => 
   reset() {
     set({
       conversations: [],
+      archivedConversations: [],
       connectedProfiles: [],
       messagesByConversation: {},
       isInboxLoading: false,

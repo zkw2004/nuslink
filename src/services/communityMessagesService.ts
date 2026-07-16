@@ -24,6 +24,8 @@ type CommunityAttachmentUpload = {
 
 const CHAT_ATTACHMENTS_BUCKET = "chat-attachments";
 
+type CommunityChatScope = "active" | "archived" | "all";
+
 function mapProfileToPreview(profile: ProfileRow): ConnectedProfilePreview {
   return {
     id: profile.id,
@@ -71,6 +73,8 @@ function mapCommunityMessage(
     attachment_size: message.attachment_size,
     attachment_kind: message.attachment_kind,
     created_at: message.created_at,
+    deleted_at: message.deleted_at,
+    edited_at: message.edited_at,
     sender_profile: senderProfile,
   };
 }
@@ -124,15 +128,27 @@ function stripFileExtension(name: string) {
   return name.replace(/\.[a-zA-Z0-9]+$/, "") || "attachment";
 }
 
-export async function fetchJoinedCommunityChats(userId: string) {
+export async function fetchJoinedCommunityChats(
+  userId: string,
+  scope: CommunityChatScope = "active",
+) {
   if (!supabase) {
     throw new Error("Supabase is not configured.");
   }
 
-  const { data: membershipRows, error: membershipError } = await supabase
+  let membershipQuery = supabase
     .from("community_members")
-    .select("community_id")
-    .eq("user_id", userId);
+    .select("*")
+    .eq("user_id", userId)
+    .is("deleted_at", null);
+
+  if (scope === "active") {
+    membershipQuery = membershipQuery.is("archived_at", null);
+  } else if (scope === "archived") {
+    membershipQuery = membershipQuery.not("archived_at", "is", null);
+  }
+
+  const { data: membershipRows, error: membershipError } = await membershipQuery;
 
   if (membershipError) {
     throw new Error(membershipError.message);
@@ -223,6 +239,9 @@ export async function fetchJoinedCommunityChats(userId: string) {
                   : null),
         last_message_at: lastMessage?.created_at ?? null,
         unread_count: unreadCountByCommunity.get(community.id) ?? 0,
+        archived_at: membershipByCommunity.get(community.id)?.archived_at ?? null,
+        deleted_at: membershipByCommunity.get(community.id)?.deleted_at ?? null,
+        muted_at: membershipByCommunity.get(community.id)?.muted_at ?? null,
       } satisfies CommunityChatSummary;
     })
     .sort((left, right) => {
@@ -237,17 +256,38 @@ export async function fetchCommunityMessages(communityId: string) {
     throw new Error("Supabase is not configured.");
   }
 
-  const { data, error } = await supabase
+  const [
+    { data, error },
+    { data: hiddenRows, error: hiddenError },
+  ] = await Promise.all([
+    supabase
     .from("community_messages")
     .select("*")
     .eq("community_id", communityId)
-    .order("created_at", { ascending: true });
+      .is("deleted_at", null)
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("chat_message_user_deletions")
+      .select("community_message_id")
+      .not("community_message_id", "is", null),
+  ]);
 
   if (error) {
     throw new Error(error.message);
   }
 
-  const messages = (data ?? []) as CommunityMessageRow[];
+  if (hiddenError) {
+    throw new Error(hiddenError.message);
+  }
+
+  const hiddenMessageIds = new Set(
+    (hiddenRows ?? [])
+      .map((row) => row.community_message_id)
+      .filter((messageId): messageId is string => messageId !== null),
+  );
+  const messages = ((data ?? []) as CommunityMessageRow[]).filter(
+    (message) => !hiddenMessageIds.has(message.id),
+  );
   const senderIds = Array.from(new Set(messages.map((message) => message.sender_id)));
   const profiles = await fetchProfilesByIds(senderIds);
   const profilesById = new Map(
@@ -277,6 +317,197 @@ export async function markCommunityChatRead(communityId: string, userId: string)
     .update({ last_read_at: new Date().toISOString() })
     .eq("community_id", communityId)
     .eq("user_id", userId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function markCommunityChatsRead(
+  communityIds: string[],
+  userId: string,
+) {
+  if (!supabase || communityIds.length === 0) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from("community_members")
+    .update({ last_read_at: new Date().toISOString() })
+    .eq("user_id", userId)
+    .in("community_id", communityIds);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function archiveCommunityChats(
+  communityIds: string[],
+  userId: string,
+) {
+  if (!supabase || communityIds.length === 0) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from("community_members")
+    .update({
+      archived_at: new Date().toISOString(),
+      deleted_at: null,
+    })
+    .eq("user_id", userId)
+    .in("community_id", communityIds);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function unarchiveCommunityChats(
+  communityIds: string[],
+  userId: string,
+) {
+  if (!supabase || communityIds.length === 0) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from("community_members")
+    .update({
+      archived_at: null,
+      deleted_at: null,
+    })
+    .eq("user_id", userId)
+    .in("community_id", communityIds);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function deleteCommunityChats(
+  communityIds: string[],
+  userId: string,
+) {
+  if (!supabase || communityIds.length === 0) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from("community_members")
+    .update({
+      archived_at: null,
+      deleted_at: new Date().toISOString(),
+    })
+    .eq("user_id", userId)
+    .in("community_id", communityIds);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function muteCommunityChats(
+  communityIds: string[],
+  userId: string,
+  muted: boolean,
+) {
+  if (!supabase || communityIds.length === 0) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from("community_members")
+    .update({ muted_at: muted ? new Date().toISOString() : null })
+    .eq("user_id", userId)
+    .in("community_id", communityIds);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function editCommunityMessage(messageId: string, body: string) {
+  if (!supabase) {
+    throw new Error("Supabase is not configured.");
+  }
+
+  const trimmedBody = body.trim();
+
+  if (!trimmedBody) {
+    throw new Error("Message cannot be empty.");
+  }
+
+  const { error } = await supabase
+    .from("community_messages")
+    .update({ body: trimmedBody, edited_at: new Date().toISOString() })
+    .eq("id", messageId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function deleteCommunityMessageForEveryone(messageId: string) {
+  if (!supabase) {
+    throw new Error("Supabase is not configured.");
+  }
+
+  const { error } = await supabase
+    .from("community_messages")
+    .update({
+      body: null,
+      attachment_kind: null,
+      attachment_mime_type: null,
+      attachment_name: null,
+      attachment_size: null,
+      attachment_url: null,
+      deleted_at: new Date().toISOString(),
+    })
+    .eq("id", messageId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function deleteCommunityMessageForMe(
+  messageId: string,
+  userId: string,
+) {
+  if (!supabase) {
+    throw new Error("Supabase is not configured.");
+  }
+
+  const { error } = await supabase
+    .from("chat_message_user_deletions")
+    .insert({
+      community_message_id: messageId,
+      user_id: userId,
+    });
+
+  if (error && error.code !== "23505") {
+    throw new Error(error.message);
+  }
+}
+
+export async function restoreCommunityChat(
+  communityId: string,
+  userId: string,
+) {
+  if (!supabase) {
+    throw new Error("Supabase is not configured.");
+  }
+
+  const { error } = await supabase
+    .from("community_members")
+    .update({
+      archived_at: null,
+      deleted_at: null,
+    })
+    .eq("user_id", userId)
+    .eq("community_id", communityId);
 
   if (error) {
     throw new Error(error.message);

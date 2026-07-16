@@ -5,17 +5,21 @@ import {
   Linking,
   Pressable,
   ScrollView,
+  StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
+import { BlurView } from "expo-blur";
 import { router, useLocalSearchParams } from "expo-router";
 import { File as ExpoFile } from "expo-file-system";
 import * as ImagePicker from "expo-image-picker";
-import { SymbolView } from "expo-symbols";
+import { Ionicons } from "@expo/vector-icons";
 
-import { AppAvatar, AppButton, BadgeTierPill, SectionCard } from "@components/shared";
+import { GlassButton, GlassSurface } from "@components/shared";
 import type { ChatAttachmentKind } from "@appTypes/index";
 import {
   ChatPollCard,
@@ -23,8 +27,22 @@ import {
   PollComposer,
   type PinnedMessagePreview,
 } from "@features/chat/ChatFeaturePanels";
-import { uploadChatAttachment } from "@services/directMessagesService";
-import { useAuthStore, useChatFeaturesStore, useDirectMessagesStore } from "@store/index";
+import { AttachSheet } from "@features/chat/AttachSheet";
+import {
+  MessageActionMenu,
+  type MessageActionKey,
+} from "@features/chat/MessageActionMenu";
+import {
+  deleteDirectMessageForEveryone,
+  deleteDirectMessageForMe,
+  editDirectMessage,
+  uploadChatAttachment,
+} from "@services/directMessagesService";
+import {
+  useAuthStore,
+  useChatFeaturesStore,
+  useDirectMessagesStore,
+} from "@store/index";
 
 type PendingAttachment = {
   bytes: ArrayBuffer;
@@ -34,6 +52,23 @@ type PendingAttachment = {
   size: number | null;
   kind: ChatAttachmentKind;
 };
+
+const APP_GRADIENT = ["#F6F8FD", "#E7EBF7", "#D3DBEE", "#C6D0E8"] as const;
+const AVATAR_GRADIENT = ["#7DB2D3", "#427AA0"] as const;
+
+function getHeaderMetrics(width: number) {
+  return {
+    avatarSize: width * 0.09,
+    backHeight: width * 0.086,
+    backIconSize: width * 0.032,
+    backWidth: width * 0.19,
+    headerHeight: width * 0.174,
+    paddingLeft: width * 0.03,
+    paddingRight: width * 0.075,
+    titleHeight: width * 0.095,
+    titleWidth: width * 0.46,
+  };
+}
 
 type DocumentPickerModule = {
   getDocumentAsync: (options: {
@@ -76,6 +111,22 @@ function formatMessageTime(value: string) {
     hour: "numeric",
     minute: "2-digit",
   });
+}
+
+function formatThreadTime(value: string) {
+  return new Date(value).toLocaleTimeString("en-SG", {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function getInitials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("");
 }
 
 function formatFileSize(size: number | null) {
@@ -153,16 +204,18 @@ function getDefaultAttachmentName(kind: ChatAttachmentKind, mimeType: string) {
   return "photo.jpg";
 }
 
-function getAttachmentIconName(kind: ChatAttachmentKind) {
+function getAttachmentIconName(
+  kind: ChatAttachmentKind,
+): keyof typeof Ionicons.glyphMap {
   switch (kind) {
     case "video":
-      return { ios: "play.rectangle.fill", android: "movie", web: "movie" } as const;
+      return "videocam-outline";
     case "audio":
-      return { ios: "waveform", android: "graphic_eq", web: "graphic_eq" } as const;
+      return "musical-notes-outline";
     case "image":
-      return { ios: "photo.fill", android: "image", web: "image" } as const;
+      return "image-outline";
     default:
-      return { ios: "doc.fill", android: "description", web: "description" } as const;
+      return "document-text-outline";
   }
 }
 
@@ -183,12 +236,22 @@ export default function ConversationThreadScreen() {
   const params = useLocalSearchParams<{ conversationId?: string }>();
   const conversationId =
     typeof params.conversationId === "string" ? params.conversationId : "";
+  const { width: screenWidth } = useWindowDimensions();
+  const headerMetrics = useMemo(
+    () => getHeaderMetrics(screenWidth),
+    [screenWidth],
+  );
   const session = useAuthStore((state) => state.session);
   const conversations = useDirectMessagesStore((state) => state.conversations);
+  const archivedConversations = useDirectMessagesStore(
+    (state) => state.archivedConversations,
+  );
   const messagesByConversation = useDirectMessagesStore(
     (state) => state.messagesByConversation,
   );
-  const isThreadLoading = useDirectMessagesStore((state) => state.isThreadLoading);
+  const isThreadLoading = useDirectMessagesStore(
+    (state) => state.isThreadLoading,
+  );
   const isSending = useDirectMessagesStore((state) => state.isSending);
   const error = useDirectMessagesStore((state) => state.error);
   const refreshInbox = useDirectMessagesStore((state) => state.refreshInbox);
@@ -199,7 +262,9 @@ export default function ConversationThreadScreen() {
   const subscribeToConversation = useDirectMessagesStore(
     (state) => state.subscribeToConversation,
   );
-  const pollsByMessageId = useChatFeaturesStore((state) => state.pollsByMessageId);
+  const pollsByMessageId = useChatFeaturesStore(
+    (state) => state.pollsByMessageId,
+  );
   const pinnedMessagesByChatKey = useChatFeaturesStore(
     (state) => state.pinnedMessagesByChatKey,
   );
@@ -216,22 +281,34 @@ export default function ConversationThreadScreen() {
   );
 
   const [messageDraft, setMessageDraft] = useState("");
-  const [pendingAttachment, setPendingAttachment] = useState<PendingAttachment | null>(null);
+  const [pendingAttachment, setPendingAttachment] =
+    useState<PendingAttachment | null>(null);
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
   const [isPinnedDrawerOpen, setIsPinnedDrawerOpen] = useState(false);
   const [isPollComposerOpen, setIsPollComposerOpen] = useState(false);
+  const [isAttachSheetOpen, setIsAttachSheetOpen] = useState(false);
+  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(
+    null,
+  );
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [pollQuestion, setPollQuestion] = useState("");
   const [pollOptions, setPollOptions] = useState(["", ""]);
 
   const conversation = useMemo(
-    () => conversations.find((item) => item.id === conversationId) ?? null,
-    [conversationId, conversations],
+    () =>
+      [...conversations, ...archivedConversations].find(
+        (item) => item.id === conversationId,
+      ) ?? null,
+    [archivedConversations, conversationId, conversations],
   );
   const messages = useMemo(
     () => messagesByConversation[conversationId] ?? [],
     [conversationId, messagesByConversation],
   );
-  const messageIds = useMemo(() => messages.map((message) => message.id), [messages]);
+  const messageIds = useMemo(
+    () => messages.map((message) => message.id),
+    [messages],
+  );
   const chatKey = `direct:${conversationId}`;
   const pinnedMessages = pinnedMessagesByChatKey[chatKey] ?? [];
   const scrollViewRef = useRef<ScrollView | null>(null);
@@ -244,7 +321,12 @@ export default function ConversationThreadScreen() {
     void refreshInbox(session.user.id).then(() => {
       void loadConversationMessages(conversationId, session.user.id);
     });
-  }, [conversationId, loadConversationMessages, refreshInbox, session?.user.id]);
+  }, [
+    conversationId,
+    loadConversationMessages,
+    refreshInbox,
+    session?.user.id,
+  ]);
 
   useEffect(() => {
     if (!session?.user.id || !conversationId) {
@@ -273,12 +355,7 @@ export default function ConversationThreadScreen() {
       messageIds,
       session.user.id,
     );
-  }, [
-    conversationId,
-    messageIds,
-    session?.user.id,
-    subscribeToFeatureChanges,
-  ]);
+  }, [conversationId, messageIds, session?.user.id, subscribeToFeatureChanges]);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -311,8 +388,9 @@ export default function ConversationThreadScreen() {
 
     const asset = result.assets[0];
     const mimeType = asset.mimeType ?? "image/jpeg";
-    const kind: ChatAttachmentKind =
-      mimeType.startsWith("video/") ? "video" : "image";
+    const kind: ChatAttachmentKind = mimeType.startsWith("video/")
+      ? "video"
+      : "image";
     const bytes = await new ExpoFile(asset.uri).arrayBuffer();
 
     setPendingAttachment({
@@ -330,7 +408,8 @@ export default function ConversationThreadScreen() {
 
     try {
       // eslint-disable-next-line import/no-unresolved
-      documentPicker = (await import("expo-document-picker")) as DocumentPickerModule;
+      documentPicker =
+        (await import("expo-document-picker")) as DocumentPickerModule;
     } catch {
       Alert.alert(
         "File picker unavailable",
@@ -364,7 +443,8 @@ export default function ConversationThreadScreen() {
     setPendingAttachment({
       bytes,
       previewUri: null,
-      name: asset.name || getDefaultAttachmentName("file", asset.mimeType ?? ""),
+      name:
+        asset.name || getDefaultAttachmentName("file", asset.mimeType ?? ""),
       mimeType: asset.mimeType ?? getMimeTypeFromName(asset.name),
       size: asset.size ?? bytes.byteLength,
       kind: "file",
@@ -376,7 +456,8 @@ export default function ConversationThreadScreen() {
 
     try {
       // eslint-disable-next-line import/no-unresolved
-      documentPicker = (await import("expo-document-picker")) as DocumentPickerModule;
+      documentPicker =
+        (await import("expo-document-picker")) as DocumentPickerModule;
     } catch {
       Alert.alert(
         "File picker unavailable",
@@ -407,7 +488,8 @@ export default function ConversationThreadScreen() {
     setPendingAttachment({
       bytes,
       previewUri: null,
-      name: asset.name || getDefaultAttachmentName("audio", asset.mimeType ?? ""),
+      name:
+        asset.name || getDefaultAttachmentName("audio", asset.mimeType ?? ""),
       mimeType: asset.mimeType ?? getMimeTypeFromName(asset.name),
       size: asset.size ?? bytes.byteLength,
       kind: "audio",
@@ -415,39 +497,61 @@ export default function ConversationThreadScreen() {
   }
 
   function openAttachmentMenu() {
-    Alert.alert("Attach", "Choose what to share", [
-      {
-        text: "Photo or video",
-        onPress: () => {
-          void handlePickMedia();
-        },
-      },
-      {
-        text: "File",
-        onPress: () => {
-          void handlePickFile();
-        },
-      },
-      {
-        text: "Audio",
-        onPress: () => {
-          void handlePickAudio();
-        },
-      },
-      { text: "Cancel", style: "cancel" },
-    ]);
+    setIsAttachSheetOpen(true);
+  }
+
+  function handlePickAttachment(
+    type: "photo" | "video" | "file" | "audio" | "poll",
+  ) {
+    if (type === "file") {
+      void handlePickFile();
+      return;
+    }
+
+    if (type === "audio") {
+      void handlePickAudio();
+      return;
+    }
+
+    if (type === "poll") {
+      setIsPollComposerOpen(true);
+      return;
+    }
+
+    void handlePickMedia();
   }
 
   async function handleSendMessage() {
     if (!session?.user.id) {
-      Alert.alert("Sign in required", "Please sign in again before sending messages.");
+      Alert.alert(
+        "Sign in required",
+        "Please sign in again before sending messages.",
+      );
       return;
     }
 
     const trimmedMessage = messageDraft.trim();
 
     if (!trimmedMessage && !pendingAttachment) {
-      Alert.alert("Write a message", "Type something or attach media before sending.");
+      Alert.alert(
+        "Write a message",
+        "Type something or attach media before sending.",
+      );
+      return;
+    }
+
+    if (editingMessageId) {
+      try {
+        await editDirectMessage(editingMessageId, trimmedMessage);
+        await loadConversationMessages(conversationId, session.user.id);
+        setEditingMessageId(null);
+        setMessageDraft("");
+      } catch (editError) {
+        Alert.alert(
+          "Could not edit message",
+          editError instanceof Error ? editError.message : "Please try again.",
+        );
+      }
       return;
     }
 
@@ -491,10 +595,15 @@ export default function ConversationThreadScreen() {
 
   async function handleCreatePoll() {
     const trimmedQuestion = pollQuestion.trim();
-    const trimmedOptions = pollOptions.map((option) => option.trim()).filter(Boolean);
+    const trimmedOptions = pollOptions
+      .map((option) => option.trim())
+      .filter(Boolean);
 
     if (!session?.user.id) {
-      Alert.alert("Sign in required", "Please sign in again before creating polls.");
+      Alert.alert(
+        "Sign in required",
+        "Please sign in again before creating polls.",
+      );
       return;
     }
 
@@ -509,7 +618,12 @@ export default function ConversationThreadScreen() {
     }
 
     try {
-      await createPoll("direct", conversationId, trimmedQuestion, trimmedOptions);
+      await createPoll(
+        "direct",
+        conversationId,
+        trimmedQuestion,
+        trimmedOptions,
+      );
       await Promise.all([
         loadConversationMessages(conversationId, session.user.id),
         refreshInbox(session.user.id),
@@ -548,7 +662,10 @@ export default function ConversationThreadScreen() {
 
   async function handleUnvotePoll(pollId: string) {
     if (!session?.user.id) {
-      Alert.alert("Sign in required", "Please sign in again before updating votes.");
+      Alert.alert(
+        "Sign in required",
+        "Please sign in again before updating votes.",
+      );
       return;
     }
 
@@ -570,7 +687,10 @@ export default function ConversationThreadScreen() {
 
   async function handleSetPinned(messageId: string, pinned: boolean) {
     if (!session?.user.id) {
-      Alert.alert("Sign in required", "Please sign in again before pinning messages.");
+      Alert.alert(
+        "Sign in required",
+        "Please sign in again before pinning messages.",
+      );
       return;
     }
 
@@ -603,14 +723,16 @@ export default function ConversationThreadScreen() {
       poll?.question ??
       message.body ??
       message.attachment_name ??
-      (message.attachment_kind === "image" ? "Photo attachment" : "File attachment");
+      (message.attachment_kind === "image"
+        ? "Photo attachment"
+        : "File attachment");
 
     return {
       body,
       senderName:
         message.sender_id === session?.user.id
           ? "You"
-          : conversation?.other_user.display_name ?? "Connection",
+          : (conversation?.other_user.display_name ?? "Connection"),
     };
   }
 
@@ -629,284 +751,539 @@ export default function ConversationThreadScreen() {
       };
     })
     .filter((message): message is PinnedMessagePreview => message !== null);
+  const selectedMessage = selectedMessageId
+    ? (messages.find((message) => message.id === selectedMessageId) ?? null)
+    : null;
+
+  async function handleMessageAction(action: MessageActionKey) {
+    if (!selectedMessage || !session?.user.id) {
+      setSelectedMessageId(null);
+      return;
+    }
+
+    if (action === "pin") {
+      setSelectedMessageId(null);
+      Alert.alert(
+        "Pin this message?",
+        "Pinned messages are visible to everyone in this chat.",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Pin for everyone",
+            onPress: () => {
+              void handleSetPinned(selectedMessage.id, true);
+            },
+          },
+        ],
+      );
+      return;
+    }
+
+    if (action === "edit") {
+      setEditingMessageId(selectedMessage.id);
+      setMessageDraft(selectedMessage.body ?? "");
+      setSelectedMessageId(null);
+      return;
+    }
+
+    if (action === "delete") {
+      const isMine = selectedMessage.sender_id === session.user.id;
+      setSelectedMessageId(null);
+      Alert.alert(
+        "Delete message?",
+        isMine
+          ? "Choose how this message should be deleted."
+          : "This only removes the message for you.",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Delete for me",
+            style: "destructive",
+            onPress: () => {
+              void deleteDirectMessageForMe(
+                selectedMessage.id,
+                session.user.id,
+              ).then(() =>
+                loadConversationMessages(conversationId, session.user.id),
+              );
+            },
+          },
+          ...(isMine
+            ? [
+                {
+                  text: "Delete for everyone",
+                  style: "destructive" as const,
+                  onPress: () => {
+                    void deleteDirectMessageForEveryone(
+                      selectedMessage.id,
+                    ).then(() =>
+                      loadConversationMessages(conversationId, session.user.id),
+                    );
+                  },
+                },
+              ]
+            : []),
+        ],
+      );
+      return;
+    }
+
+    if (action === "forward") {
+      setSelectedMessageId(null);
+      Alert.alert(
+        "Forward",
+        "Forwarding to existing chats will be wired in the next slice.",
+      );
+      return;
+    }
+
+    if (action === "copy") {
+      setSelectedMessageId(null);
+      Alert.alert(
+        "Copied",
+        selectedMessage.body ?? "Only text messages can be copied.",
+      );
+      return;
+    }
+
+    setSelectedMessageId(null);
+  }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#EEF3F9" }}>
-      <View className="px-5 pb-4 pt-3">
-        <View className="flex-row items-center gap-3">
-          <Pressable
-            onPress={() => router.replace("/(tabs)/chats")}
-            className="rounded-full bg-white px-4 py-3"
-          >
-            <Text className="text-[13px] font-semibold text-[#0F1115]">Back</Text>
-          </Pressable>
+    <View style={styles.threadRoot}>
+      <LinearGradient
+        colors={APP_GRADIENT}
+        locations={[0, 0.44, 0.8, 1]}
+        style={StyleSheet.absoluteFill}
+      />
+      <SafeAreaView style={styles.safeArea}>
+        <View
+          style={[
+            styles.topbar,
+            {
+              height: headerMetrics.headerHeight,
+              paddingLeft: headerMetrics.paddingLeft,
+              paddingRight: headerMetrics.paddingRight,
+            },
+          ]}
+        >
+          <View style={styles.headerSideLeft}>
+            <Pressable onPress={() => router.replace("/(tabs)/chats")}>
+              <GlassSurface
+                tint="light"
+                radius={headerMetrics.backHeight / 2}
+                intensity={40}
+                style={[
+                  styles.backButton,
+                  {
+                    height: headerMetrics.backHeight,
+                    width: headerMetrics.backWidth,
+                  },
+                ]}
+              >
+                <View
+                  style={[
+                    styles.backButtonContent,
+                    { height: headerMetrics.backHeight },
+                  ]}
+                >
+                  <Ionicons
+                    name="chevron-back"
+                    size={headerMetrics.backIconSize}
+                    color="#33333F"
+                  />
+                  <Text style={styles.backText}>Back</Text>
+                </View>
+              </GlassSurface>
+            </Pressable>
+          </View>
 
-          {conversation ? (
+          <View style={styles.centerArea}>
             <Pressable
               onPress={() => {
-                router.push(`/chats/media/${conversationId}` as never);
+                router.push({
+                  pathname: "/(tabs)/chats/info",
+                  params: { kind: "direct", id: conversationId },
+                } as never);
               }}
-              className="flex-1 flex-row items-center gap-3 rounded-[20px] bg-white px-4 py-3"
+              disabled={!conversation}
+              style={[
+                styles.namePill,
+                {
+                  borderRadius: headerMetrics.titleHeight / 2,
+                  height: headerMetrics.titleHeight,
+                  width: headerMetrics.titleWidth,
+                },
+              ]}
             >
-              <AppAvatar
-                name={conversation.other_user.display_name}
-                imageUri={conversation.other_user.avatar_url}
-                size={44}
-              />
-              <View className="flex-1">
-                <View className="flex-row flex-wrap items-center gap-2">
-                  <Text className="text-[16px] font-bold text-[#0F1115]">
-                    {conversation.other_user.display_name}
-                  </Text>
-                  <BadgeTierPill
-                    tier={toBadgeTierLabel(conversation.other_user.badge_tier)}
-                  />
-                </View>
-                <Text className="mt-1 text-[12px] text-[#5C6370]">
-                  Mutual connection direct message
-                </Text>
-              </View>
+              <Text
+                ellipsizeMode="tail"
+                numberOfLines={1}
+                style={styles.topbarName}
+              >
+                {conversation?.other_user.display_name ?? "Direct message"}
+              </Text>
+              <Text style={styles.topbarSub} numberOfLines={1}>
+                last seen recently
+              </Text>
             </Pressable>
+          </View>
+
+          <View style={styles.headerSideRight}>
+            <Pressable
+              onPress={() => setIsPinnedDrawerOpen((current) => !current)}
+              style={styles.avatarPressable}
+            >
+              <LinearGradient
+                colors={AVATAR_GRADIENT}
+                style={[
+                  styles.threadAvatar,
+                  {
+                    borderRadius: headerMetrics.avatarSize / 2,
+                    height: headerMetrics.avatarSize,
+                    width: headerMetrics.avatarSize,
+                  },
+                ]}
+              >
+                <Text style={styles.threadAvatarText}>
+                  {getInitials(conversation?.other_user.display_name ?? "DM") ||
+                    "DM"}
+                </Text>
+              </LinearGradient>
+            </Pressable>
+          </View>
+        </View>
+
+        {pinnedPreviews[0] ? (
+          <View style={styles.pinnedBanner}>
+            <View style={styles.pinnedAccent} />
+            <View style={styles.pinnedContent}>
+              <Text style={styles.pinnedLabel}>Pinned message</Text>
+              <Text numberOfLines={1} style={styles.pinnedText}>
+                {pinnedPreviews[0].body}
+              </Text>
+            </View>
+            <Pressable
+              onPress={() => {
+                void handleSetPinned(pinnedPreviews[0].message_id, false);
+              }}
+              style={styles.pinnedClose}
+            >
+              <Ionicons name="close" size={15} color="#6E6E80" />
+            </Pressable>
+          </View>
+        ) : null}
+
+        {isPinnedDrawerOpen ? (
+          <PinnedMessagesDrawer
+            pinnedMessages={pinnedPreviews}
+            onUnpin={(messageId) => {
+              void handleSetPinned(messageId, false);
+            }}
+          />
+        ) : null}
+
+        <ScrollView
+          ref={(ref) => {
+            scrollViewRef.current = ref;
+          }}
+          contentContainerStyle={styles.messagesContent}
+          onContentSizeChange={() => {
+            scrollViewRef.current?.scrollToEnd({ animated: true });
+          }}
+          showsVerticalScrollIndicator={false}
+        >
+          {error ? (
+            <View style={styles.stateCard}>
+              <Text style={styles.stateTitle}>Conversation unavailable</Text>
+              <Text style={styles.stateError}>{error}</Text>
+            </View>
           ) : null}
 
-          <Pressable
-            onPress={() => setIsPinnedDrawerOpen((current) => !current)}
-            className="h-12 w-12 items-center justify-center rounded-full bg-white"
-          >
-            <SymbolView
-              name={{ ios: "pin.fill", android: "push_pin", web: "push_pin" }}
-              size={18}
-              tintColor="#0F1115"
-            />
-          </Pressable>
-        </View>
-      </View>
+          {!error && !conversation && !isThreadLoading ? (
+            <View style={styles.stateCard}>
+              <Text style={styles.stateTitle}>
+                Could not find this conversation
+              </Text>
+              <Text style={styles.stateText}>
+                Return to the Chats inbox and open the thread again from your
+                mutual connections.
+              </Text>
+            </View>
+          ) : null}
 
-      {isPinnedDrawerOpen ? (
-        <PinnedMessagesDrawer
-          pinnedMessages={pinnedPreviews}
-          onUnpin={(messageId) => {
-            void handleSetPinned(messageId, false);
-          }}
-        />
-      ) : null}
+          {!error &&
+          conversation &&
+          messages.length === 0 &&
+          !isThreadLoading ? (
+            <View style={styles.stateCard}>
+              <Text style={styles.stateTitle}>No messages yet</Text>
+              <Text style={styles.stateText}>
+                Send the first message to start this direct conversation.
+              </Text>
+            </View>
+          ) : null}
 
-      <ScrollView
-        ref={(ref) => {
-          scrollViewRef.current = ref;
-        }}
-        className="flex-1 px-5"
-        contentContainerStyle={{ paddingBottom: 24 }}
-        onContentSizeChange={() => {
-          scrollViewRef.current?.scrollToEnd({ animated: true });
-        }}
-        showsVerticalScrollIndicator={false}
-      >
-        {error ? (
-          <SectionCard className="mb-4">
-            <Text className="text-[15px] font-semibold text-[#0F1115]">
-              Conversation unavailable
-            </Text>
-            <Text className="mt-2 text-[14px] leading-6 text-red-700">{error}</Text>
-          </SectionCard>
-        ) : null}
+          <View style={styles.messageStack}>
+            {messages.map((message) => {
+              const isCurrentUser = message.sender_id === session?.user.id;
+              const hasImage =
+                message.attachment_kind === "image" && message.attachment_url;
+              const hasVideo =
+                message.attachment_kind === "video" && message.attachment_url;
+              const isMediaBubble = Boolean(hasImage || hasVideo);
+              const hasAttachmentCard =
+                message.attachment_kind !== null &&
+                message.attachment_kind !== "image" &&
+                message.attachment_kind !== "video" &&
+                Boolean(message.attachment_url);
+              const poll = pollsByMessageId[message.id];
+              const isPinned = pinnedMessages.some(
+                (pinnedMessage) => pinnedMessage.message_id === message.id,
+              );
 
-        {!error && !conversation && !isThreadLoading ? (
-          <SectionCard className="mb-4">
-            <Text className="text-[17px] font-bold text-[#0F1115]">
-              Could not find this conversation
-            </Text>
-            <Text className="mt-2 text-[14px] leading-6 text-[#5C6370]">
-              Return to the Chats inbox and open the thread again from your mutual connections.
-            </Text>
-          </SectionCard>
-        ) : null}
-
-        {!error && conversation && messages.length === 0 && !isThreadLoading ? (
-          <SectionCard className="mb-4">
-            <Text className="text-[17px] font-bold text-[#0F1115]">
-              No messages yet
-            </Text>
-            <Text className="mt-2 text-[14px] leading-6 text-[#5C6370]">
-              Send the first message to start this direct conversation.
-            </Text>
-          </SectionCard>
-        ) : null}
-
-        <View className="gap-3">
-          {messages.map((message) => {
-            const isCurrentUser = message.sender_id === session?.user.id;
-            const hasImage = message.attachment_kind === "image" && message.attachment_url;
-            const hasAttachmentCard =
-              message.attachment_kind !== null &&
-              message.attachment_kind !== "image" &&
-              Boolean(message.attachment_url);
-            const poll = pollsByMessageId[message.id];
-            const isPinned = pinnedMessages.some(
-              (pinnedMessage) => pinnedMessage.message_id === message.id,
-            );
-
-            return (
-              <View
-                key={message.id}
-                className={`rounded-[18px] px-4 py-3 ${
-                  poll ? "w-[88%] min-w-[260px]" : "max-w-[88%]"
-                } ${
-                  isCurrentUser ? "self-end bg-[#0F1115]" : "self-start bg-white"
-                }`}
-              >
-                {hasImage ? (
-                  <Pressable
-                    onPress={() => {
-                      void Linking.openURL(message.attachment_url ?? "");
-                    }}
-                  >
-                    <Image
-                      source={{ uri: message.attachment_url ?? "" }}
-                      className="mb-3 h-48 w-64 rounded-[14px] bg-[#DDE5EF]"
-                      resizeMode="cover"
-                    />
-                  </Pressable>
-                ) : null}
-
-                {hasAttachmentCard ? (
-                  <Pressable
-                    onPress={() => {
-                      void Linking.openURL(message.attachment_url ?? "");
-                    }}
-                    className={`mb-3 rounded-[14px] border px-3 py-3 ${
-                      isCurrentUser
-                        ? "border-[#303744] bg-[#20242B]"
-                        : "border-[#E4E9F1] bg-[#F7F9FC]"
-                    }`}
-                  >
-                    <View className="flex-row items-center gap-3">
-                      <SymbolView
-                        name={getAttachmentIconName(message.attachment_kind ?? "file")}
-                        size={22}
-                        tintColor={isCurrentUser ? "#FFFFFF" : "#0F1115"}
-                      />
-                      <View className="flex-1">
+              return (
+                <Pressable
+                  key={message.id}
+                  onLongPress={() => setSelectedMessageId(message.id)}
+                  delayLongPress={320}
+                  style={[
+                    styles.bubble,
+                    isCurrentUser ? styles.bubbleMine : styles.bubbleTheirs,
+                    isMediaBubble ? styles.bubbleMedia : null,
+                    poll ? styles.pollBubble : null,
+                  ]}
+                >
+                  {hasImage ? (
+                    <View style={styles.mediaWrap}>
+                      <Pressable
+                        onPress={() => {
+                          void Linking.openURL(message.attachment_url ?? "");
+                        }}
+                      >
+                        <Image
+                          source={{ uri: message.attachment_url ?? "" }}
+                          style={styles.attachmentImage}
+                          resizeMode="cover"
+                        />
+                      </Pressable>
+                      {message.body ? (
                         <Text
-                          numberOfLines={1}
-                          className={`text-[13px] font-semibold ${
-                            isCurrentUser ? "text-white" : "text-[#0F1115]"
-                          }`}
+                          style={[
+                            styles.attachmentCaption,
+                            isCurrentUser
+                              ? styles.bubbleTextMine
+                              : styles.bubbleTextTheirs,
+                          ]}
                         >
-                          {message.attachment_name ?? "Attachment"}
+                          {message.body}
                         </Text>
-                        <Text
-                          className={`mt-1 text-[11px] ${
-                            isCurrentUser ? "text-[#C9D0DB]" : "text-[#7B8494]"
-                          }`}
-                        >
-                          {getAttachmentMeta(message.attachment_kind ?? "file", message.attachment_size)}
-                        </Text>
-                      </View>
+                      ) : null}
                     </View>
-                  </Pressable>
-                ) : null}
+                  ) : null}
 
-                {poll ? (
-                  <ChatPollCard
-                    poll={poll}
-                    disabled={isVoting}
-                    isDark={isCurrentUser}
-                    onVote={(optionId) => {
-                      void handleVotePoll(poll.id, optionId);
-                    }}
-                    onUnvote={() => {
-                      void handleUnvotePoll(poll.id);
-                    }}
-                  />
-                ) : message.body ? (
-                  <Text
-                    className={`text-[14px] leading-6 ${
-                      isCurrentUser ? "text-white" : "text-[#0F1115]"
-                    }`}
-                  >
-                    {message.body}
-                  </Text>
-                ) : null}
-                <View className={poll ? "mt-3 gap-2" : "mt-2 gap-2"}>
-                  <Text
-                    className={`text-[11px] ${
-                      isCurrentUser ? "text-[#C9D0DB]" : "text-[#7B8494]"
-                    }`}
-                  >
-                    {formatMessageTime(message.created_at)}
-                  </Text>
-                  <Pressable
-                    disabled={isPinning}
-                    onPress={() => {
-                      void handleSetPinned(message.id, !isPinned);
-                    }}
-                    className={`self-start rounded-full px-3 py-1.5 ${
-                      isCurrentUser ? "bg-[#20242B]" : "bg-[#F1F3F7]"
-                    }`}
+                  {hasVideo ? (
+                    <View style={styles.mediaWrap}>
+                      <Pressable
+                        onPress={() => {
+                          void Linking.openURL(message.attachment_url ?? "");
+                        }}
+                      >
+                        <LinearGradient
+                          colors={["#8B93B8", "#5A6390"]}
+                          style={styles.videoAttachment}
+                        >
+                          <View style={styles.videoPlayCircle}>
+                            <Ionicons name="play" size={20} color="#FFFFFF" />
+                          </View>
+                        </LinearGradient>
+                      </Pressable>
+                      {message.body ? (
+                        <Text
+                          style={[
+                            styles.attachmentCaption,
+                            isCurrentUser
+                              ? styles.bubbleTextMine
+                              : styles.bubbleTextTheirs,
+                          ]}
+                        >
+                          {message.body}
+                        </Text>
+                      ) : null}
+                    </View>
+                  ) : null}
+
+                  {hasAttachmentCard ? (
+                    <Pressable
+                      onPress={() => {
+                        void Linking.openURL(message.attachment_url ?? "");
+                      }}
+                      style={[
+                        styles.attachmentCard,
+                        isCurrentUser
+                          ? styles.attachmentCardMine
+                          : styles.attachmentCardTheirs,
+                      ]}
+                    >
+                      <View style={styles.attachmentRow}>
+                        <Ionicons
+                          name={getAttachmentIconName(
+                            message.attachment_kind ?? "file",
+                          )}
+                          size={22}
+                          color={isCurrentUser ? "#FFFFFF" : "#0F1115"}
+                        />
+                        <View style={styles.attachmentTextColumn}>
+                          <Text
+                            numberOfLines={1}
+                            style={[
+                              styles.attachmentName,
+                              isCurrentUser
+                                ? styles.bubbleTextMine
+                                : styles.bubbleTextTheirs,
+                            ]}
+                          >
+                            {message.attachment_name ?? "Attachment"}
+                          </Text>
+                          <Text
+                            numberOfLines={1}
+                            style={[
+                              styles.attachmentMeta,
+                              isCurrentUser
+                                ? styles.bubbleTimeMine
+                                : styles.bubbleTimeTheirs,
+                            ]}
+                          >
+                            {getAttachmentMeta(
+                              message.attachment_kind ?? "file",
+                              message.attachment_size,
+                            )}
+                          </Text>
+                        </View>
+                      </View>
+                    </Pressable>
+                  ) : null}
+
+                  {poll ? (
+                    <ChatPollCard
+                      poll={poll}
+                      disabled={isVoting}
+                      isDark={isCurrentUser}
+                      onVote={(optionId) => {
+                        void handleVotePoll(poll.id, optionId);
+                      }}
+                      onUnvote={() => {
+                        void handleUnvotePoll(poll.id);
+                      }}
+                    />
+                  ) : message.body && !isMediaBubble ? (
+                    <Text
+                      style={[
+                        styles.bubbleText,
+                        isCurrentUser
+                          ? styles.bubbleTextMine
+                          : styles.bubbleTextTheirs,
+                      ]}
+                    >
+                      {message.body}
+                    </Text>
+                  ) : null}
+                  <View
+                    style={[
+                      styles.bubbleMeta,
+                      isMediaBubble ? styles.bubbleMetaMedia : null,
+                    ]}
                   >
                     <Text
-                      className={`text-[11px] font-semibold ${
-                        isCurrentUser ? "text-[#C9D0DB]" : "text-[#5C6370]"
-                      }`}
+                      style={[
+                        styles.bubbleTime,
+                        isCurrentUser
+                          ? styles.bubbleTimeMine
+                          : styles.bubbleTimeTheirs,
+                      ]}
                     >
-                      {isPinned ? "Unpin" : "Pin"}
+                      {formatThreadTime(message.created_at)}
                     </Text>
-                  </Pressable>
-                </View>
-              </View>
-            );
-          })}
-        </View>
-      </ScrollView>
+                    {isCurrentUser ? (
+                      <Ionicons
+                        name="checkmark-done"
+                        size={14}
+                        color="rgba(255,255,255,0.82)"
+                      />
+                    ) : null}
+                    <Pressable
+                      disabled={isPinning}
+                      onPress={() => {
+                        void handleSetPinned(message.id, !isPinned);
+                      }}
+                      style={styles.pinPill}
+                    >
+                      <Text style={styles.pinPillText}>
+                        {isPinned ? "Unpin" : "Pin"}
+                      </Text>
+                    </Pressable>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+        </ScrollView>
 
-      <View className="border-t border-[#DDE5EF] bg-[#EEF3F9] px-5 pb-6 pt-4">
-        <View className="rounded-[22px] bg-white p-3">
+        <View style={styles.composerWrap}>
+          <BlurView
+            intensity={30}
+            tint="systemChromeMaterialLight"
+            style={StyleSheet.absoluteFill}
+          />
+          <View style={styles.composerTint} />
           {isPollComposerOpen ? (
-            <PollComposer
-              question={pollQuestion}
-              options={pollOptions}
-              isCreating={isCreatingPoll}
-              onQuestionChange={setPollQuestion}
-              onOptionChange={(index, value) => {
-                setPollOptions((current) =>
-                  current.map((option, optionIndex) =>
-                    optionIndex === index ? value : option,
-                  ),
-                );
-              }}
-              onAddOption={() => {
-                setPollOptions((current) =>
-                  current.length >= 6 ? current : [...current, ""],
-                );
-              }}
-              onRemoveOption={(index) => {
-                setPollOptions((current) =>
-                  current.filter((_, optionIndex) => optionIndex !== index),
-                );
-              }}
-              onCancel={resetPollComposer}
-              onSubmit={() => {
-                void handleCreatePoll();
-              }}
-            />
+            <View style={styles.composerPanel}>
+              <PollComposer
+                question={pollQuestion}
+                options={pollOptions}
+                isCreating={isCreatingPoll}
+                onQuestionChange={setPollQuestion}
+                onOptionChange={(index, value) => {
+                  setPollOptions((current) =>
+                    current.map((option, optionIndex) =>
+                      optionIndex === index ? value : option,
+                    ),
+                  );
+                }}
+                onAddOption={() => {
+                  setPollOptions((current) =>
+                    current.length >= 12 ? current : [...current, ""],
+                  );
+                }}
+                onRemoveOption={(index) => {
+                  setPollOptions((current) =>
+                    current.filter((_, optionIndex) => optionIndex !== index),
+                  );
+                }}
+                onCancel={resetPollComposer}
+                onSubmit={() => {
+                  void handleCreatePoll();
+                }}
+              />
+            </View>
           ) : null}
 
           {pendingAttachment ? (
-            <View className="mb-3 rounded-[16px] border border-[#E4E9F1] bg-[#F7F9FC] p-3">
+            <View style={styles.pendingAttachment}>
               <View className="flex-row items-center gap-3">
-                {pendingAttachment.kind === "image" && pendingAttachment.previewUri ? (
+                {pendingAttachment.kind === "image" &&
+                pendingAttachment.previewUri ? (
                   <Image
                     source={{ uri: pendingAttachment.previewUri }}
-                    className="h-14 w-14 rounded-[12px] bg-[#DDE5EF]"
+                    style={styles.pendingImage}
                     resizeMode="cover"
                   />
                 ) : (
-                  <View className="h-14 w-14 items-center justify-center rounded-[12px] bg-[#E4E9F1]">
-                    <SymbolView
+                  <View style={styles.pendingIcon}>
+                    <Ionicons
                       name={getAttachmentIconName(pendingAttachment.kind)}
                       size={22}
-                      tintColor="#0F1115"
+                      color="#0F1115"
                     />
                   </View>
                 )}
@@ -918,73 +1295,439 @@ export default function ConversationThreadScreen() {
                     {pendingAttachment.name}
                   </Text>
                   <Text className="mt-1 text-[12px] text-[#7B8494]">
-                    {getAttachmentMeta(pendingAttachment.kind, pendingAttachment.size)}
+                    {getAttachmentMeta(
+                      pendingAttachment.kind,
+                      pendingAttachment.size,
+                    )}
                   </Text>
                 </View>
                 <Pressable
                   onPress={() => setPendingAttachment(null)}
                   className="h-9 w-9 items-center justify-center rounded-full bg-white"
                 >
-                  <SymbolView name="xmark" size={14} tintColor="#0F1115" />
+                  <Ionicons name="close" size={14} color="#0F1115" />
                 </Pressable>
               </View>
             </View>
           ) : null}
 
-          <View className="flex-row items-end gap-2">
+          <View style={styles.composerRow}>
             <Pressable
               disabled={isSending || isUploadingAttachment || !conversation}
               onPress={openAttachmentMenu}
-              className="h-12 w-12 items-center justify-center rounded-full bg-[#EEF2F7]"
+              style={styles.composerIcon}
             >
-              <SymbolView
-                name={{
-                  ios: "paperclip",
-                  android: "attach_file",
-                  web: "attach_file",
-                }}
-                size={20}
-                tintColor="#0F1115"
-              />
+              <Ionicons name="attach" size={22} color="#7A7A8C" />
             </Pressable>
 
-            <Pressable
+            <TextInput
+              value={messageDraft}
+              onChangeText={setMessageDraft}
+              placeholder={editingMessageId ? "Edit message" : "Message"}
+              placeholderTextColor="#7A7A87"
+              multiline
+              style={styles.composerInput}
+            />
+
+            <GlassButton
+              variant="dark"
               disabled={isSending || isUploadingAttachment || !conversation}
               onPress={() => {
-                setIsPollComposerOpen((current) => !current);
+                void handleSendMessage();
               }}
-              className="h-12 w-12 items-center justify-center rounded-full bg-[#EEF2F7]"
+              style={styles.sendButton}
             >
-              <SymbolView
-                name={{ ios: "chart.bar.doc.horizontal", android: "poll", web: "poll" }}
-                size={20}
-                tintColor="#0F1115"
-              />
-            </Pressable>
-
-            <View className="flex-1 rounded-[22px] border border-[#E4E9F1] bg-[#F9FBFD] px-3 py-1">
-              <TextInput
-                value={messageDraft}
-                onChangeText={setMessageDraft}
-                placeholder="Write a message"
-                placeholderTextColor="#9AA0AB"
-                multiline
-                className="min-h-[44px] text-[14px] leading-6 text-[#0F1115]"
-              />
-            </View>
-
-            <View className="w-[88px]">
-              <AppButton
-                label={isSending || isUploadingAttachment ? "Sending..." : "Send"}
-                disabled={isSending || isUploadingAttachment || !conversation}
-                onPress={() => {
-                  void handleSendMessage();
-                }}
-              />
-            </View>
+              <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
+            </GlassButton>
           </View>
         </View>
-      </View>
-    </SafeAreaView>
+        <AttachSheet
+          visible={isAttachSheetOpen}
+          isGroup={false}
+          onClose={() => setIsAttachSheetOpen(false)}
+          onPick={handlePickAttachment}
+        />
+        <MessageActionMenu
+          visible={selectedMessage !== null}
+          isMine={selectedMessage?.sender_id === session?.user.id}
+          onClose={() => setSelectedMessageId(null)}
+          onAction={(action) => {
+            void handleMessageAction(action);
+          }}
+          onReact={() => {
+            setSelectedMessageId(null);
+          }}
+        />
+      </SafeAreaView>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  threadRoot: {
+    backgroundColor: "#E7EBF7",
+    flex: 1,
+  },
+  safeArea: {
+    flex: 1,
+  },
+  topbar: {
+    alignItems: "center",
+    flexDirection: "row",
+  },
+  headerSideLeft: {
+    alignItems: "flex-start",
+    flex: 1,
+  },
+  headerSideRight: {
+    alignItems: "flex-end",
+    flex: 1,
+  },
+  backButton: {
+    shadowColor: "#8795C5",
+    shadowOffset: { width: 0, height: 7 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+  },
+  backButtonContent: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "center",
+  },
+  backText: {
+    color: "#33333F",
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  centerArea: {
+    alignItems: "center",
+    flexShrink: 0,
+    justifyContent: "center",
+    transform: [{ translateX: 15 }],
+  },
+  namePill: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.42)",
+    borderColor: "rgba(255,255,255,0.82)",
+    borderWidth: 1.5,
+    justifyContent: "center",
+    minWidth: 0,
+    overflow: "hidden",
+    paddingHorizontal: 20,
+    shadowColor: "#8290BE",
+    shadowOffset: { width: 0, height: 9 },
+    shadowOpacity: 0.1,
+    shadowRadius: 22,
+    width: "100%",
+  },
+  topbarName: {
+    color: "#10121F",
+    fontSize: 15.5,
+    fontWeight: "700",
+    lineHeight: 19,
+    maxWidth: "100%",
+    minWidth: 0,
+  },
+  topbarSub: {
+    color: "#696C7C",
+    fontSize: 12,
+    fontWeight: "400",
+    lineHeight: 15,
+  },
+  avatarPressable: {
+    borderRadius: 20,
+  },
+  threadAvatar: {
+    alignItems: "center",
+    borderColor: "rgba(210,225,244,0.9)",
+    borderWidth: 2,
+    justifyContent: "center",
+  },
+  threadAvatarText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  messagesContent: {
+    gap: 8,
+    paddingBottom: 90,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+  },
+  pinnedBanner: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.58)",
+    borderColor: "rgba(255,255,255,0.82)",
+    borderRadius: 18,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    marginHorizontal: 16,
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  pinnedAccent: {
+    backgroundColor: "#5B4FE0",
+    borderRadius: 2,
+    height: 32,
+    width: 3,
+  },
+  pinnedContent: {
+    flex: 1,
+    minWidth: 0,
+  },
+  pinnedLabel: {
+    color: "#4230A0",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  pinnedText: {
+    color: "#4B4B57",
+    fontSize: 12.5,
+    marginTop: 1,
+  },
+  pinnedClose: {
+    alignItems: "center",
+    height: 28,
+    justifyContent: "center",
+    width: 28,
+  },
+  messageStack: {
+    gap: 8,
+  },
+  stateCard: {
+    backgroundColor: "rgba(255,255,255,0.62)",
+    borderColor: "rgba(255,255,255,0.8)",
+    borderRadius: 22,
+    borderWidth: 1,
+    padding: 18,
+  },
+  stateTitle: {
+    color: "#10121F",
+    fontSize: 17,
+    fontWeight: "800",
+  },
+  stateText: {
+    color: "#606473",
+    fontSize: 14,
+    lineHeight: 21,
+    marginTop: 8,
+  },
+  stateError: {
+    color: "#C33B32",
+    fontSize: 14,
+    lineHeight: 21,
+    marginTop: 8,
+  },
+  bubble: {
+    borderWidth: 1,
+    flexShrink: 0,
+    maxWidth: "76%",
+    paddingHorizontal: 13,
+    paddingVertical: 9,
+    shadowColor: "#3240A0",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+  },
+  pollBubble: {
+    minWidth: 260,
+    maxWidth: 300,
+    width: "88%",
+  },
+  bubbleMedia: {
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+  },
+  bubbleMine: {
+    alignSelf: "flex-end",
+    backgroundColor: "rgba(91,79,224,0.92)",
+    borderBottomRightRadius: 6,
+    borderColor: "rgba(255,255,255,0.18)",
+    borderRadius: 18,
+  },
+  bubbleTheirs: {
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(255,255,255,0.62)",
+    borderBottomLeftRadius: 6,
+    borderColor: "rgba(255,255,255,0.82)",
+    borderRadius: 18,
+  },
+  bubbleText: {
+    fontSize: 14,
+    lineHeight: 19,
+  },
+  bubbleTextMine: {
+    color: "#FFFFFF",
+    fontWeight: "600",
+  },
+  bubbleTextTheirs: {
+    color: "#1B1D29",
+  },
+  bubbleMeta: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 5,
+    justifyContent: "flex-end",
+    marginTop: 2,
+  },
+  bubbleMetaMedia: {
+    paddingBottom: 2,
+    paddingHorizontal: 6,
+  },
+  bubbleTime: {
+    fontSize: 10.5,
+  },
+  bubbleTimeMine: {
+    color: "rgba(255,255,255,0.74)",
+  },
+  bubbleTimeTheirs: {
+    color: "#6B6F7F",
+  },
+  pinPill: {
+    display: "none",
+  },
+  pinPillText: {
+    color: "#6B6F7F",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  attachmentImage: {
+    backgroundColor: "#DDE5EF",
+    borderRadius: 14,
+    height: 168,
+    width: 232,
+  },
+  mediaWrap: {
+    gap: 6,
+  },
+  videoAttachment: {
+    alignItems: "center",
+    borderRadius: 14,
+    height: 168,
+    justifyContent: "center",
+    overflow: "hidden",
+    width: 232,
+  },
+  videoPlayCircle: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.3)",
+    borderRadius: 22,
+    height: 44,
+    justifyContent: "center",
+    width: 44,
+  },
+  attachmentCaption: {
+    fontSize: 14,
+    lineHeight: 19,
+    paddingBottom: 2,
+    paddingHorizontal: 7,
+  },
+  attachmentCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 3,
+    maxWidth: "100%",
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    width: 220,
+  },
+  attachmentCardMine: {
+    backgroundColor: "rgba(255,255,255,0.16)",
+    borderColor: "rgba(255,255,255,0.32)",
+  },
+  attachmentCardTheirs: {
+    backgroundColor: "rgba(255,255,255,0.55)",
+    borderColor: "rgba(255,255,255,0.85)",
+  },
+  attachmentRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 11,
+  },
+  attachmentTextColumn: {
+    flex: 1,
+    minWidth: 0,
+  },
+  attachmentName: {
+    fontSize: 13,
+    fontWeight: "600",
+    lineHeight: 18,
+  },
+  attachmentMeta: {
+    fontSize: 11,
+    marginTop: 1,
+  },
+  composerWrap: {
+    borderColor: "rgba(255,255,255,0.85)",
+    borderRadius: 22,
+    borderWidth: 1,
+    bottom: 18,
+    left: 20,
+    overflow: "hidden",
+    paddingLeft: 10,
+    paddingRight: 6,
+    paddingVertical: 5,
+    position: "absolute",
+    right: 20,
+  },
+  composerTint: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: "rgba(255,255,255,0.42)",
+    borderRadius: 22,
+  },
+  composerPanel: {
+    marginBottom: 12,
+  },
+  pendingAttachment: {
+    backgroundColor: "rgba(255,255,255,0.58)",
+    borderColor: "rgba(255,255,255,0.8)",
+    borderRadius: 18,
+    borderWidth: 1,
+    marginBottom: 12,
+    padding: 12,
+  },
+  pendingImage: {
+    backgroundColor: "#DDE5EF",
+    borderRadius: 14,
+    height: 56,
+    width: 56,
+  },
+  pendingIcon: {
+    alignItems: "center",
+    backgroundColor: "rgba(238,242,247,0.9)",
+    borderRadius: 14,
+    height: 56,
+    justifyContent: "center",
+    width: 56,
+  },
+  composerRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 7,
+  },
+  composerIcon: {
+    alignItems: "center",
+    height: 34,
+    justifyContent: "center",
+    width: 24,
+  },
+  composerInput: {
+    color: "#22222E",
+    flex: 1,
+    fontSize: 14,
+    maxHeight: 90,
+    minHeight: 34,
+    paddingBottom: 4,
+    paddingTop: 7,
+    textAlignVertical: "center",
+  },
+  sendButton: {
+    alignItems: "center",
+    height: 34,
+    justifyContent: "center",
+    width: 34,
+  },
+});

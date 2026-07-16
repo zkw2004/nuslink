@@ -25,6 +25,8 @@ type ChatAttachmentUpload = {
   kind: ChatAttachmentKind;
 };
 
+type ConversationListScope = "active" | "archived" | "all";
+
 const CHAT_ATTACHMENTS_BUCKET = "chat-attachments";
 
 function mapProfileToPreview(profile: ProfileRow): ConnectedProfilePreview {
@@ -99,6 +101,8 @@ function mapDirectMessage(message: DirectMessageRow): DirectMessage {
     attachment_size: message.attachment_size,
     attachment_kind: message.attachment_kind,
     created_at: message.created_at,
+    deleted_at: message.deleted_at,
+    edited_at: message.edited_at,
   };
 }
 
@@ -193,15 +197,27 @@ export async function fetchConnectedProfiles(userId: string) {
     );
 }
 
-export async function fetchDirectConversations(userId: string) {
+export async function fetchDirectConversations(
+  userId: string,
+  scope: ConversationListScope = "active",
+) {
   if (!supabase) {
     throw new Error("Supabase is not configured.");
   }
 
-  const { data: membershipRows, error: membershipError } = await supabase
+  let membershipQuery = supabase
     .from("direct_conversation_members")
     .select("*")
-    .eq("user_id", userId);
+    .eq("user_id", userId)
+    .is("deleted_at", null);
+
+  if (scope === "active") {
+    membershipQuery = membershipQuery.is("archived_at", null);
+  } else if (scope === "archived") {
+    membershipQuery = membershipQuery.not("archived_at", "is", null);
+  }
+
+  const { data: membershipRows, error: membershipError } = await membershipQuery;
 
   if (membershipError) {
     throw new Error(membershipError.message);
@@ -312,6 +328,9 @@ export async function fetchDirectConversations(userId: string) {
         last_message_at: lastMessage?.created_at ?? null,
         updated_at: conversation.updated_at,
         unread_count: unreadCountByConversation.get(conversation.id) ?? 0,
+        archived_at: ownMembershipByConversation.get(conversation.id)?.archived_at ?? null,
+        deleted_at: ownMembershipByConversation.get(conversation.id)?.deleted_at ?? null,
+        muted_at: ownMembershipByConversation.get(conversation.id)?.muted_at ?? null,
       };
     })
     .filter(
@@ -378,17 +397,39 @@ export async function fetchDirectMessages(conversationId: string) {
     throw new Error("Supabase is not configured.");
   }
 
-  const { data, error } = await supabase
+  const [
+    { data, error },
+    { data: hiddenRows, error: hiddenError },
+  ] = await Promise.all([
+    supabase
     .from("direct_messages")
     .select("*")
     .eq("conversation_id", conversationId)
-    .order("created_at", { ascending: true });
+      .is("deleted_at", null)
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("chat_message_user_deletions")
+      .select("direct_message_id")
+      .not("direct_message_id", "is", null),
+  ]);
 
   if (error) {
     throw new Error(error.message);
   }
 
-  return ((data ?? []) as DirectMessageRow[]).map(
+  if (hiddenError) {
+    throw new Error(hiddenError.message);
+  }
+
+  const hiddenMessageIds = new Set(
+    (hiddenRows ?? [])
+      .map((row) => row.direct_message_id)
+      .filter((messageId): messageId is string => messageId !== null),
+  );
+
+  return ((data ?? []) as DirectMessageRow[])
+    .filter((message) => !hiddenMessageIds.has(message.id))
+    .map(
     (message): DirectMessage => mapDirectMessage(message),
   );
 }
@@ -404,6 +445,194 @@ export async function markDirectConversationRead(
   const { error } = await supabase
     .from("direct_conversation_members")
     .update({ last_read_at: new Date().toISOString() })
+    .eq("conversation_id", conversationId)
+    .eq("user_id", userId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function markDirectConversationsRead(
+  conversationIds: string[],
+  userId: string,
+) {
+  if (!supabase || conversationIds.length === 0) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from("direct_conversation_members")
+    .update({ last_read_at: new Date().toISOString() })
+    .eq("user_id", userId)
+    .in("conversation_id", conversationIds);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function archiveDirectConversations(
+  conversationIds: string[],
+  userId: string,
+) {
+  if (!supabase || conversationIds.length === 0) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from("direct_conversation_members")
+    .update({
+      archived_at: new Date().toISOString(),
+      deleted_at: null,
+    })
+    .eq("user_id", userId)
+    .in("conversation_id", conversationIds);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function unarchiveDirectConversations(
+  conversationIds: string[],
+  userId: string,
+) {
+  if (!supabase || conversationIds.length === 0) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from("direct_conversation_members")
+    .update({
+      archived_at: null,
+      deleted_at: null,
+    })
+    .eq("user_id", userId)
+    .in("conversation_id", conversationIds);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function deleteDirectConversations(
+  conversationIds: string[],
+  _userId: string,
+) {
+  if (!supabase || conversationIds.length === 0) {
+    return;
+  }
+
+  for (const conversationId of conversationIds) {
+    const { error } = await supabase.rpc("delete_direct_conversation_for_all", {
+      conversation_id_input: conversationId,
+    });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+  }
+}
+
+export async function muteDirectConversations(
+  conversationIds: string[],
+  userId: string,
+  muted: boolean,
+) {
+  if (!supabase || conversationIds.length === 0) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from("direct_conversation_members")
+    .update({ muted_at: muted ? new Date().toISOString() : null })
+    .eq("user_id", userId)
+    .in("conversation_id", conversationIds);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function editDirectMessage(messageId: string, body: string) {
+  if (!supabase) {
+    throw new Error("Supabase is not configured.");
+  }
+
+  const trimmedBody = body.trim();
+
+  if (!trimmedBody) {
+    throw new Error("Message cannot be empty.");
+  }
+
+  const { error } = await supabase
+    .from("direct_messages")
+    .update({ body: trimmedBody, edited_at: new Date().toISOString() })
+    .eq("id", messageId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function deleteDirectMessageForEveryone(messageId: string) {
+  if (!supabase) {
+    throw new Error("Supabase is not configured.");
+  }
+
+  const { error } = await supabase
+    .from("direct_messages")
+    .update({
+      body: null,
+      attachment_kind: null,
+      attachment_mime_type: null,
+      attachment_name: null,
+      attachment_size: null,
+      attachment_url: null,
+      deleted_at: new Date().toISOString(),
+    })
+    .eq("id", messageId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function deleteDirectMessageForMe(
+  messageId: string,
+  userId: string,
+) {
+  if (!supabase) {
+    throw new Error("Supabase is not configured.");
+  }
+
+  const { error } = await supabase
+    .from("chat_message_user_deletions")
+    .insert({
+      direct_message_id: messageId,
+      user_id: userId,
+    });
+
+  if (error && error.code !== "23505") {
+    throw new Error(error.message);
+  }
+}
+
+export async function restoreDirectConversation(
+  conversationId: string,
+  userId: string,
+) {
+  if (!supabase) {
+    throw new Error("Supabase is not configured.");
+  }
+
+  const { error } = await supabase
+    .from("direct_conversation_members")
+    .update({
+      archived_at: null,
+      deleted_at: null,
+    })
     .eq("conversation_id", conversationId)
     .eq("user_id", userId);
 

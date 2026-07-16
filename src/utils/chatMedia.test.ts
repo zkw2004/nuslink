@@ -38,6 +38,8 @@ test("builds direct message media collections", () => {
       attachment_size: 2048,
       attachment_kind: "image",
       created_at: "2026-06-20T10:00:00.000Z",
+      deleted_at: null,
+      edited_at: null,
     },
     {
       id: "msg-2",
@@ -50,6 +52,8 @@ test("builds direct message media collections", () => {
       attachment_size: 1024 * 1024,
       attachment_kind: "file",
       created_at: "2026-06-20T10:05:00.000Z",
+      deleted_at: null,
+      edited_at: null,
     },
   ]);
 
@@ -88,6 +92,8 @@ test("combines community chat media with shared resources", () => {
         attachment_size: null,
         attachment_kind: null,
         created_at: "2026-06-21T10:00:00.000Z",
+        deleted_at: null,
+        edited_at: null,
         sender_profile: {
           id: "user-1",
           display_name: "Joel",

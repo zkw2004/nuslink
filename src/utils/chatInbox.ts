@@ -16,6 +16,8 @@ export type InboxItem = {
   avatarUri?: string | null;
   roundedAvatar?: boolean;
   targetUserId?: string;
+  isArchived: boolean;
+  isMuted: boolean;
 };
 
 export function formatGroupTypeLabel(type: string) {
@@ -46,6 +48,8 @@ export function buildUnifiedInboxItems({
     avatarUri: conversation.other_user.avatar_url,
     roundedAvatar: true,
     targetUserId: conversation.other_user.id,
+    isArchived: conversation.archived_at !== null,
+    isMuted: conversation.muted_at !== null,
   }));
 
   const groupItems: InboxItem[] = groupChats.map((group) => ({
@@ -61,6 +65,8 @@ export function buildUnifiedInboxItems({
     sortTimestamp: group.last_message_at ?? group.created_at,
     unreadCount: group.unread_count,
     roundedAvatar: false,
+    isArchived: group.archived_at !== null,
+    isMuted: group.muted_at !== null,
   }));
 
   const communityItems: InboxItem[] = communityChats.map((community) => ({
@@ -75,6 +81,8 @@ export function buildUnifiedInboxItems({
     sortTimestamp: community.last_message_at ?? community.created_at,
     unreadCount: community.unread_count,
     roundedAvatar: false,
+    isArchived: community.archived_at !== null,
+    isMuted: community.muted_at !== null,
   }));
 
   return [...directItems, ...groupItems, ...communityItems].sort(

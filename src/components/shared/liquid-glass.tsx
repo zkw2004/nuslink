@@ -198,7 +198,7 @@ export function GlassButton({
             />
           </>
         ) : null}
-        <View style={styles.buttonContent}>
+        <View style={label ? styles.buttonLabelContent : styles.buttonIconContent}>
           {label ? (
             <Text
               style={[styles.buttonLabel, { color: variantStyle.text }, textStyle]}
@@ -231,11 +231,20 @@ const styles = StyleSheet.create({
   buttonShell: {
     overflow: "hidden",
   },
-  buttonContent: {
+  buttonLabelContent: {
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 18,
     paddingVertical: 13,
+    position: "relative",
+    zIndex: 1,
+  },
+  buttonIconContent: {
+    alignItems: "center",
+    flex: 1,
+    justifyContent: "center",
+    position: "relative",
+    zIndex: 1,
   },
   buttonLabel: {
     fontSize: 14,
