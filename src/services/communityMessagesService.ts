@@ -24,6 +24,8 @@ type CommunityAttachmentUpload = {
 
 const CHAT_ATTACHMENTS_BUCKET = "chat-attachments";
 
+type CommunityChatScope = "active" | "archived" | "all";
+
 function mapProfileToPreview(profile: ProfileRow): ConnectedProfilePreview {
   return {
     id: profile.id,
@@ -124,15 +126,27 @@ function stripFileExtension(name: string) {
   return name.replace(/\.[a-zA-Z0-9]+$/, "") || "attachment";
 }
 
-export async function fetchJoinedCommunityChats(userId: string) {
+export async function fetchJoinedCommunityChats(
+  userId: string,
+  scope: CommunityChatScope = "active",
+) {
   if (!supabase) {
     throw new Error("Supabase is not configured.");
   }
 
-  const { data: membershipRows, error: membershipError } = await supabase
+  let membershipQuery = supabase
     .from("community_members")
-    .select("community_id")
-    .eq("user_id", userId);
+    .select("*")
+    .eq("user_id", userId)
+    .is("deleted_at", null);
+
+  if (scope === "active") {
+    membershipQuery = membershipQuery.is("archived_at", null);
+  } else if (scope === "archived") {
+    membershipQuery = membershipQuery.not("archived_at", "is", null);
+  }
+
+  const { data: membershipRows, error: membershipError } = await membershipQuery;
 
   if (membershipError) {
     throw new Error(membershipError.message);
@@ -223,6 +237,8 @@ export async function fetchJoinedCommunityChats(userId: string) {
                   : null),
         last_message_at: lastMessage?.created_at ?? null,
         unread_count: unreadCountByCommunity.get(community.id) ?? 0,
+        archived_at: membershipByCommunity.get(community.id)?.archived_at ?? null,
+        deleted_at: membershipByCommunity.get(community.id)?.deleted_at ?? null,
       } satisfies CommunityChatSummary;
     })
     .sort((left, right) => {
@@ -277,6 +293,113 @@ export async function markCommunityChatRead(communityId: string, userId: string)
     .update({ last_read_at: new Date().toISOString() })
     .eq("community_id", communityId)
     .eq("user_id", userId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function markCommunityChatsRead(
+  communityIds: string[],
+  userId: string,
+) {
+  if (!supabase || communityIds.length === 0) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from("community_members")
+    .update({ last_read_at: new Date().toISOString() })
+    .eq("user_id", userId)
+    .in("community_id", communityIds);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function archiveCommunityChats(
+  communityIds: string[],
+  userId: string,
+) {
+  if (!supabase || communityIds.length === 0) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from("community_members")
+    .update({
+      archived_at: new Date().toISOString(),
+      deleted_at: null,
+    })
+    .eq("user_id", userId)
+    .in("community_id", communityIds);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function unarchiveCommunityChats(
+  communityIds: string[],
+  userId: string,
+) {
+  if (!supabase || communityIds.length === 0) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from("community_members")
+    .update({
+      archived_at: null,
+      deleted_at: null,
+    })
+    .eq("user_id", userId)
+    .in("community_id", communityIds);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function deleteCommunityChats(
+  communityIds: string[],
+  userId: string,
+) {
+  if (!supabase || communityIds.length === 0) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from("community_members")
+    .update({
+      archived_at: null,
+      deleted_at: new Date().toISOString(),
+    })
+    .eq("user_id", userId)
+    .in("community_id", communityIds);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function restoreCommunityChat(
+  communityId: string,
+  userId: string,
+) {
+  if (!supabase) {
+    throw new Error("Supabase is not configured.");
+  }
+
+  const { error } = await supabase
+    .from("community_members")
+    .update({
+      archived_at: null,
+      deleted_at: null,
+    })
+    .eq("user_id", userId)
+    .eq("community_id", communityId);
 
   if (error) {
     throw new Error(error.message);

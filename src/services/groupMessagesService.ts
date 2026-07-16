@@ -11,6 +11,8 @@ type GroupRow = Database["public"]["Tables"]["groups"]["Row"];
 type GroupMessageRow = Database["public"]["Tables"]["group_messages"]["Row"];
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
 
+type GroupChatScope = "active" | "archived" | "all";
+
 function mapProfileToPreview(profile: ProfileRow): ConnectedProfilePreview {
   return {
     id: profile.id,
@@ -88,15 +90,27 @@ function mapGroupMessage(
   };
 }
 
-export async function fetchJoinedGroupChats(userId: string) {
+export async function fetchJoinedGroupChats(
+  userId: string,
+  scope: GroupChatScope = "active",
+) {
   if (!supabase) {
     throw new Error("Supabase is not configured.");
   }
 
-  const { data: membershipRows, error: membershipError } = await supabase
+  let membershipQuery = supabase
     .from("group_members")
     .select("*")
-    .eq("user_id", userId);
+    .eq("user_id", userId)
+    .is("deleted_at", null);
+
+  if (scope === "active") {
+    membershipQuery = membershipQuery.is("archived_at", null);
+  } else if (scope === "archived") {
+    membershipQuery = membershipQuery.not("archived_at", "is", null);
+  }
+
+  const { data: membershipRows, error: membershipError } = await membershipQuery;
 
   if (membershipError) {
     throw new Error(membershipError.message);
@@ -172,6 +186,8 @@ export async function fetchJoinedGroupChats(userId: string) {
         last_message_preview: lastMessage ? getMessagePreview(lastMessage) : null,
         last_message_at: lastMessage?.created_at ?? null,
         unread_count: unreadCountByGroup.get(group.id) ?? 0,
+        archived_at: membershipByGroup.get(group.id)?.archived_at ?? null,
+        deleted_at: membershipByGroup.get(group.id)?.deleted_at ?? null,
       } satisfies GroupChatSummary;
     })
     .sort((left, right) => {
@@ -252,6 +268,98 @@ export async function markGroupChatRead(groupId: string, userId: string) {
     .update({ last_read_at: new Date().toISOString() })
     .eq("group_id", groupId)
     .eq("user_id", userId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function markGroupChatsRead(groupIds: string[], userId: string) {
+  if (!supabase || groupIds.length === 0) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from("group_members")
+    .update({ last_read_at: new Date().toISOString() })
+    .eq("user_id", userId)
+    .in("group_id", groupIds);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function archiveGroupChats(groupIds: string[], userId: string) {
+  if (!supabase || groupIds.length === 0) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from("group_members")
+    .update({
+      archived_at: new Date().toISOString(),
+      deleted_at: null,
+    })
+    .eq("user_id", userId)
+    .in("group_id", groupIds);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function unarchiveGroupChats(groupIds: string[], userId: string) {
+  if (!supabase || groupIds.length === 0) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from("group_members")
+    .update({
+      archived_at: null,
+      deleted_at: null,
+    })
+    .eq("user_id", userId)
+    .in("group_id", groupIds);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function deleteGroupChats(groupIds: string[], userId: string) {
+  if (!supabase || groupIds.length === 0) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from("group_members")
+    .update({
+      archived_at: null,
+      deleted_at: new Date().toISOString(),
+    })
+    .eq("user_id", userId)
+    .in("group_id", groupIds);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function restoreGroupChat(groupId: string, userId: string) {
+  if (!supabase) {
+    throw new Error("Supabase is not configured.");
+  }
+
+  const { error } = await supabase
+    .from("group_members")
+    .update({
+      archived_at: null,
+      deleted_at: null,
+    })
+    .eq("user_id", userId)
+    .eq("group_id", groupId);
 
   if (error) {
     throw new Error(error.message);

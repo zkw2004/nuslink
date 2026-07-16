@@ -225,21 +225,27 @@ export type Database = {
       };
       direct_conversation_members: {
         Row: {
+          archived_at: string | null;
           conversation_id: string;
+          deleted_at: string | null;
           id: string;
           joined_at: string;
           last_read_at: string | null;
           user_id: string;
         };
         Insert: {
+          archived_at?: string | null;
           conversation_id: string;
+          deleted_at?: string | null;
           id?: string;
           joined_at?: string;
           last_read_at?: string | null;
           user_id: string;
         };
         Update: {
+          archived_at?: string | null;
           conversation_id?: string;
+          deleted_at?: string | null;
           id?: string;
           joined_at?: string;
           last_read_at?: string | null;
@@ -456,6 +462,8 @@ export type Database = {
       };
       group_members: {
         Row: {
+          archived_at: string | null;
+          deleted_at: string | null;
           group_id: string;
           id: string;
           joined_at: string;
@@ -464,6 +472,8 @@ export type Database = {
           user_id: string;
         };
         Insert: {
+          archived_at?: string | null;
+          deleted_at?: string | null;
           group_id: string;
           id?: string;
           joined_at?: string;
@@ -472,6 +482,8 @@ export type Database = {
           user_id: string;
         };
         Update: {
+          archived_at?: string | null;
+          deleted_at?: string | null;
           group_id?: string;
           id?: string;
           joined_at?: string;
@@ -621,7 +633,9 @@ export type Database = {
       };
       community_members: {
         Row: {
+          archived_at: string | null;
           community_id: string;
+          deleted_at: string | null;
           id: string;
           joined_at: string;
           last_read_at: string | null;
@@ -629,7 +643,9 @@ export type Database = {
           user_id: string;
         };
         Insert: {
+          archived_at?: string | null;
           community_id: string;
+          deleted_at?: string | null;
           id?: string;
           joined_at?: string;
           last_read_at?: string | null;
@@ -637,7 +653,9 @@ export type Database = {
           user_id: string;
         };
         Update: {
+          archived_at?: string | null;
           community_id?: string;
+          deleted_at?: string | null;
           id?: string;
           joined_at?: string;
           last_read_at?: string | null;

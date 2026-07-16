@@ -207,6 +207,8 @@ export interface DirectConversationSummary {
   last_message_at: string | null;
   updated_at: string;
   unread_count: number;
+  archived_at: string | null;
+  deleted_at: string | null;
 }
 
 export interface DirectMessage {
@@ -270,6 +272,8 @@ export interface CommunityChatSummary {
   last_message_preview: string | null;
   last_message_at: string | null;
   unread_count: number;
+  archived_at: string | null;
+  deleted_at: string | null;
 }
 
 export interface CommunityChatMessage {
@@ -297,6 +301,8 @@ export interface GroupChatSummary {
   last_message_preview: string | null;
   last_message_at: string | null;
   unread_count: number;
+  archived_at: string | null;
+  deleted_at: string | null;
 }
 
 export interface GroupChatMessage {

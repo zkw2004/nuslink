@@ -32,14 +32,46 @@ libraries to "fix" Android blur.
 ## 1. File map — copy all six, keep the names
 
 ```
-LiquidGlass.jsx        GlassSurface primitive: BlurView + adaptive tint fill + specular border
-GlassButton.jsx        dark / light / plain glass button, scales + brightens on press
-ProfileCard.jsx        five-zone match card (imports GlassSurface + GlassButton)
-BottomNav.jsx          floating glass tab bar with center dark "Create" circle
-PeopleScreen.jsx       People feed: gradient bg + header + filter chips + feed + BottomNav
-ProfileScreen.jsx      Profile view: glass sections (basics, academics, interests, etc.)
-EditProfileScreen.jsx  Edit form: glass fields + toggle pills + import timetable
-data.js                sample PEOPLE + FILTERS arrays
+LiquidGlass.jsx         GlassSurface primitive: BlurView + adaptive tint fill + specular border
+GlassButton.jsx         dark / light / plain glass button, scales + brightens on press
+ProfileCard.jsx         five-zone match card (imports GlassSurface + GlassButton)
+BottomNav.jsx           floating glass tab bar with center dark "Create" circle
+PeopleScreen.jsx        People feed: gradient bg + header + filter chips + feed + BottomNav
+ProfileScreen.jsx       Profile view: glass sections (basics, academics, interests, etc.)
+EditProfileScreen.jsx   Edit form: glass fields + toggle pills + import timetable
+ChatsScreen.jsx         Telegram-layout chat list + Edit mode (select → Read/Archive/Delete pills)
+ArchivedScreen.jsx      Archived chats list (tap to unarchive) + empty state
+ChatThreadScreen.jsx    Conversation view: date chips, glass bubbles, glass composer
+NewChatSheet.jsx        Liquid-glass bottom sheet: search + connected-people rows
+data.js                 sample PEOPLE + FILTERS arrays
+chatData.js             sample CHATS + THREAD_MSGS + CONNECTED arrays
+```
+
+Chat screen wiring (all callbacks optional):
+
+```jsx
+const [chat, setChat] = useState({ view: "list", id: null }); // "list" | "archived" | "thread"
+const [archived, setArchived] = useState([]);
+const [sheet, setSheet] = useState(false);
+
+if (chat.view === "thread")
+  return <ChatThreadScreen chatId={chat.id} onBack={() => setChat({ view: "list" })} />;
+if (chat.view === "archived")
+  return <ArchivedScreen archivedIds={archived}
+    onBack={() => setChat({ view: "list" })}
+    onUnarchive={(id) => setArchived((a) => a.filter((x) => x !== id))} />;
+return (
+  <>
+    <ChatsScreen
+      onOpenThread={(id) => setChat({ view: "thread", id })}
+      onOpenArchived={() => setChat({ view: "archived" })}
+      onCompose={() => setSheet(true)}
+      onArchive={(ids) => setArchived((a) => [...new Set([...a, ...ids])])}
+      onDelete={(ids) => {/* persist removal */}}
+      onTabChange={tab} onCreate={create} />
+    {sheet && <NewChatSheet onClose={() => setSheet(false)} onSelectPerson={() => setSheet(false)} />}
+  </>
+);
 ```
 
 Import graph (do not rename or the imports break):

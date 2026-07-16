@@ -1,10 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
+import { BlurView } from "expo-blur";
 import { router, useLocalSearchParams } from "expo-router";
-import { SymbolView } from "expo-symbols";
+import { Ionicons } from "@expo/vector-icons";
 
-import { AppAvatar, AppButton, SectionCard } from "@components/shared";
+import { GlassButton } from "@components/shared";
 import {
   ChatPollCard,
   PinnedMessagesDrawer,
@@ -17,6 +27,9 @@ import {
   useGroupMessagesStore,
 } from "@store/index";
 
+const APP_GRADIENT = ["#F6F8FD", "#E7EBF7", "#D3DBEE", "#C6D0E8"] as const;
+const GROUP_AVATAR_GRADIENT = ["#F8C949", "#EAA31F"] as const;
+
 function formatMessageTime(value: string) {
   const date = new Date(value);
 
@@ -26,6 +39,22 @@ function formatMessageTime(value: string) {
     hour: "numeric",
     minute: "2-digit",
   });
+}
+
+function formatThreadTime(value: string) {
+  return new Date(value).toLocaleTimeString("en-SG", {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function getInitials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("");
 }
 
 function formatGroupTypeLabel(type: string) {
@@ -40,6 +69,7 @@ export default function GroupChatThreadScreen() {
   const groupId = typeof params.groupId === "string" ? params.groupId : "";
   const session = useAuthStore((state) => state.session);
   const groupChats = useGroupMessagesStore((state) => state.groupChats);
+  const archivedGroupChats = useGroupMessagesStore((state) => state.archivedGroupChats);
   const messagesByGroup = useGroupMessagesStore((state) => state.messagesByGroup);
   const isThreadLoading = useGroupMessagesStore((state) => state.isThreadLoading);
   const isSending = useGroupMessagesStore((state) => state.isSending);
@@ -71,8 +101,8 @@ export default function GroupChatThreadScreen() {
   const scrollViewRef = useRef<ScrollView | null>(null);
 
   const group = useMemo(
-    () => groupChats.find((item) => item.id === groupId) ?? null,
-    [groupChats, groupId],
+    () => [...groupChats, ...archivedGroupChats].find((item) => item.id === groupId) ?? null,
+    [archivedGroupChats, groupChats, groupId],
   );
   const messages = useMemo(
     () => messagesByGroup[groupId] ?? [],
@@ -265,44 +295,43 @@ export default function GroupChatThreadScreen() {
   );
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#EEF3F9" }}>
-      <View className="border-b border-[#E4E9F1] bg-white px-5 pb-4 pt-2">
-        <View className="flex-row items-center gap-3">
-          <Pressable
-            onPress={() => router.back()}
-            className="h-10 w-10 items-center justify-center rounded-full bg-[#F1F4F8]"
-          >
-            <SymbolView
-              name={{ ios: "chevron.left", android: "arrow_back", web: "arrow_back" }}
-              size={20}
-              tintColor="#0F1115"
-            />
-          </Pressable>
-          <AppAvatar name={group?.name ?? "Group"} size={44} rounded={false} />
-          <View className="flex-1">
-            <Text className="text-[17px] font-bold text-[#0F1115]" numberOfLines={1}>
+    <View style={styles.threadRoot}>
+      <LinearGradient
+        colors={APP_GRADIENT}
+        locations={[0, 0.44, 0.8, 1]}
+        style={StyleSheet.absoluteFill}
+      />
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.topbar}>
+          <GlassButton variant="light" onPress={() => router.back()} style={styles.backButton}>
+            <View style={styles.backContent}>
+              <Ionicons name="chevron-back" size={16} color="#33333F" />
+              <Text style={styles.backText}>Back</Text>
+            </View>
+          </GlassButton>
+          <View style={styles.topbarCenter}>
+            <Text style={styles.topbarName} numberOfLines={1}>
               {group?.name ?? "Group chat"}
             </Text>
-            <Text className="mt-1 text-[13px] text-[#5C6370]" numberOfLines={1}>
+            <Text style={styles.topbarSub} numberOfLines={1}>
               {group
                 ? [group.module_code, formatGroupTypeLabel(group.type)]
                     .filter(Boolean)
                     .join(" · ")
-                : "Loading group chat..."}
+                : "loading group chat"}
             </Text>
           </View>
           <Pressable
             onPress={() => setIsPinnedDrawerOpen((current) => !current)}
-            className="h-10 w-10 items-center justify-center rounded-full bg-[#F1F4F8]"
+            style={styles.avatarPressable}
           >
-            <SymbolView
-              name={{ ios: "pin.fill", android: "push_pin", web: "push_pin" }}
-              size={18}
-              tintColor="#0F1115"
-            />
+            <LinearGradient colors={GROUP_AVATAR_GRADIENT} style={styles.threadAvatar}>
+              <Text style={styles.threadAvatarText}>
+                {getInitials(group?.name ?? "Group") || "G"}
+              </Text>
+            </LinearGradient>
           </Pressable>
         </View>
-      </View>
 
       {isPinnedDrawerOpen ? (
         <PinnedMessagesDrawer
@@ -313,32 +342,29 @@ export default function GroupChatThreadScreen() {
         />
       ) : null}
 
-      <ScrollView
-        ref={scrollViewRef}
-        className="flex-1 px-5"
-        contentContainerStyle={{ paddingBottom: 20, paddingTop: 16 }}
-        showsVerticalScrollIndicator={false}
-      >
+        <ScrollView
+          ref={scrollViewRef}
+          contentContainerStyle={styles.messagesContent}
+          showsVerticalScrollIndicator={false}
+        >
         {error ? (
-          <SectionCard className="mb-4">
-            <Text className="text-[15px] font-semibold text-[#0F1115]">
-              Group chat is not available yet
-            </Text>
-            <Text className="mt-2 text-[14px] leading-6 text-red-700">{error}</Text>
-          </SectionCard>
+          <View style={styles.stateCard}>
+            <Text style={styles.stateTitle}>Group chat is not available yet</Text>
+            <Text style={styles.stateError}>{error}</Text>
+          </View>
         ) : null}
 
         {!error && messages.length === 0 && !isThreadLoading ? (
-          <SectionCard>
-            <Text className="text-[17px] font-bold text-[#0F1115]">No messages yet</Text>
-            <Text className="mt-2 text-[14px] leading-6 text-[#5C6370]">
+          <View style={styles.stateCard}>
+            <Text style={styles.stateTitle}>No messages yet</Text>
+            <Text style={styles.stateText}>
               Start the group conversation here. Everyone in the group can read
               messages in this thread.
             </Text>
-          </SectionCard>
+          </View>
         ) : null}
 
-        <View className="gap-3">
+        <View style={styles.messageStack}>
           {messages.map((message) => {
             const isMine = message.sender_id === session?.user.id;
             const poll = pollsByMessageId[message.id];
@@ -349,20 +375,17 @@ export default function GroupChatThreadScreen() {
             return (
               <View
                 key={message.id}
-                className={`${
-                  poll ? "w-[88%] min-w-[260px]" : "max-w-[86%]"
-                } ${isMine ? "self-end" : "self-start"}`}
+                style={[
+                  styles.bubble,
+                  isMine ? styles.bubbleMine : styles.bubbleTheirs,
+                  poll ? styles.pollBubble : null,
+                ]}
               >
                 {!isMine ? (
-                  <Text className="mb-1 ml-1 text-[12px] font-semibold text-[#7B8494]">
+                  <Text style={styles.senderLabel}>
                     {message.sender_profile.display_name}
                   </Text>
                 ) : null}
-                <View
-                  className={`rounded-[18px] px-4 py-3 ${
-                    isMine ? "bg-[#0F1115]" : "border border-[#E4E9F1] bg-white"
-                  }`}
-                >
                   {poll ? (
                     <ChatPollCard
                       poll={poll}
@@ -376,50 +399,58 @@ export default function GroupChatThreadScreen() {
                       }}
                     />
                   ) : (
-                    <Text
-                      className={`text-[15px] leading-6 ${
-                        isMine ? "text-white" : "text-[#0F1115]"
-                      }`}
+                      <Text
+                      style={[
+                        styles.bubbleText,
+                        isMine ? styles.bubbleTextMine : styles.bubbleTextTheirs,
+                      ]}
                     >
                       {message.body}
                     </Text>
                   )}
-                  <View className={poll ? "mt-3 gap-2" : "mt-2 gap-2"}>
+                  <View style={styles.bubbleMeta}>
                     <Text
-                      className={`text-[11px] ${
-                        isMine ? "text-white/60" : "text-[#9AA0AB]"
-                      }`}
+                      style={[
+                        styles.bubbleTime,
+                        isMine ? styles.bubbleTimeMine : styles.bubbleTimeTheirs,
+                      ]}
                     >
-                      {formatMessageTime(message.created_at)}
+                      {formatThreadTime(message.created_at)}
                     </Text>
+                    {isMine ? (
+                      <Ionicons
+                        name="checkmark-done"
+                        size={14}
+                        color="rgba(255,255,255,0.82)"
+                      />
+                    ) : null}
                     <Pressable
                       disabled={isPinning}
                       onPress={() => {
                         void handleSetPinned(message.id, !isPinned);
                       }}
-                      className={`self-start rounded-full px-3 py-1.5 ${
-                        isMine ? "bg-[#20242B]" : "bg-[#F1F3F7]"
-                      }`}
+                      style={styles.pinPill}
                     >
-                      <Text
-                        className={`text-[11px] font-semibold ${
-                          isMine ? "text-[#C9D0DB]" : "text-[#5C6370]"
-                        }`}
-                      >
+                      <Text style={styles.pinPillText}>
                         {isPinned ? "Unpin" : "Pin"}
                       </Text>
                     </Pressable>
                   </View>
-                </View>
               </View>
             );
           })}
         </View>
-      </ScrollView>
+        </ScrollView>
 
-      <View className="border-t border-[#DDE5EF] bg-[#EEF3F9] px-5 pb-6 pt-4">
-        <View className="rounded-[22px] bg-white p-3">
+        <View style={styles.composerWrap}>
+          <BlurView
+            intensity={30}
+            tint="systemChromeMaterialLight"
+            style={StyleSheet.absoluteFill}
+          />
+          <View style={styles.composerTint} />
           {isPollComposerOpen ? (
+            <View style={styles.composerPanel}>
             <PollComposer
               question={pollQuestion}
               options={pollOptions}
@@ -447,46 +478,193 @@ export default function GroupChatThreadScreen() {
                 void handleCreatePoll();
               }}
             />
+            </View>
           ) : null}
 
-          <View className="flex-row items-end gap-2">
+          <View style={styles.composerRow}>
             <Pressable
               disabled={isSending || !group}
               onPress={() => {
                 setIsPollComposerOpen((current) => !current);
               }}
-              className="h-12 w-12 items-center justify-center rounded-full bg-[#EEF2F7]"
+              style={styles.composerIcon}
             >
-              <SymbolView
-                name={{ ios: "chart.bar.doc.horizontal", android: "poll", web: "poll" }}
-                size={20}
-                tintColor="#0F1115"
-              />
+              <Ionicons name="stats-chart-outline" size={20} color="#7A7A8C" />
             </Pressable>
 
-            <View className="flex-1 rounded-[22px] border border-[#E4E9F1] bg-[#F9FBFD] px-3 py-1">
-              <TextInput
-                value={messageDraft}
-                onChangeText={setMessageDraft}
-                placeholder="Write to the group"
-                placeholderTextColor="#9AA0AB"
-                multiline
-                className="min-h-[44px] text-[14px] leading-6 text-[#0F1115]"
-              />
-            </View>
+            <TextInput
+              value={messageDraft}
+              onChangeText={setMessageDraft}
+              placeholder="Message"
+              placeholderTextColor="#7A7A87"
+              multiline
+              style={styles.composerInput}
+            />
 
-            <View className="w-[88px]">
-              <AppButton
-                label={isSending ? "Sending..." : "Send"}
-                disabled={isSending || !group}
-                onPress={() => {
-                  void handleSendMessage();
-                }}
-              />
-            </View>
+            <GlassButton
+              variant="dark"
+              disabled={isSending || !group}
+              onPress={() => {
+                void handleSendMessage();
+              }}
+              style={styles.sendButton}
+            >
+              <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
+            </GlassButton>
           </View>
         </View>
-      </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  threadRoot: { backgroundColor: "#E7EBF7", flex: 1 },
+  safeArea: { flex: 1 },
+  topbar: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  backButton: { paddingLeft: 10, paddingRight: 14, paddingVertical: 8 },
+  backContent: { alignItems: "center", flexDirection: "row", gap: 4 },
+  backText: { color: "#33333F", fontSize: 14, fontWeight: "500" },
+  topbarCenter: { alignItems: "center", flex: 1 },
+  topbarName: {
+    color: "#10121F",
+    fontSize: 16,
+    fontWeight: "700",
+    maxWidth: "100%",
+  },
+  topbarSub: {
+    color: "#7A7A8C",
+    fontSize: 12,
+  },
+  avatarPressable: { borderRadius: 20 },
+  threadAvatar: {
+    alignItems: "center",
+    borderRadius: 20,
+    height: 40,
+    justifyContent: "center",
+    width: 40,
+  },
+  threadAvatarText: { color: "#FFFFFF", fontSize: 14, fontWeight: "600" },
+  messagesContent: {
+    gap: 8,
+    paddingBottom: 90,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+  },
+  messageStack: { gap: 8 },
+  stateCard: {
+    backgroundColor: "rgba(255,255,255,0.62)",
+    borderColor: "rgba(255,255,255,0.8)",
+    borderRadius: 22,
+    borderWidth: 1,
+    padding: 18,
+  },
+  stateTitle: { color: "#10121F", fontSize: 17, fontWeight: "800" },
+  stateText: {
+    color: "#606473",
+    fontSize: 14,
+    lineHeight: 21,
+    marginTop: 8,
+  },
+  stateError: {
+    color: "#C33B32",
+    fontSize: 14,
+    lineHeight: 21,
+    marginTop: 8,
+  },
+  bubble: {
+    borderWidth: 1,
+    maxWidth: "76%",
+    paddingHorizontal: 13,
+    paddingVertical: 9,
+    shadowColor: "#3240A0",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+  },
+  pollBubble: { minWidth: 260, width: "88%" },
+  bubbleMine: {
+    alignSelf: "flex-end",
+    backgroundColor: "rgba(91,79,224,0.92)",
+    borderBottomRightRadius: 6,
+    borderColor: "rgba(255,255,255,0.18)",
+    borderRadius: 18,
+  },
+  bubbleTheirs: {
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(255,255,255,0.62)",
+    borderBottomLeftRadius: 6,
+    borderColor: "rgba(255,255,255,0.82)",
+    borderRadius: 18,
+  },
+  senderLabel: {
+    color: "#6B6F7F",
+    fontSize: 13,
+    fontWeight: "700",
+    marginBottom: 6,
+  },
+  bubbleText: { fontSize: 14, lineHeight: 19 },
+  bubbleTextMine: { color: "#FFFFFF", fontWeight: "600" },
+  bubbleTextTheirs: { color: "#1B1D29" },
+  bubbleMeta: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 5,
+    justifyContent: "flex-end",
+    marginTop: 2,
+  },
+  bubbleTime: { fontSize: 10.5, fontWeight: "500" },
+  bubbleTimeMine: { color: "rgba(255,255,255,0.74)" },
+  bubbleTimeTheirs: { color: "#6B6F7F" },
+  pinPill: { display: "none" },
+  pinPillText: { color: "#6B6F7F", fontSize: 11, fontWeight: "700" },
+  composerWrap: {
+    borderColor: "rgba(255,255,255,0.85)",
+    borderRadius: 26,
+    borderWidth: 1,
+    bottom: 14,
+    left: 12,
+    overflow: "hidden",
+    paddingLeft: 14,
+    paddingRight: 8,
+    paddingVertical: 7,
+    position: "absolute",
+    right: 12,
+  },
+  composerTint: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: "rgba(255,255,255,0.42)",
+    borderRadius: 26,
+  },
+  composerPanel: { marginBottom: 12 },
+  composerRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 9,
+  },
+  composerIcon: {
+    alignItems: "center",
+    height: 40,
+    justifyContent: "center",
+    width: 28,
+  },
+  composerInput: {
+    color: "#22222E",
+    flex: 1,
+    fontSize: 15,
+    maxHeight: 110,
+    minHeight: 40,
+  },
+  sendButton: {
+    alignItems: "center",
+    height: 40,
+    justifyContent: "center",
+    width: 40,
+  },
+});
