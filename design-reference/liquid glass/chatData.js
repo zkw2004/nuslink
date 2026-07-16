@@ -1,32 +1,91 @@
 /**
  * chatData — sample chat + thread + connected-people data (filler only).
- * Shared by ChatsScreen, ArchivedScreen, ChatThreadScreen, NewChatSheet.
+ * Shared by ChatsScreen, ArchivedScreen, ChatThreadScreen, ChatInfoScreen,
+ * AttachSheet, NewChatSheet.
+ *
+ * `group: true` marks a group / community chat. That single flag drives every
+ * group-only affordance: the Poll attachment option, the poll message bubble,
+ * the "Pin for everyone" wording, the "Leave" (vs "Delete chat") info action,
+ * and the extra "Polls" media tab on the info screen.
  */
 
 export const CHATS = [
-  { id: "0", name: "Milk Tea Run 🧋", initials: "MT", avatarBg: ["#e8a0b8", "#b96f8f"], muted: true, read: false, time: "2:12 AM", preview: "Omg the queue was insane today, took me like 40 mins for one drink sia", badge: "183" },
-  { id: "1", name: "Campus ConfessIt 📢", initials: "C!", avatarBg: ["#8a94c8", "#5a63a8"], muted: true, read: false, time: "1:53 AM", preview: "#Campus 🏫: Freshman seeking tips to run for union execomm this year", badge: "55" },
-  { id: "2", name: "Hackers Guild", initials: "HG", avatarBg: ["#f0c14b", "#d99a2b"], muted: true, read: false, time: "1:30 AM", preview: "🚀 Unlock the full power of the new build pipeline — RSVP inside", badge: "161" },
-  { id: "3", name: "Wei Jie", initials: "WJ", avatarBg: ["#7fa8c9", "#3b6688"], muted: false, read: true, time: "1:22 AM", preview: "I might wanna join the intramural game", badge: null },
-  { id: "4", name: "Events Board 📌", initials: "EB", avatarBg: ["#a98ac8", "#7a4fa0"], muted: true, read: false, time: "1:20 AM", preview: "App Ambassador [$15/hr | Central | Start ASAP] 🤩 one week only…", badge: "2K" },
-  { id: "5", name: "Marcus", initials: "MA", avatarBg: ["#6fb0e8", "#3a7fc8"], muted: false, read: false, time: "12:31 AM", preview: "Approved by my advisor. Left the admin side but should be sorted tmr", badge: null },
-  { id: "6", name: "BizAd Batch Chat", initials: "BA", avatarBg: ["#f0846b", "#d1543b"], muted: true, read: false, time: "12:25 AM", preview: "Hi! Anyone who didn't manage to get a slot — drop your name here", badge: "3" },
-  { id: "7", name: "Daniel", initials: "DN", avatarBg: ["#6f8a6a", "#3b5566"], muted: false, read: true, time: "12:11 AM", preview: "done", badge: null },
+  { id: "0", name: "Milk Tea Run 🧋", initials: "MT", avatarBg: ["#e8a0b8", "#b96f8f"], group: true,  muted: true,  read: false, time: "2:12 AM", preview: "Omg the queue was insane today, took me like 40 mins for one drink sia", badge: "183" },
+  { id: "1", name: "Campus ConfessIt 📢", initials: "C!", avatarBg: ["#8a94c8", "#5a63a8"], group: true,  muted: true,  read: false, time: "1:53 AM", preview: "#Campus 🏫: Freshman seeking tips to run for union execomm this year", badge: "55" },
+  { id: "2", name: "Hackers Guild", initials: "HG", avatarBg: ["#f0c14b", "#d99a2b"], group: true,  muted: true,  read: false, time: "1:30 AM", preview: "🚀 Unlock the full power of the new build pipeline — RSVP inside", badge: "161" },
+  { id: "3", name: "Wei Jie", initials: "WJ", avatarBg: ["#7fa8c9", "#3b6688"], group: false, muted: false, read: true,  time: "1:22 AM", preview: "I might wanna join the intramural game", badge: null },
+  { id: "4", name: "Events Board 📌", initials: "EB", avatarBg: ["#a98ac8", "#7a4fa0"], group: true,  muted: true,  read: false, time: "1:20 AM", preview: "App Ambassador [$15/hr | Central | Start ASAP] 🤩 one week only…", badge: "2K" },
+  { id: "5", name: "Marcus", initials: "MA", avatarBg: ["#6fb0e8", "#3a7fc8"], group: false, muted: false, read: false, time: "12:31 AM", preview: "Approved by my advisor. Left the admin side but should be sorted tmr", badge: null },
+  { id: "6", name: "BizAd Batch Chat", initials: "BA", avatarBg: ["#f0846b", "#d1543b"], group: true,  muted: true,  read: false, time: "12:25 AM", preview: "Hi! Anyone who didn't manage to get a slot — drop your name here", badge: "3" },
+  { id: "7", name: "Daniel", initials: "DN", avatarBg: ["#6f8a6a", "#3b5566"], group: false, muted: false, read: true,  time: "12:11 AM", preview: "done", badge: null },
 ];
 
+/**
+ * Text messages. `kind` defaults to "text". `reaction`/`reactCount` render a
+ * reaction chip under the bubble (users can add more via the long-press menu).
+ */
 export const THREAD_MSGS = [
   { date: "Jul 13" },
   { mine: false, text: "wait so are we meeting this week?", time: "11:03 PM" },
   { date: "Jul 14" },
-  { mine: true, text: "thurs or fri, you free?", time: "11:16 AM" },
+  { mine: true, text: "thurs or fri, you free?", time: "11:16 AM", read: true },
   { mine: false, text: "yea fri can", time: "2:54 PM" },
-  { mine: true, text: "have you been working on the features btw", time: "7:10 PM" },
-  { mine: true, text: "should start soon", time: "7:10 PM" },
+  { mine: true, text: "have you been working on the features btw", time: "7:10 PM", read: true },
+  { mine: true, text: "should start soon", time: "7:10 PM", read: true },
   { mine: false, text: "ok i'll start tmr", time: "9:22 PM" },
   { date: "Today" },
   { mine: false, text: "merge my PR when you can 🙏", time: "12:11 AM" },
   { mine: true, text: "done", time: "12:11 AM", read: true },
 ];
+
+/** Media examples appended to every thread (photo / file / video / voice). */
+export const MEDIA_MSGS = [
+  { kind: "image", mine: false, time: "3:12 PM", sender: "Wei Jie",  caption: "Free credits here — grab them before SuperAI 2026 ends 🎟️", reaction: "❤️", reactCount: 2 },
+  { kind: "file",  mine: false, time: "3:13 PM", sender: "Wei Jie",  fileName: "CS2103 Project Brief.pdf", fileSize: "2.4 MB · PDF" },
+  { kind: "video", mine: true,  time: "3:15 PM", read: true, dur: "0:42", caption: "demo of the new build pipeline" },
+  { kind: "audio", mine: false, time: "3:16 PM", sender: "Marcus",   dur: "0:12" },
+];
+
+/** Poll — appended ONLY when the chat is a group. */
+export const POLL_MSG = {
+  kind: "poll", mine: false, time: "3:20 PM", sender: "yw",
+  question: "Which day works for the outing?",
+  votes: "38 votes",
+  options: [
+    { label: "Friday", pct: 58 },
+    { label: "Saturday", pct: 29 },
+    { label: "Sunday", pct: 13 },
+  ],
+};
+
+/** Build the full message list for a chat (media always, poll if group). */
+export function buildThread(chat) {
+  return [...THREAD_MSGS, ...MEDIA_MSGS, ...(chat?.group ? [POLL_MSG] : [])];
+}
+
+/* ---- Info screen media data ---- */
+export const TILE_PALETTE = [
+  ["#c3cbe6", "#9aa6cf"], ["#d3b8cf", "#a97fb0"], ["#b8ccd9", "#7fa2b8"],
+  ["#cbd3b8", "#9fb07f"], ["#d9c3b8", "#b8907f"], ["#b8c3d9", "#7f8fb8"],
+];
+
+export const INFO_LISTS = {
+  Files: [
+    { ext: "PDF", iconBg: ["#ef6f6f", "#d13b3b"], name: "CS2103 Project Brief.pdf", meta: "2.4 MB · Jul 12" },
+    { ext: "DOC", iconBg: ["#5b8def", "#2f6fd6"], name: "Meeting notes.docx", meta: "88 KB · Jul 11" },
+    { ext: "ZIP", iconBg: ["#f0a24b", "#d97a1f"], name: "orbital-assets.zip", meta: "14.2 MB · Jul 9" },
+  ],
+  Audio: [
+    { ext: "♪", iconBg: ["#7986cb", "#5561b8"], name: "Voice message", meta: "0:12 · Jul 11" },
+    { ext: "♪", iconBg: ["#7986cb", "#5561b8"], name: "Voice message", meta: "0:34 · Jul 10" },
+  ],
+  Links: [
+    { ext: "↗", iconBg: ["#4db6ac", "#00897b"], name: "github.com/orbital", meta: "Orbital repository" },
+    { ext: "↗", iconBg: ["#4db6ac", "#00897b"], name: "nus.edu.sg/soc", meta: "Module registration" },
+  ],
+};
+
+export const REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏", "👎"];
 
 export const CONNECTED = [
   { name: "Adam Tan", sub: "Business Analytics · Year 1", initials: "AT", avatarBg: ["#e05a9b", "#b02f7a"], existing: true },

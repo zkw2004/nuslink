@@ -8,6 +8,7 @@ import {
   fetchJoinedGroupChats,
   markGroupChatRead,
   markGroupChatsRead as markGroupChatsReadService,
+  muteGroupChats as muteGroupChatsService,
   restoreGroupChat as restoreGroupChatService,
   sendGroupMessage,
   subscribeToGroupMessages,
@@ -29,6 +30,11 @@ interface GroupMessagesState {
   archiveGroupChats: (groupIds: string[], userId: string) => Promise<void>;
   unarchiveGroupChats: (groupIds: string[], userId: string) => Promise<void>;
   deleteGroupChats: (groupIds: string[], userId: string) => Promise<void>;
+  muteGroupChats: (
+    groupIds: string[],
+    userId: string,
+    muted: boolean,
+  ) => Promise<void>;
   restoreGroupChat: (groupId: string, userId: string) => Promise<void>;
   sendMessage: (groupId: string, body: string, userId: string) => Promise<void>;
   subscribeToGroup: (groupId: string, userId: string) => () => void;
@@ -169,6 +175,11 @@ export const useGroupMessagesStore = create<GroupMessagesState>((set, get) => ({
 
   async deleteGroupChats(groupIds, userId) {
     await deleteGroupChatsService(groupIds, userId);
+    await get().refreshGroupChats(userId);
+  },
+
+  async muteGroupChats(groupIds, userId, muted) {
+    await muteGroupChatsService(groupIds, userId, muted);
     await get().refreshGroupChats(userId);
   },
 

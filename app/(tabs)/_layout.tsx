@@ -11,6 +11,10 @@ import { useAuthStore, useNotificationsStore } from "@store/index";
 type LiquidGlassTabBarProps = Parameters<
   NonNullable<ComponentProps<typeof Tabs>["tabBar"]>
 >[0];
+type NestedRouteState = {
+  index?: number;
+  routes?: { name?: string }[];
+};
 
 const TABS = [
   { key: "discover", label: "Discover", icon: "search" },
@@ -54,6 +58,24 @@ function LiquidGlassTabBar({
     if (!isRouteActive(key) && !event.defaultPrevented) {
       navigation.navigate(route.name, route.params);
     }
+  }
+
+  function getNestedRouteName(route: (typeof state.routes)[number]) {
+    const nestedState = route.state as NestedRouteState | undefined;
+    const nestedIndex = nestedState?.index ?? 0;
+
+    return nestedState?.routes?.[nestedIndex]?.name;
+  }
+
+  const activeRoute = state.routes[state.index];
+  const activeNestedRouteName = activeRoute ? getNestedRouteName(activeRoute) : undefined;
+
+  if (
+    activeRoute?.name === "chats" &&
+    activeNestedRouteName &&
+    activeNestedRouteName !== "index"
+  ) {
+    return null;
   }
 
   function renderTab(tab: (typeof TABS)[number]) {

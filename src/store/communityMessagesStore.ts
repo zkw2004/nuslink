@@ -12,6 +12,7 @@ import {
   fetchJoinedCommunityChats,
   markCommunityChatRead,
   markCommunityChatsRead as markCommunityChatsReadService,
+  muteCommunityChats as muteCommunityChatsService,
   restoreCommunityChat as restoreCommunityChatService,
   sendCommunityMessage,
   subscribeToCommunityMessages,
@@ -33,6 +34,11 @@ interface CommunityMessagesState {
   archiveCommunityChats: (communityIds: string[], userId: string) => Promise<void>;
   unarchiveCommunityChats: (communityIds: string[], userId: string) => Promise<void>;
   deleteCommunityChats: (communityIds: string[], userId: string) => Promise<void>;
+  muteCommunityChats: (
+    communityIds: string[],
+    userId: string,
+    muted: boolean,
+  ) => Promise<void>;
   restoreCommunityChat: (communityId: string, userId: string) => Promise<void>;
   sendMessage: (
     communityId: string,
@@ -182,6 +188,11 @@ export const useCommunityMessagesStore = create<CommunityMessagesState>((set, ge
 
   async deleteCommunityChats(communityIds, userId) {
     await deleteCommunityChatsService(communityIds, userId);
+    await get().refreshCommunityChats(userId);
+  },
+
+  async muteCommunityChats(communityIds, userId, muted) {
+    await muteCommunityChatsService(communityIds, userId, muted);
     await get().refreshCommunityChats(userId);
   },
 

@@ -15,6 +15,7 @@ import {
   getOrCreateDirectConversation,
   markDirectConversationRead,
   markDirectConversationsRead,
+  muteDirectConversations,
   restoreDirectConversation,
   sendDirectMessage,
   subscribeToDirectMessages,
@@ -38,6 +39,11 @@ interface DirectMessagesState {
   archiveConversations: (conversationIds: string[], userId: string) => Promise<void>;
   unarchiveConversations: (conversationIds: string[], userId: string) => Promise<void>;
   deleteConversations: (conversationIds: string[], userId: string) => Promise<void>;
+  muteConversations: (
+    conversationIds: string[],
+    userId: string,
+    muted: boolean,
+  ) => Promise<void>;
   sendMessage: (
     conversationId: string,
     body: string,
@@ -179,6 +185,11 @@ export const useDirectMessagesStore = create<DirectMessagesState>((set, get) => 
 
   async deleteConversations(conversationIds, userId) {
     await deleteDirectConversations(conversationIds, userId);
+    await get().refreshInbox(userId);
+  },
+
+  async muteConversations(conversationIds, userId, muted) {
+    await muteDirectConversations(conversationIds, userId, muted);
     await get().refreshInbox(userId);
   },
 

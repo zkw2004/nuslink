@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -13,6 +14,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { Swipeable } from "react-native-gesture-handler";
 
 import { AppAvatar, GlassButton, GlassSurface } from "@components/shared";
 import type { GroupChatSummary } from "@appTypes/index";
@@ -110,15 +112,22 @@ function InboxRow({
   editing,
   selected,
   onPress,
+  onMute,
+  onArchive,
+  onDelete,
   isLast,
 }: {
   item: InboxItem;
   editing: boolean;
   selected: boolean;
   onPress: () => void;
+  onMute: () => void;
+  onArchive: () => void;
+  onDelete: () => void;
   isLast: boolean;
 }) {
-  return (
+  const isMuted = Boolean(item.isMuted);
+  const row = (
     <Pressable
       onPress={onPress}
       style={[styles.row, !isLast ? styles.rowDivider : null]}
@@ -136,6 +145,9 @@ function InboxRow({
           <Text numberOfLines={1} style={styles.rowTitle}>
             {item.title}
           </Text>
+          {isMuted ? (
+            <Ionicons name="volume-mute" size={13} color="#8A8A9C" />
+          ) : null}
           <View style={styles.rowTopSpacer} />
           <Text style={styles.rowTime}>{formatInboxTime(item.timestamp)}</Text>
         </View>
@@ -153,6 +165,38 @@ function InboxRow({
         </View>
       </View>
     </Pressable>
+  );
+
+  if (editing) {
+    return row;
+  }
+
+  return (
+    <Swipeable
+      overshootRight={false}
+      renderRightActions={() => (
+        <View style={styles.swipeActions}>
+          <Pressable style={[styles.swipeAction, styles.swipeMute]} onPress={onMute}>
+            <Ionicons
+              name={isMuted ? "notifications-outline" : "notifications-off-outline"}
+              size={18}
+              color="#FFFFFF"
+            />
+            <Text style={styles.swipeActionText}>{isMuted ? "Unmute" : "Mute"}</Text>
+          </Pressable>
+          <Pressable style={[styles.swipeAction, styles.swipeDelete]} onPress={onDelete}>
+            <Ionicons name="trash-outline" size={18} color="#FFFFFF" />
+            <Text style={styles.swipeActionText}>Delete</Text>
+          </Pressable>
+          <Pressable style={[styles.swipeAction, styles.swipeArchive]} onPress={onArchive}>
+            <Ionicons name="archive-outline" size={18} color="#FFFFFF" />
+            <Text style={styles.swipeActionText}>Archive</Text>
+          </Pressable>
+        </View>
+      )}
+    >
+      {row}
+    </Swipeable>
   );
 }
 
@@ -267,6 +311,7 @@ export default function ChatsScreen() {
   const deleteConversations = useDirectMessagesStore(
     (state) => state.deleteConversations,
   );
+  const muteConversations = useDirectMessagesStore((state) => state.muteConversations);
   const error = useDirectMessagesStore((state) => state.error);
 
   const groupChats = useGroupMessagesStore((state) => state.groupChats);
@@ -276,6 +321,7 @@ export default function ChatsScreen() {
   const archiveGroupChats = useGroupMessagesStore((state) => state.archiveGroupChats);
   const restoreGroupChat = useGroupMessagesStore((state) => state.restoreGroupChat);
   const deleteGroupChats = useGroupMessagesStore((state) => state.deleteGroupChats);
+  const muteGroupChats = useGroupMessagesStore((state) => state.muteGroupChats);
   const groupError = useGroupMessagesStore((state) => state.error);
 
   const communityChats = useCommunityMessagesStore((state) => state.communityChats);
@@ -293,6 +339,9 @@ export default function ChatsScreen() {
   );
   const deleteCommunityChats = useCommunityMessagesStore(
     (state) => state.deleteCommunityChats,
+  );
+  const muteCommunityChats = useCommunityMessagesStore(
+    (state) => state.muteCommunityChats,
   );
   const communityError = useCommunityMessagesStore((state) => state.error);
 
@@ -501,6 +550,80 @@ export default function ChatsScreen() {
     setSelectedKeys({});
   }
 
+  async function handleMuteInboxItem(item: InboxItem) {
+    if (!session?.user.id) {
+      return;
+    }
+
+    const muted = !item.isMuted;
+
+    if (item.kind === "direct") {
+      await muteConversations([item.id], session.user.id, muted);
+      return;
+    }
+
+    if (item.kind === "group") {
+      await muteGroupChats([item.id], session.user.id, muted);
+      return;
+    }
+
+    await muteCommunityChats([item.id], session.user.id, muted);
+  }
+
+  async function handleArchiveInboxItem(item: InboxItem) {
+    if (!session?.user.id) {
+      return;
+    }
+
+    if (item.kind === "direct") {
+      await archiveConversations([item.id], session.user.id);
+      return;
+    }
+
+    if (item.kind === "group") {
+      await archiveGroupChats([item.id], session.user.id);
+      return;
+    }
+
+    await archiveCommunityChats([item.id], session.user.id);
+  }
+
+  function handleDeleteInboxItem(item: InboxItem) {
+    if (!session?.user.id) {
+      return;
+    }
+
+    const copy =
+      item.kind === "direct"
+        ? "This deletes the DM for both users."
+        : "This makes you leave this chat. Other members will keep it.";
+
+    Alert.alert("Delete chat?", copy, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: item.kind === "direct" ? "Delete for both" : "Leave",
+        style: "destructive",
+        onPress: () => {
+          if (!session?.user.id) {
+            return;
+          }
+
+          if (item.kind === "direct") {
+            void deleteConversations([item.id], session.user.id);
+            return;
+          }
+
+          if (item.kind === "group") {
+            void deleteGroupChats([item.id], session.user.id);
+            return;
+          }
+
+          void deleteCommunityChats([item.id], session.user.id);
+        },
+      },
+    ]);
+  }
+
   async function handleOpenInboxItem(item: InboxItem) {
     if (editing) {
       toggleSelection(item);
@@ -627,6 +750,15 @@ export default function ChatsScreen() {
                   selected={Boolean(selectedKeys[getSelectableKey(item)])}
                   onPress={() => {
                     void handleOpenInboxItem(item);
+                  }}
+                  onMute={() => {
+                    void handleMuteInboxItem(item);
+                  }}
+                  onArchive={() => {
+                    void handleArchiveInboxItem(item);
+                  }}
+                  onDelete={() => {
+                    handleDeleteInboxItem(item);
                   }}
                   isLast={index === visibleInboxItems.length - 1}
                 />
@@ -863,6 +995,33 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "600",
+  },
+  swipeActions: {
+    alignItems: "stretch",
+    flexDirection: "row",
+    marginVertical: 8,
+    overflow: "hidden",
+  },
+  swipeAction: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    width: 76,
+  },
+  swipeMute: {
+    backgroundColor: "#7A849D",
+  },
+  swipeDelete: {
+    backgroundColor: "#D2483F",
+  },
+  swipeArchive: {
+    backgroundColor: "#5B4FE0",
+  },
+  swipeActionText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "700",
+    marginTop: 4,
   },
   stateBlock: {
     gap: 8,

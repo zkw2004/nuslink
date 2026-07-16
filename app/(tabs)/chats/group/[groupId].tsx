@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -14,13 +15,23 @@ import { BlurView } from "expo-blur";
 import { router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
-import { GlassButton } from "@components/shared";
+import { GlassButton, GlassSurface } from "@components/shared";
 import {
   ChatPollCard,
   PinnedMessagesDrawer,
   PollComposer,
   type PinnedMessagePreview,
 } from "@features/chat/ChatFeaturePanels";
+import { AttachSheet } from "@features/chat/AttachSheet";
+import {
+  MessageActionMenu,
+  type MessageActionKey,
+} from "@features/chat/MessageActionMenu";
+import {
+  deleteGroupMessageForEveryone,
+  deleteGroupMessageForMe,
+  editGroupMessage,
+} from "@services/groupMessagesService";
 import {
   useAuthStore,
   useChatFeaturesStore,
@@ -29,6 +40,20 @@ import {
 
 const APP_GRADIENT = ["#F6F8FD", "#E7EBF7", "#D3DBEE", "#C6D0E8"] as const;
 const GROUP_AVATAR_GRADIENT = ["#F8C949", "#EAA31F"] as const;
+
+function getHeaderMetrics(width: number) {
+  return {
+    avatarSize: width * 0.09,
+    backHeight: width * 0.086,
+    backIconSize: width * 0.032,
+    backWidth: width * 0.19,
+    headerHeight: width * 0.174,
+    paddingLeft: width * 0.03,
+    paddingRight: width * 0.075,
+    titleHeight: width * 0.095,
+    titleWidth: width * 0.46,
+  };
+}
 
 function formatMessageTime(value: string) {
   const date = new Date(value);
@@ -67,6 +92,8 @@ function formatGroupTypeLabel(type: string) {
 export default function GroupChatThreadScreen() {
   const params = useLocalSearchParams<{ groupId?: string }>();
   const groupId = typeof params.groupId === "string" ? params.groupId : "";
+  const { width: screenWidth } = useWindowDimensions();
+  const headerMetrics = useMemo(() => getHeaderMetrics(screenWidth), [screenWidth]);
   const session = useAuthStore((state) => state.session);
   const groupChats = useGroupMessagesStore((state) => state.groupChats);
   const archivedGroupChats = useGroupMessagesStore((state) => state.archivedGroupChats);
@@ -94,8 +121,11 @@ export default function GroupChatThreadScreen() {
     (state) => state.subscribeToFeatureChanges,
   );
   const [messageDraft, setMessageDraft] = useState("");
+  const [isAttachSheetOpen, setIsAttachSheetOpen] = useState(false);
   const [isPinnedDrawerOpen, setIsPinnedDrawerOpen] = useState(false);
   const [isPollComposerOpen, setIsPollComposerOpen] = useState(false);
+  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [pollQuestion, setPollQuestion] = useState("");
   const [pollOptions, setPollOptions] = useState(["", ""]);
   const scrollViewRef = useRef<ScrollView | null>(null);
@@ -168,6 +198,21 @@ export default function GroupChatThreadScreen() {
       return;
     }
 
+    if (editingMessageId) {
+      try {
+        await editGroupMessage(editingMessageId, trimmedDraft);
+        await loadGroupMessages(groupId, session.user.id);
+        setEditingMessageId(null);
+        setMessageDraft("");
+      } catch (editError) {
+        Alert.alert(
+          "Could not edit message",
+          editError instanceof Error ? editError.message : "Please try again.",
+        );
+      }
+      return;
+    }
+
     try {
       setMessageDraft("");
       await sendMessage(groupId, trimmedDraft, session.user.id);
@@ -177,6 +222,12 @@ export default function GroupChatThreadScreen() {
         "Could not send message",
         sendError instanceof Error ? sendError.message : "Please try again.",
       );
+    }
+  }
+
+  function handlePickAttachment(type: "photo" | "video" | "file" | "audio" | "poll") {
+    if (type === "poll") {
+      setIsPollComposerOpen(true);
     }
   }
 
@@ -293,6 +344,75 @@ export default function GroupChatThreadScreen() {
         .filter((message): message is PinnedMessagePreview => message !== null),
     [messages, pinnedMessages, pollsByMessageId],
   );
+  const selectedMessage = selectedMessageId
+    ? messages.find((message) => message.id === selectedMessageId) ?? null
+    : null;
+
+  async function handleMessageAction(action: MessageActionKey) {
+    if (!selectedMessage || !session?.user.id) {
+      setSelectedMessageId(null);
+      return;
+    }
+
+    if (action === "pin") {
+      setSelectedMessageId(null);
+      Alert.alert("Pin this message?", "Pinned messages are visible to everyone in this chat.", [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Pin for everyone",
+          onPress: () => {
+            void handleSetPinned(selectedMessage.id, true);
+          },
+        },
+      ]);
+      return;
+    }
+
+    if (action === "edit") {
+      setEditingMessageId(selectedMessage.id);
+      setMessageDraft(selectedMessage.body ?? "");
+      setSelectedMessageId(null);
+      return;
+    }
+
+    if (action === "delete") {
+      const isMine = selectedMessage.sender_id === session.user.id;
+      setSelectedMessageId(null);
+      Alert.alert(
+        "Delete message?",
+        isMine ? "Choose how this message should be deleted." : "This only removes the message for you.",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Delete for me",
+            style: "destructive",
+            onPress: () => {
+              void deleteGroupMessageForMe(selectedMessage.id, session.user.id).then(() =>
+                loadGroupMessages(groupId, session.user.id),
+              );
+            },
+          },
+          ...(isMine
+            ? [
+                {
+                  text: "Delete for everyone",
+                  style: "destructive" as const,
+                  onPress: () => {
+                    void deleteGroupMessageForEveryone(selectedMessage.id).then(() =>
+                      loadGroupMessages(groupId, session.user.id),
+                    );
+                  },
+                },
+              ]
+            : []),
+        ],
+      );
+      return;
+    }
+
+    setSelectedMessageId(null);
+    Alert.alert("Coming soon", `${action} will be wired in the next chat slice.`);
+  }
 
   return (
     <View style={styles.threadRoot}>
@@ -302,36 +422,106 @@ export default function GroupChatThreadScreen() {
         style={StyleSheet.absoluteFill}
       />
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.topbar}>
-          <GlassButton variant="light" onPress={() => router.back()} style={styles.backButton}>
-            <View style={styles.backContent}>
-              <Ionicons name="chevron-back" size={16} color="#33333F" />
-              <Text style={styles.backText}>Back</Text>
-            </View>
-          </GlassButton>
-          <View style={styles.topbarCenter}>
-            <Text style={styles.topbarName} numberOfLines={1}>
+        <View
+          style={[
+            styles.topbar,
+            {
+              height: headerMetrics.headerHeight,
+              paddingLeft: headerMetrics.paddingLeft,
+              paddingRight: headerMetrics.paddingRight,
+            },
+          ]}
+        >
+          <View style={styles.headerSideLeft}>
+          <Pressable onPress={() => router.back()}>
+            <GlassSurface
+              tint="light"
+              radius={headerMetrics.backHeight / 2}
+              intensity={40}
+              style={[
+                styles.backButton,
+                { height: headerMetrics.backHeight, width: headerMetrics.backWidth },
+              ]}
+            >
+              <View style={[styles.backButtonContent, { height: headerMetrics.backHeight }]}>
+                <Ionicons
+                  name="chevron-back"
+                  size={headerMetrics.backIconSize}
+                  color="#33333F"
+                />
+                <Text style={styles.backText}>Back</Text>
+              </View>
+            </GlassSurface>
+          </Pressable>
+          </View>
+          <View style={styles.centerArea}>
+          <Pressable
+            style={[
+              styles.namePill,
+              {
+                borderRadius: headerMetrics.titleHeight / 2,
+                height: headerMetrics.titleHeight,
+                width: headerMetrics.titleWidth,
+              },
+            ]}
+            onPress={() => {
+              router.push({
+                pathname: "/(tabs)/chats/info",
+                params: { kind: "group", id: groupId },
+              } as never);
+            }}
+          >
+            <Text ellipsizeMode="tail" numberOfLines={1} style={styles.topbarName}>
               {group?.name ?? "Group chat"}
             </Text>
             <Text style={styles.topbarSub} numberOfLines={1}>
-              {group
-                ? [group.module_code, formatGroupTypeLabel(group.type)]
-                    .filter(Boolean)
-                    .join(" · ")
-                : "loading group chat"}
+              {group ? formatGroupTypeLabel(group.type) : "Study Group"}
             </Text>
+          </Pressable>
           </View>
+          <View style={styles.headerSideRight}>
           <Pressable
             onPress={() => setIsPinnedDrawerOpen((current) => !current)}
             style={styles.avatarPressable}
           >
-            <LinearGradient colors={GROUP_AVATAR_GRADIENT} style={styles.threadAvatar}>
+            <LinearGradient
+              colors={GROUP_AVATAR_GRADIENT}
+              style={[
+                styles.threadAvatar,
+                {
+                  borderRadius: headerMetrics.avatarSize / 2,
+                  height: headerMetrics.avatarSize,
+                  width: headerMetrics.avatarSize,
+                },
+              ]}
+            >
               <Text style={styles.threadAvatarText}>
                 {getInitials(group?.name ?? "Group") || "G"}
               </Text>
             </LinearGradient>
           </Pressable>
+          </View>
         </View>
+
+        {pinnedPreviews[0] ? (
+          <View style={styles.pinnedBanner}>
+            <View style={styles.pinnedAccent} />
+            <View style={styles.pinnedContent}>
+              <Text style={styles.pinnedLabel}>Pinned message</Text>
+              <Text numberOfLines={1} style={styles.pinnedText}>
+                {pinnedPreviews[0].body}
+              </Text>
+            </View>
+            <Pressable
+              onPress={() => {
+                void handleSetPinned(pinnedPreviews[0].message_id, false);
+              }}
+              style={styles.pinnedClose}
+            >
+              <Ionicons name="close" size={15} color="#6E6E80" />
+            </Pressable>
+          </View>
+        ) : null}
 
       {isPinnedDrawerOpen ? (
         <PinnedMessagesDrawer
@@ -373,8 +563,10 @@ export default function GroupChatThreadScreen() {
             );
 
             return (
-              <View
+              <Pressable
                 key={message.id}
+                onLongPress={() => setSelectedMessageId(message.id)}
+                delayLongPress={320}
                 style={[
                   styles.bubble,
                   isMine ? styles.bubbleMine : styles.bubbleTheirs,
@@ -436,7 +628,7 @@ export default function GroupChatThreadScreen() {
                       </Text>
                     </Pressable>
                   </View>
-              </View>
+              </Pressable>
             );
           })}
         </View>
@@ -465,7 +657,7 @@ export default function GroupChatThreadScreen() {
               }}
               onAddOption={() => {
                 setPollOptions((current) =>
-                  current.length >= 6 ? current : [...current, ""],
+                    current.length >= 12 ? current : [...current, ""],
                 );
               }}
               onRemoveOption={(index) => {
@@ -484,18 +676,16 @@ export default function GroupChatThreadScreen() {
           <View style={styles.composerRow}>
             <Pressable
               disabled={isSending || !group}
-              onPress={() => {
-                setIsPollComposerOpen((current) => !current);
-              }}
+              onPress={() => setIsAttachSheetOpen(true)}
               style={styles.composerIcon}
             >
-              <Ionicons name="stats-chart-outline" size={20} color="#7A7A8C" />
+              <Ionicons name="attach" size={22} color="#7A7A8C" />
             </Pressable>
 
             <TextInput
               value={messageDraft}
               onChangeText={setMessageDraft}
-              placeholder="Message"
+              placeholder={editingMessageId ? "Edit message" : "Message"}
               placeholderTextColor="#7A7A87"
               multiline
               style={styles.composerInput}
@@ -513,6 +703,24 @@ export default function GroupChatThreadScreen() {
             </GlassButton>
           </View>
         </View>
+        <AttachSheet
+          visible={isAttachSheetOpen}
+          isGroup
+          allowedTypes={["poll"]}
+          onClose={() => setIsAttachSheetOpen(false)}
+          onPick={handlePickAttachment}
+        />
+        <MessageActionMenu
+          visible={selectedMessage !== null}
+          isMine={selectedMessage?.sender_id === session?.user.id}
+          onClose={() => setSelectedMessageId(null)}
+          onAction={(action) => {
+            void handleMessageAction(action);
+          }}
+          onReact={() => {
+            setSelectedMessageId(null);
+          }}
+        />
       </SafeAreaView>
     </View>
   );
@@ -524,31 +732,69 @@ const styles = StyleSheet.create({
   topbar: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
   },
-  backButton: { paddingLeft: 10, paddingRight: 14, paddingVertical: 8 },
-  backContent: { alignItems: "center", flexDirection: "row", gap: 4 },
+  headerSideLeft: {
+    alignItems: "flex-start",
+    flex: 1,
+  },
+  headerSideRight: {
+    alignItems: "flex-end",
+    flex: 1,
+  },
+  backButton: {
+    shadowColor: "#8795C5",
+    shadowOffset: { width: 0, height: 7 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+  },
+  backButtonContent: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "center",
+  },
   backText: { color: "#33333F", fontSize: 14, fontWeight: "500" },
-  topbarCenter: { alignItems: "center", flex: 1 },
+  centerArea: {
+    alignItems: "center",
+    flexShrink: 0,
+    justifyContent: "center",
+    transform: [{ translateX: 15 }],
+  },
+  namePill: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.42)",
+    borderColor: "rgba(255,255,255,0.82)",
+    borderWidth: 1.5,
+    justifyContent: "center",
+    minWidth: 0,
+    overflow: "hidden",
+    paddingHorizontal: 20,
+    shadowColor: "#8290BE",
+    shadowOffset: { width: 0, height: 9 },
+    shadowOpacity: 0.1,
+    shadowRadius: 22,
+    width: "100%",
+  },
   topbarName: {
     color: "#10121F",
-    fontSize: 16,
+    fontSize: 15.5,
     fontWeight: "700",
+    lineHeight: 19,
     maxWidth: "100%",
+    minWidth: 0,
   },
   topbarSub: {
-    color: "#7A7A8C",
+    color: "#696C7C",
     fontSize: 12,
+    fontWeight: "400",
+    lineHeight: 15,
   },
   avatarPressable: { borderRadius: 20 },
   threadAvatar: {
     alignItems: "center",
-    borderRadius: 20,
-    height: 40,
+    borderColor: "rgba(210,225,244,0.9)",
+    borderWidth: 2,
     justifyContent: "center",
-    width: 40,
   },
   threadAvatarText: { color: "#FFFFFF", fontSize: 14, fontWeight: "600" },
   messagesContent: {
@@ -556,6 +802,34 @@ const styles = StyleSheet.create({
     paddingBottom: 90,
     paddingHorizontal: 16,
     paddingTop: 8,
+  },
+  pinnedBanner: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.58)",
+    borderColor: "rgba(255,255,255,0.82)",
+    borderRadius: 18,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    marginHorizontal: 16,
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  pinnedAccent: {
+    backgroundColor: "#5B4FE0",
+    borderRadius: 2,
+    height: 32,
+    width: 3,
+  },
+  pinnedContent: { flex: 1, minWidth: 0 },
+  pinnedLabel: { color: "#4230A0", fontSize: 11, fontWeight: "700" },
+  pinnedText: { color: "#4B4B57", fontSize: 12.5, marginTop: 1 },
+  pinnedClose: {
+    alignItems: "center",
+    height: 28,
+    justifyContent: "center",
+    width: 28,
   },
   messageStack: { gap: 8 },
   stateCard: {
@@ -580,6 +854,7 @@ const styles = StyleSheet.create({
   },
   bubble: {
     borderWidth: 1,
+    flexShrink: 0,
     maxWidth: "76%",
     paddingHorizontal: 13,
     paddingVertical: 9,
@@ -588,7 +863,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 10,
   },
-  pollBubble: { minWidth: 260, width: "88%" },
+  pollBubble: { maxWidth: 300, minWidth: 260, width: "88%" },
   bubbleMine: {
     alignSelf: "flex-end",
     backgroundColor: "rgba(91,79,224,0.92)",
@@ -626,45 +901,48 @@ const styles = StyleSheet.create({
   pinPillText: { color: "#6B6F7F", fontSize: 11, fontWeight: "700" },
   composerWrap: {
     borderColor: "rgba(255,255,255,0.85)",
-    borderRadius: 26,
+    borderRadius: 22,
     borderWidth: 1,
-    bottom: 14,
-    left: 12,
+    bottom: 18,
+    left: 20,
     overflow: "hidden",
-    paddingLeft: 14,
-    paddingRight: 8,
-    paddingVertical: 7,
+    paddingLeft: 10,
+    paddingRight: 6,
+    paddingVertical: 5,
     position: "absolute",
-    right: 12,
+    right: 20,
   },
   composerTint: {
     ...StyleSheet.absoluteFill,
     backgroundColor: "rgba(255,255,255,0.42)",
-    borderRadius: 26,
+    borderRadius: 22,
   },
   composerPanel: { marginBottom: 12 },
   composerRow: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 9,
+    gap: 7,
   },
   composerIcon: {
     alignItems: "center",
-    height: 40,
+    height: 34,
     justifyContent: "center",
-    width: 28,
+    width: 24,
   },
   composerInput: {
     color: "#22222E",
     flex: 1,
-    fontSize: 15,
-    maxHeight: 110,
-    minHeight: 40,
+    fontSize: 14,
+    maxHeight: 90,
+    minHeight: 34,
+    paddingBottom: 4,
+    paddingTop: 7,
+    textAlignVertical: "center",
   },
   sendButton: {
     alignItems: "center",
-    height: 40,
+    height: 34,
     justifyContent: "center",
-    width: 40,
+    width: 34,
   },
 });

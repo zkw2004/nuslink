@@ -86,6 +86,8 @@ function mapGroupMessage(
     attachment_size: message.attachment_size,
     attachment_kind: message.attachment_kind,
     created_at: message.created_at,
+    deleted_at: message.deleted_at,
+    edited_at: message.edited_at,
     sender_profile: senderProfile,
   };
 }
@@ -188,6 +190,7 @@ export async function fetchJoinedGroupChats(
         unread_count: unreadCountByGroup.get(group.id) ?? 0,
         archived_at: membershipByGroup.get(group.id)?.archived_at ?? null,
         deleted_at: membershipByGroup.get(group.id)?.deleted_at ?? null,
+        muted_at: membershipByGroup.get(group.id)?.muted_at ?? null,
       } satisfies GroupChatSummary;
     })
     .sort((left, right) => {
@@ -202,17 +205,38 @@ export async function fetchGroupMessages(groupId: string) {
     throw new Error("Supabase is not configured.");
   }
 
-  const { data, error } = await supabase
+  const [
+    { data, error },
+    { data: hiddenRows, error: hiddenError },
+  ] = await Promise.all([
+    supabase
     .from("group_messages")
     .select("*")
     .eq("group_id", groupId)
-    .order("created_at", { ascending: true });
+      .is("deleted_at", null)
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("chat_message_user_deletions")
+      .select("group_message_id")
+      .not("group_message_id", "is", null),
+  ]);
 
   if (error) {
     throw new Error(error.message);
   }
 
-  const messages = (data ?? []) as GroupMessageRow[];
+  if (hiddenError) {
+    throw new Error(hiddenError.message);
+  }
+
+  const hiddenMessageIds = new Set(
+    (hiddenRows ?? [])
+      .map((row) => row.group_message_id)
+      .filter((messageId): messageId is string => messageId !== null),
+  );
+  const messages = ((data ?? []) as GroupMessageRow[]).filter(
+    (message) => !hiddenMessageIds.has(message.id),
+  );
   const senderIds = Array.from(new Set(messages.map((message) => message.sender_id)));
   const profiles = await fetchProfilesByIds(senderIds);
   const profilesById = new Map(
@@ -343,6 +367,79 @@ export async function deleteGroupChats(groupIds: string[], userId: string) {
     .in("group_id", groupIds);
 
   if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function muteGroupChats(
+  groupIds: string[],
+  userId: string,
+  muted: boolean,
+) {
+  if (!supabase || groupIds.length === 0) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from("group_members")
+    .update({ muted_at: muted ? new Date().toISOString() : null })
+    .eq("user_id", userId)
+    .in("group_id", groupIds);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function editGroupMessage(messageId: string, body: string) {
+  if (!supabase) {
+    throw new Error("Supabase is not configured.");
+  }
+
+  const trimmedBody = body.trim();
+
+  if (!trimmedBody) {
+    throw new Error("Message cannot be empty.");
+  }
+
+  const { error } = await supabase
+    .from("group_messages")
+    .update({ body: trimmedBody, edited_at: new Date().toISOString() })
+    .eq("id", messageId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function deleteGroupMessageForEveryone(messageId: string) {
+  if (!supabase) {
+    throw new Error("Supabase is not configured.");
+  }
+
+  const { error } = await supabase
+    .from("group_messages")
+    .update({ body: null, deleted_at: new Date().toISOString() })
+    .eq("id", messageId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function deleteGroupMessageForMe(messageId: string, userId: string) {
+  if (!supabase) {
+    throw new Error("Supabase is not configured.");
+  }
+
+  const { error } = await supabase
+    .from("chat_message_user_deletions")
+    .insert({
+      group_message_id: messageId,
+      user_id: userId,
+    });
+
+  if (error && error.code !== "23505") {
     throw new Error(error.message);
   }
 }

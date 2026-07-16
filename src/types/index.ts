@@ -209,6 +209,7 @@ export interface DirectConversationSummary {
   unread_count: number;
   archived_at: string | null;
   deleted_at: string | null;
+  muted_at: string | null;
 }
 
 export interface DirectMessage {
@@ -222,6 +223,8 @@ export interface DirectMessage {
   attachment_size: number | null;
   attachment_kind: ChatAttachmentKind | null;
   created_at: string;
+  deleted_at: string | null;
+  edited_at: string | null;
 }
 
 export interface DirectMessageAttachmentInput {
@@ -274,6 +277,7 @@ export interface CommunityChatSummary {
   unread_count: number;
   archived_at: string | null;
   deleted_at: string | null;
+  muted_at: string | null;
 }
 
 export interface CommunityChatMessage {
@@ -287,6 +291,8 @@ export interface CommunityChatMessage {
   attachment_size: number | null;
   attachment_kind: ChatAttachmentKind | null;
   created_at: string;
+  deleted_at: string | null;
+  edited_at: string | null;
   sender_profile: ConnectedProfilePreview;
 }
 
@@ -303,6 +309,7 @@ export interface GroupChatSummary {
   unread_count: number;
   archived_at: string | null;
   deleted_at: string | null;
+  muted_at: string | null;
 }
 
 export interface GroupChatMessage {
@@ -316,6 +323,8 @@ export interface GroupChatMessage {
   attachment_size: number | null;
   attachment_kind: ChatAttachmentKind | null;
   created_at: string;
+  deleted_at: string | null;
+  edited_at: string | null;
   sender_profile: ConnectedProfilePreview;
 }
 

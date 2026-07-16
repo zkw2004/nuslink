@@ -27,6 +27,7 @@ test("merges direct, group, and community chats into one sorted inbox", () => {
         unread_count: 2,
         archived_at: null,
         deleted_at: null,
+        muted_at: null,
       },
     ],
     groupChats: [
@@ -43,6 +44,7 @@ test("merges direct, group, and community chats into one sorted inbox", () => {
         unread_count: 0,
         archived_at: null,
         deleted_at: null,
+        muted_at: null,
       },
     ],
     communityChats: [
@@ -60,6 +62,7 @@ test("merges direct, group, and community chats into one sorted inbox", () => {
         unread_count: 4,
         archived_at: null,
         deleted_at: null,
+        muted_at: null,
       },
     ],
   });
@@ -79,6 +82,7 @@ test("merges direct, group, and community chats into one sorted inbox", () => {
     unreadCount: 4,
     roundedAvatar: false,
     isArchived: false,
+    isMuted: false,
   });
   assert.equal(items[1].preview, "See you at COM3");
   assert.equal(items[1].avatarUri, "https://example.com/avatar.png");
@@ -105,6 +109,7 @@ test("uses honest empty previews for chats without messages", () => {
         unread_count: 0,
         archived_at: null,
         deleted_at: null,
+        muted_at: null,
       },
     ],
     groupChats: [],
@@ -123,6 +128,7 @@ test("uses honest empty previews for chats without messages", () => {
         unread_count: 0,
         archived_at: null,
         deleted_at: null,
+        muted_at: null,
       },
     ],
   });

@@ -231,6 +231,7 @@ export type Database = {
           id: string;
           joined_at: string;
           last_read_at: string | null;
+          muted_at: string | null;
           user_id: string;
         };
         Insert: {
@@ -240,6 +241,7 @@ export type Database = {
           id?: string;
           joined_at?: string;
           last_read_at?: string | null;
+          muted_at?: string | null;
           user_id: string;
         };
         Update: {
@@ -249,6 +251,7 @@ export type Database = {
           id?: string;
           joined_at?: string;
           last_read_at?: string | null;
+          muted_at?: string | null;
           user_id?: string;
         };
         Relationships: [];
@@ -263,6 +266,8 @@ export type Database = {
           body: string | null;
           conversation_id: string;
           created_at: string;
+          deleted_at: string | null;
+          edited_at: string | null;
           id: string;
           sender_id: string;
         };
@@ -275,6 +280,8 @@ export type Database = {
           body?: string | null;
           conversation_id: string;
           created_at?: string;
+          deleted_at?: string | null;
+          edited_at?: string | null;
           id?: string;
           sender_id: string;
         };
@@ -287,6 +294,8 @@ export type Database = {
           body?: string | null;
           conversation_id?: string;
           created_at?: string;
+          deleted_at?: string | null;
+          edited_at?: string | null;
           id?: string;
           sender_id?: string;
         };
@@ -338,7 +347,7 @@ export type Database = {
           position: number;
         };
         Update: {
-          body?: string;
+          body?: string | null;
           created_at?: string;
           id?: string;
           poll_id?: string;
@@ -394,6 +403,33 @@ export type Database = {
           group_message_id?: string | null;
           id?: string;
           pinned_by?: string;
+        };
+        Relationships: [];
+      };
+      chat_message_user_deletions: {
+        Row: {
+          community_message_id: string | null;
+          created_at: string;
+          direct_message_id: string | null;
+          group_message_id: string | null;
+          id: string;
+          user_id: string;
+        };
+        Insert: {
+          community_message_id?: string | null;
+          created_at?: string;
+          direct_message_id?: string | null;
+          group_message_id?: string | null;
+          id?: string;
+          user_id: string;
+        };
+        Update: {
+          community_message_id?: string | null;
+          created_at?: string;
+          direct_message_id?: string | null;
+          group_message_id?: string | null;
+          id?: string;
+          user_id?: string;
         };
         Relationships: [];
       };
@@ -468,6 +504,7 @@ export type Database = {
           id: string;
           joined_at: string;
           last_read_at: string | null;
+          muted_at: string | null;
           role: "member" | "co_admin" | "admin";
           user_id: string;
         };
@@ -478,6 +515,7 @@ export type Database = {
           id?: string;
           joined_at?: string;
           last_read_at?: string | null;
+          muted_at?: string | null;
           role?: "member" | "co_admin" | "admin";
           user_id: string;
         };
@@ -488,6 +526,7 @@ export type Database = {
           id?: string;
           joined_at?: string;
           last_read_at?: string | null;
+          muted_at?: string | null;
           role?: "member" | "co_admin" | "admin";
           user_id?: string;
         };
@@ -562,6 +601,8 @@ export type Database = {
           attachment_url: string | null;
           body: string | null;
           created_at: string;
+          deleted_at: string | null;
+          edited_at: string | null;
           group_id: string;
           id: string;
           sender_id: string;
@@ -574,6 +615,8 @@ export type Database = {
           attachment_url?: string | null;
           body?: string | null;
           created_at?: string;
+          deleted_at?: string | null;
+          edited_at?: string | null;
           group_id: string;
           id?: string;
           sender_id: string;
@@ -586,6 +629,8 @@ export type Database = {
           attachment_url?: string | null;
           body?: string | null;
           created_at?: string;
+          deleted_at?: string | null;
+          edited_at?: string | null;
           group_id?: string;
           id?: string;
           sender_id?: string;
@@ -639,6 +684,7 @@ export type Database = {
           id: string;
           joined_at: string;
           last_read_at: string | null;
+          muted_at: string | null;
           role: "member" | "co_admin" | "admin";
           user_id: string;
         };
@@ -649,6 +695,7 @@ export type Database = {
           id?: string;
           joined_at?: string;
           last_read_at?: string | null;
+          muted_at?: string | null;
           role?: "member" | "co_admin" | "admin";
           user_id: string;
         };
@@ -659,6 +706,7 @@ export type Database = {
           id?: string;
           joined_at?: string;
           last_read_at?: string | null;
+          muted_at?: string | null;
           role?: "member" | "co_admin" | "admin";
           user_id?: string;
         };
@@ -674,6 +722,8 @@ export type Database = {
           body: string | null;
           community_id: string;
           created_at: string;
+          deleted_at: string | null;
+          edited_at: string | null;
           id: string;
           sender_id: string;
         };
@@ -686,6 +736,8 @@ export type Database = {
           body?: string | null;
           community_id: string;
           created_at?: string;
+          deleted_at?: string | null;
+          edited_at?: string | null;
           id?: string;
           sender_id: string;
         };
@@ -695,9 +747,11 @@ export type Database = {
           attachment_name?: string | null;
           attachment_size?: number | null;
           attachment_url?: string | null;
-          body?: string;
+          body?: string | null;
           community_id?: string;
           created_at?: string;
+          deleted_at?: string | null;
+          edited_at?: string | null;
           id?: string;
           sender_id?: string;
         };
@@ -825,6 +879,12 @@ export type Database = {
           poll_id_input: string;
         };
         Returns: boolean;
+      };
+      delete_direct_conversation_for_all: {
+        Args: {
+          conversation_id_input: string;
+        };
+        Returns: undefined;
       };
       create_community_chat_poll: {
         Args: {
