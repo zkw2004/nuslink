@@ -40,6 +40,9 @@ yarn-error.*
 /ios
 /android
 
+# design references
+design-reference/
+
 # Python
 __pycache__/
 *.py[cod]

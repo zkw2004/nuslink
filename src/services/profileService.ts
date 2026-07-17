@@ -4,11 +4,14 @@ import type { Database } from "@appTypes/database";
 import type { StudyMode, StudyStyle, TimetableSlot, UserProfile } from "@appTypes/index";
 import {
   normalizeInterestTag,
-  normalizeInterestTags,
   normalizeProfileTags,
 } from "@utils/interestTags";
 import type { SelectedModule } from "@features/onboarding/types";
 import { replaceCurrentSemesterTimetableSlots } from "./timetableService";
+import {
+  normalizeCcaTagsForSave,
+  normalizeInterestTagsForSave,
+} from "./tagNormalizationService";
 
 export type ProfileViewModel = {
   badgeTierLabel: "New" | "Reliable" | "Trusted" | "Standout";
@@ -195,6 +198,11 @@ export async function updateEditableProfile(
   }
 
   const { semester } = getCurrentSemester();
+  const normalizedInterests = await normalizeInterestTagsForSave(input.interests);
+  const normalizedCcaTags =
+    input.ccaTags !== undefined
+      ? await normalizeCcaTagsForSave(input.ccaTags)
+      : undefined;
 
   const profileUpdates: Database["public"]["Tables"]["profiles"]["Update"] = {
     display_name: input.displayName.trim(),
@@ -205,7 +213,7 @@ export async function updateEditableProfile(
     hall_residence: input.hallResidence.trim() || null,
     study_style: input.studyStyle,
     preferred_group_size: input.preferredGroupSize,
-    interests: normalizeInterestTags(input.interests),
+    interests: normalizedInterests,
     intents: input.intents,
   };
 
@@ -213,8 +221,8 @@ export async function updateEditableProfile(
     profileUpdates.study_mode = input.studyMode;
   }
 
-  if (input.ccaTags !== undefined) {
-    profileUpdates.cca_tags = normalizeProfileTags(input.ccaTags);
+  if (normalizedCcaTags !== undefined) {
+    profileUpdates.cca_tags = normalizedCcaTags;
   }
 
   if (input.skills !== undefined) {
