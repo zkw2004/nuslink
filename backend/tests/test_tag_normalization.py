@@ -8,8 +8,10 @@ from app.main import app
 from app.routers.tags import (
     get_current_user as get_tags_current_user,
 )
-from app.routers.tags import get_tag_normalization_memory_store
-from app.routers.tags import get_tag_normalization_provider
+from app.routers.tags import (
+    get_tag_normalization_memory_store,
+    get_tag_normalization_provider,
+)
 from app.tag_normalization import service
 from app.tag_normalization.schemas import TagClassification
 from app.tag_normalization.service import (
@@ -171,7 +173,9 @@ def test_normalize_tags_keeps_passthrough_when_ai_returns_no_match():
 
 
 def test_normalize_tags_falls_back_to_passthrough_when_ai_is_unconfigured():
-    provider = FakeTagNormalizationProvider(error="AI tag normalization is not configured.")
+    provider = FakeTagNormalizationProvider(
+        error="AI tag normalization is not configured."
+    )
     memory_store = FakeTagNormalizationMemoryStore()
 
     results = normalize_tags(
