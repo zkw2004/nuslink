@@ -76,6 +76,75 @@ export type Database = {
         };
         Relationships: [];
       };
+      profile_links: {
+        Row: {
+          created_at: string;
+          id: string;
+          is_visible: boolean;
+          label: "linkedin" | "github" | "portfolio" | "other";
+          updated_at: string;
+          url: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          is_visible?: boolean;
+          label: "linkedin" | "github" | "portfolio" | "other";
+          updated_at?: string;
+          url: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          is_visible?: boolean;
+          label?: "linkedin" | "github" | "portfolio" | "other";
+          updated_at?: string;
+          url?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      profile_entries: {
+        Row: {
+          category: "work" | "project" | "competition";
+          created_at: string;
+          date_label: string | null;
+          description: string | null;
+          id: string;
+          is_visible: boolean;
+          organization: string | null;
+          title: string;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          category: "work" | "project" | "competition";
+          created_at?: string;
+          date_label?: string | null;
+          description?: string | null;
+          id?: string;
+          is_visible?: boolean;
+          organization?: string | null;
+          title: string;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          category?: "work" | "project" | "competition";
+          created_at?: string;
+          date_label?: string | null;
+          description?: string | null;
+          id?: string;
+          is_visible?: boolean;
+          organization?: string | null;
+          title?: string;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       modules: {
         Row: {
           code: string;
@@ -874,6 +943,17 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      apply_profile_import: {
+        Args: {
+          bio_input: string | null;
+          cca_tags_input: string[] | null;
+          entries_input: unknown[];
+          interests_input: string[] | null;
+          links_input: unknown[];
+          skills_input: string[] | null;
+        };
+        Returns: void;
+      };
       can_access_chat_poll: {
         Args: {
           poll_id_input: string;

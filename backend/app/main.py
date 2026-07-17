@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
-from app.routers import communities, group_drafts, health, matches
+from app.routers import communities, group_drafts, health, matches, profile_extraction
 
 app = FastAPI(title="NUSLink API", version=settings.app_version)
 
@@ -18,3 +18,4 @@ app.include_router(health.router)
 app.include_router(matches.router)
 app.include_router(communities.router)
 app.include_router(group_drafts.router)
+app.include_router(profile_extraction.router)

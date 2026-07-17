@@ -14,7 +14,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { Swipeable } from "react-native-gesture-handler";
+import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable";
 
 import { AppAvatar, GlassButton, GlassSurface } from "@components/shared";
 import type { GroupChatSummary } from "@appTypes/index";
