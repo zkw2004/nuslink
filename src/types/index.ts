@@ -29,6 +29,8 @@ export type UserRole = "member" | "co_admin" | "admin";
 export type TimetableSource = "manual" | "nusmods";
 export type ConnectionRequestStatus = "pending" | "accepted" | "declined";
 export type MatchFeedbackEventType = "view" | "skip" | "accept" | "chat_start";
+export type ProfileEntryCategory = "work" | "project" | "competition";
+export type ProfileLinkLabel = "linkedin" | "github" | "portfolio" | "other";
 export type ConnectionRelationshipStatus =
   | "none"
   | "incoming_request"
@@ -66,6 +68,29 @@ export interface UserProfile {
   skills: string[];
   badge_tier: BadgeTier | null;
   onboarding_completed: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProfileLink {
+  id: string;
+  user_id: string;
+  label: ProfileLinkLabel;
+  url: string;
+  is_visible: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProfileEntry {
+  id: string;
+  user_id: string;
+  category: ProfileEntryCategory;
+  title: string;
+  organization: string | null;
+  date_label: string | null;
+  description: string | null;
+  is_visible: boolean;
   created_at: string;
   updated_at: string;
 }

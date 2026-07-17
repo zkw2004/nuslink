@@ -32,6 +32,7 @@ import {
   ProgressBar,
 } from "@components/shared";
 import { ProfileTagEditor } from "@features/profile/ProfileTagEditor";
+import { ProfessionalProfileSection } from "@features/profile/ProfessionalProfileSection";
 import { saveProfileSetup, uploadProfileImage } from "@features/onboarding/onboardingService";
 import { toSelectedModule, type SelectedModule } from "@features/onboarding/types";
 import { searchNusmodsModules } from "@lib/nusmods";
@@ -935,6 +936,23 @@ export default function ProfileScreen() {
           )}
         </SectionCard>
 
+        {!isEditing ? (
+          <SectionCard className="mb-3">
+            <SectionHeader title="AI Profile Import" />
+            <Text className="text-[13px] leading-5 text-[#5C6370]">
+              Extract skills and professional experience from a resume, then
+              review every field before saving.
+            </Text>
+            <AppButton
+              label="Import from resume"
+              variant="secondary"
+              onPress={() => {
+                router.push("/profile/import-resume" as never);
+              }}
+            />
+          </SectionCard>
+        ) : null}
+
         <SectionCard className="mb-3">
           <SectionHeader title="Academics" />
           {isEditing ? (
@@ -1269,6 +1287,14 @@ export default function ProfileScreen() {
               </View>
             </View>
           )}
+        </SectionCard>
+
+        <SectionCard className="mb-3">
+          <SectionHeader title="Professional Profile" />
+          <ProfessionalProfileSection
+            editable={isEditing}
+            userId={profile.id}
+          />
         </SectionCard>
 
         <SectionCard className="mb-3">

@@ -8,5 +8,6 @@ export * from "./groupDraftingService";
 export * from "./matchingService";
 export * from "./notificationsService";
 export * from "./profileService";
+export * from "./profileExtractionService";
 export * from "./sharedResourcesService";
 export * from "./timetableService";
