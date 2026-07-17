@@ -5,6 +5,7 @@ import { supabase } from "@lib/supabase";
 import type { Database } from "@appTypes/database";
 import type { StudyMode, StudyStyle, UserProfile } from "@appTypes/index";
 import { normalizeInterestTags, normalizeProfileTags } from "@utils/interestTags";
+import { normalizeInterestTagsForSave } from "@services/tagNormalizationService";
 
 type ProfileUpdate = Database["public"]["Tables"]["profiles"]["Update"];
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
@@ -243,8 +244,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     set({ isProfileLoading: true, hasProfileLoaded: false });
 
+    const normalizedInterests = await normalizeInterestTagsForSave(payload.interests);
+
     const updates: ProfileUpdate = {
-      interests: normalizeInterestTags(payload.interests),
+      interests: normalizedInterests,
       intents: payload.intents,
       onboarding_completed: true,
     };

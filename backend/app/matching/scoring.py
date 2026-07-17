@@ -8,6 +8,10 @@ from app.matching.models import (
     ProfileSummary,
     TimetableSlot,
 )
+from app.tag_normalization.service import (
+    normalize_interest_tags_for_matching,
+    normalize_profile_tags_for_matching,
+)
 
 MATCH_WEIGHTS = {
     "same_intent": 0.18,
@@ -40,39 +44,6 @@ TOP_SIGNAL_PRIORITIES = {
     "year_proximity": 11,
     "same_faculty": 12,
 }
-
-CANONICAL_INTEREST_ALIASES = {
-    "ai": ("artificial_intelligence",),
-    "a i": ("artificial_intelligence",),
-    "a.i": ("artificial_intelligence",),
-    "artificial intelligence": ("artificial_intelligence",),
-    "machine learning": ("machine_learning",),
-    "ml": ("machine_learning",),
-    "m l": ("machine_learning",),
-    "a i m l": ("artificial_intelligence", "machine_learning"),
-    "ai ml": ("artificial_intelligence", "machine_learning"),
-    "ai / ml": ("artificial_intelligence", "machine_learning"),
-    "ai/ml": ("artificial_intelligence", "machine_learning"),
-    "artificial intelligence / machine learning": (
-        "artificial_intelligence",
-        "machine_learning",
-    ),
-    "artificial intelligence and machine learning": (
-        "artificial_intelligence",
-        "machine_learning",
-    ),
-    "software engineering": ("software_engineering",),
-    "software eng": ("software_engineering",),
-    "swe": ("software_engineering",),
-    "data science": ("data_science",),
-    "data sci": ("data_science",),
-    "cybersecurity": ("cybersecurity",),
-    "cyber security": ("cybersecurity",),
-    "product management": ("product_management",),
-    "product": ("product_management",),
-    "public policy": ("public_policy",),
-}
-
 
 @dataclass(frozen=True)
 class CandidateScore:
@@ -120,43 +91,12 @@ def _simplify_tag(raw_tag: str) -> str:
     return re.sub(r"\s+", " ", raw_tag.strip().lower()).strip()
 
 
-def _expand_interest_tag(raw_tag: str) -> set[str]:
-    simplified_tag = _simplify_tag(raw_tag)
-    simplified_tag = simplified_tag.replace("&", "and")
-
-    if simplified_tag in CANONICAL_INTEREST_ALIASES:
-        return set(CANONICAL_INTEREST_ALIASES[simplified_tag])
-
-    normalized_punctuation = re.sub(r"[^a-z0-9/+ ]", " ", simplified_tag)
-    normalized_punctuation = re.sub(r"\s+", " ", normalized_punctuation).strip()
-
-    if normalized_punctuation in CANONICAL_INTEREST_ALIASES:
-        return set(CANONICAL_INTEREST_ALIASES[normalized_punctuation])
-
-    return {normalized_punctuation} if normalized_punctuation else set()
-
-
 def normalize_interest_tags(interests: list[str]) -> set[str]:
-    normalized_tags: set[str] = set()
-
-    for interest in interests:
-        normalized_tags.update(_expand_interest_tag(interest))
-
-    return normalized_tags
+    return normalize_interest_tags_for_matching(interests)
 
 
 def normalize_profile_tags(tags: list[str]) -> set[str]:
-    normalized_tags: set[str] = set()
-
-    for tag in tags:
-        simplified_tag = _simplify_tag(tag)
-        normalized_tag = re.sub(r"[^a-z0-9/+ ]", " ", simplified_tag)
-        normalized_tag = re.sub(r"\s+", " ", normalized_tag).strip()
-
-        if normalized_tag:
-            normalized_tags.add(normalized_tag)
-
-    return normalized_tags
+    return normalize_profile_tags_for_matching(tags)
 
 
 def calculate_module_overlap_score(
