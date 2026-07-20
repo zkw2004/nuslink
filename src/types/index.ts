@@ -31,6 +31,14 @@ export type ConnectionRequestStatus = "pending" | "accepted" | "declined";
 export type MatchFeedbackEventType = "view" | "skip" | "accept" | "chat_start";
 export type ProfileEntryCategory = "work" | "project" | "competition";
 export type ProfileLinkLabel = "linkedin" | "github" | "portfolio" | "other";
+export type GroupReviewEligibilityReason =
+  | "Eligible to review"
+  | "Group not found"
+  | "Missing required ids"
+  | "Not enough shared membership time yet"
+  | "Reviewee has no membership in this group"
+  | "Reviewer has no membership in this group"
+  | "You cannot review yourself";
 export type ConnectionRelationshipStatus =
   | "none"
   | "incoming_request"
@@ -105,10 +113,76 @@ export interface Group {
   description: string | null;
   tags: string[];
   max_size: number | null;
+  review_min_membership_days?: number;
   scheduled_time: string | null;
   venue: string | null;
   creator_id: string;
   created_at: string;
+}
+
+export interface BadgeTierRule {
+  tier: BadgeTier;
+  min_review_count: number;
+  min_average_score: number;
+  priority: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GroupReview {
+  id: string;
+  group_id: string;
+  reviewer_id: string;
+  reviewee_id: string;
+  reliability_score: number;
+  communication_score: number;
+  contribution_score: number;
+  written_review: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GroupReviewInput {
+  group_id: string;
+  reviewee_id: string;
+  reliability_score: number;
+  communication_score: number;
+  contribution_score: number;
+  written_review?: string | null;
+}
+
+export interface GroupReviewEligibility {
+  is_eligible: boolean;
+  reason: GroupReviewEligibilityReason;
+  required_days: number | null;
+  reviewer_joined_at: string | null;
+  reviewee_joined_at: string | null;
+  eligible_at: string | null;
+}
+
+export interface PublicProfileReview {
+  id: string;
+  group_id: string;
+  reviewer_id: string;
+  reviewee_id: string;
+  reviewer_display_name: string;
+  reviewer_avatar_url: string | null;
+  group_name: string;
+  group_type: GroupType;
+  written_review: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProfileReviewSummary {
+  reviewee_id: string;
+  received_review_count: number;
+  written_review_count: number;
+  reliability_average: number | null;
+  communication_average: number | null;
+  contribution_average: number | null;
+  overall_average: number | null;
+  badge_tier: BadgeTier | null;
 }
 
 export interface Community {
