@@ -103,7 +103,7 @@ export function CreateMeetupSheet({
       suggestions
         .filter((suggestion) => selectedSuggestionIds.includes(suggestion.id))
         .map((suggestion) => ({
-          label: `${suggestion.label} · ${suggestion.sub}`,
+          label: suggestion.label,
           source: "suggested" as const,
         })),
     [selectedSuggestionIds, suggestions],
