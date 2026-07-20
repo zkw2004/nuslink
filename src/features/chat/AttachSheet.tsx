@@ -3,7 +3,7 @@ import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 
-type AttachType = "photo" | "video" | "file" | "audio" | "poll";
+type AttachType = "photo" | "video" | "file" | "audio" | "poll" | "meetup";
 
 const OPTIONS: {
   type: AttachType;
@@ -16,6 +16,12 @@ const OPTIONS: {
   { type: "video", label: "Video", icon: "videocam", colors: ["#F06292", "#D1467C"] },
   { type: "file", label: "File", icon: "document-text", colors: ["#7986CB", "#5561B8"] },
   { type: "audio", label: "Audio", icon: "mic", colors: ["#FFA726", "#F57C00"] },
+  {
+    type: "meetup",
+    label: "Meetup",
+    icon: "calendar",
+    colors: ["#FF8A65", "#E64A19"],
+  },
   {
     type: "poll",
     label: "Poll",

@@ -16,6 +16,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
 import { GlassButton, GlassSurface } from "@components/shared";
+import { ChatMeetupCard } from "@features/chat/ChatMeetupCard";
 import {
   ChatPollCard,
   PinnedMessagesDrawer,
@@ -23,15 +24,19 @@ import {
   type PinnedMessagePreview,
 } from "@features/chat/ChatFeaturePanels";
 import { AttachSheet } from "@features/chat/AttachSheet";
+import { CreateMeetupSheet, type MeetupDraft } from "@features/chat/CreateMeetupSheet";
+import { getMeetupCloseIso } from "@features/chat/meetupDraft";
 import {
   MessageActionMenu,
   type MessageActionKey,
 } from "@features/chat/MessageActionMenu";
+import type { MeetupSuggestion } from "@appTypes/index";
 import {
   deleteGroupMessageForEveryone,
   deleteGroupMessageForMe,
   editGroupMessage,
 } from "@services/groupMessagesService";
+import { fetchMeetupSuggestions } from "@services/meetupSuggestionsService";
 import {
   useAuthStore,
   useChatFeaturesStore,
@@ -106,16 +111,22 @@ export default function GroupChatThreadScreen() {
   const sendMessage = useGroupMessagesStore((state) => state.sendMessage);
   const subscribeToGroup = useGroupMessagesStore((state) => state.subscribeToGroup);
   const pollsByMessageId = useChatFeaturesStore((state) => state.pollsByMessageId);
+  const meetupsByMessageId = useChatFeaturesStore((state) => state.meetupsByMessageId);
   const pinnedMessagesByChatKey = useChatFeaturesStore(
     (state) => state.pinnedMessagesByChatKey,
   );
   const isCreatingPoll = useChatFeaturesStore((state) => state.isCreatingPoll);
   const isVoting = useChatFeaturesStore((state) => state.isVoting);
+  const isCreatingMeetup = useChatFeaturesStore((state) => state.isCreatingMeetup);
+  const isVotingMeetup = useChatFeaturesStore((state) => state.isVotingMeetup);
   const isPinning = useChatFeaturesStore((state) => state.isPinning);
   const loadFeatures = useChatFeaturesStore((state) => state.loadFeatures);
   const createPoll = useChatFeaturesStore((state) => state.createPoll);
+  const createMeetup = useChatFeaturesStore((state) => state.createMeetup);
   const votePoll = useChatFeaturesStore((state) => state.votePoll);
   const unvotePoll = useChatFeaturesStore((state) => state.unvotePoll);
+  const voteMeetup = useChatFeaturesStore((state) => state.voteMeetup);
+  const unvoteMeetup = useChatFeaturesStore((state) => state.unvoteMeetup);
   const setPinned = useChatFeaturesStore((state) => state.setPinned);
   const subscribeToFeatureChanges = useChatFeaturesStore(
     (state) => state.subscribeToFeatureChanges,
@@ -124,10 +135,14 @@ export default function GroupChatThreadScreen() {
   const [isAttachSheetOpen, setIsAttachSheetOpen] = useState(false);
   const [isPinnedDrawerOpen, setIsPinnedDrawerOpen] = useState(false);
   const [isPollComposerOpen, setIsPollComposerOpen] = useState(false);
+  const [isMeetupComposerOpen, setIsMeetupComposerOpen] = useState(false);
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [pollQuestion, setPollQuestion] = useState("");
   const [pollOptions, setPollOptions] = useState(["", ""]);
+  const [meetupSuggestions, setMeetupSuggestions] = useState<MeetupSuggestion[]>([]);
+  const [isLoadingMeetupSuggestions, setIsLoadingMeetupSuggestions] = useState(false);
+  const [meetupHelperText, setMeetupHelperText] = useState<string | null>(null);
   const scrollViewRef = useRef<ScrollView | null>(null);
 
   const group = useMemo(
@@ -225,9 +240,40 @@ export default function GroupChatThreadScreen() {
     }
   }
 
-  function handlePickAttachment(type: "photo" | "video" | "file" | "audio" | "poll") {
+  async function openMeetupComposer() {
+    setIsLoadingMeetupSuggestions(true);
+    setMeetupHelperText(null);
+    setIsMeetupComposerOpen(true);
+
+    try {
+      const response = await fetchMeetupSuggestions("group", groupId);
+      setMeetupSuggestions(response.suggestions);
+
+      if (response.suggestions.length === 0) {
+        setMeetupHelperText(
+          "At least two group members need uploaded current-semester timetable availability before overlap suggestions can appear.",
+        );
+      }
+    } catch (suggestionError) {
+      setMeetupSuggestions([]);
+      setMeetupHelperText(
+        suggestionError instanceof Error
+          ? suggestionError.message
+          : "Could not load meetup suggestions right now.",
+      );
+    } finally {
+      setIsLoadingMeetupSuggestions(false);
+    }
+  }
+
+  function handlePickAttachment(type: "photo" | "video" | "file" | "audio" | "poll" | "meetup") {
     if (type === "poll") {
       setIsPollComposerOpen(true);
+      return;
+    }
+
+    if (type === "meetup") {
+      void openMeetupComposer();
     }
   }
 
@@ -287,6 +333,77 @@ export default function GroupChatThreadScreen() {
     }
   }
 
+  async function handleCreateMeetup(draft: MeetupDraft) {
+    if (!session?.user.id) {
+      Alert.alert("Sign in required", "Please sign in again before creating meetups.");
+      return;
+    }
+
+    if (!draft.title.trim()) {
+      Alert.alert("Title required", "Add a meetup title before posting.");
+      return;
+    }
+
+    if (draft.options.length < 2) {
+      Alert.alert(
+        "Options required",
+        "Meetups need at least two suggested or custom time options.",
+      );
+      return;
+    }
+
+    try {
+      await createMeetup(
+        "group",
+        groupId,
+        draft.title.trim(),
+        draft.options,
+        getMeetupCloseIso(draft.countdown),
+      );
+      await Promise.all([
+        loadGroupMessages(groupId, session.user.id),
+        refreshGroupChats(session.user.id),
+      ]);
+    } catch (meetupError) {
+      Alert.alert(
+        "Could not create meetup",
+        meetupError instanceof Error ? meetupError.message : "Please try again.",
+      );
+    }
+  }
+
+  async function handleVoteMeetup(meetupId: string, optionId: string) {
+    if (!session?.user.id) {
+      Alert.alert("Sign in required", "Please sign in again before voting.");
+      return;
+    }
+
+    try {
+      await voteMeetup("group", groupId, messageIds, session.user.id, meetupId, optionId);
+    } catch (meetupError) {
+      Alert.alert(
+        "Could not vote",
+        meetupError instanceof Error ? meetupError.message : "Please try again.",
+      );
+    }
+  }
+
+  async function handleUnvoteMeetup(meetupId: string) {
+    if (!session?.user.id) {
+      Alert.alert("Sign in required", "Please sign in again before updating meetup votes.");
+      return;
+    }
+
+    try {
+      await unvoteMeetup("group", groupId, messageIds, session.user.id, meetupId);
+    } catch (meetupError) {
+      Alert.alert(
+        "Could not remove vote",
+        meetupError instanceof Error ? meetupError.message : "Please try again.",
+      );
+    }
+  }
+
   async function handleUnvotePoll(pollId: string) {
     if (!session?.user.id) {
       Alert.alert("Sign in required", "Please sign in again before updating votes.");
@@ -335,6 +452,7 @@ export default function GroupChatThreadScreen() {
           return {
             ...pinnedMessage,
             body:
+              meetupsByMessageId[message.id]?.title ??
               pollsByMessageId[message.id]?.question ??
               message.body ??
               "Pinned group message",
@@ -342,7 +460,7 @@ export default function GroupChatThreadScreen() {
           };
         })
         .filter((message): message is PinnedMessagePreview => message !== null),
-    [messages, pinnedMessages, pollsByMessageId],
+    [messages, meetupsByMessageId, pinnedMessages, pollsByMessageId],
   );
   const selectedMessage = selectedMessageId
     ? messages.find((message) => message.id === selectedMessageId) ?? null
@@ -558,6 +676,7 @@ export default function GroupChatThreadScreen() {
           {messages.map((message) => {
             const isMine = message.sender_id === session?.user.id;
             const poll = pollsByMessageId[message.id];
+            const meetup = meetupsByMessageId[message.id];
             const isPinned = pinnedMessages.some(
               (pinnedMessage) => pinnedMessage.message_id === message.id,
             );
@@ -570,7 +689,7 @@ export default function GroupChatThreadScreen() {
                 style={[
                   styles.bubble,
                   isMine ? styles.bubbleMine : styles.bubbleTheirs,
-                  poll ? styles.pollBubble : null,
+                  poll || meetup ? styles.pollBubble : null,
                 ]}
               >
                 {!isMine ? (
@@ -578,7 +697,19 @@ export default function GroupChatThreadScreen() {
                     {message.sender_profile.display_name}
                   </Text>
                 ) : null}
-                  {poll ? (
+                  {meetup ? (
+                    <ChatMeetupCard
+                      meetup={meetup}
+                      disabled={isVotingMeetup}
+                      isDark={isMine}
+                      onVote={(optionId) => {
+                        void handleVoteMeetup(meetup.id, optionId);
+                      }}
+                      onUnvote={() => {
+                        void handleUnvoteMeetup(meetup.id);
+                      }}
+                    />
+                  ) : poll ? (
                     <ChatPollCard
                       poll={poll}
                       disabled={isVoting}
@@ -672,6 +803,19 @@ export default function GroupChatThreadScreen() {
             />
             </View>
           ) : null}
+          {isMeetupComposerOpen ? (
+            <CreateMeetupSheet
+              visible={isMeetupComposerOpen}
+              suggestions={meetupSuggestions}
+              isLoadingSuggestions={isLoadingMeetupSuggestions}
+              helperText={meetupHelperText}
+              isCreating={isCreatingMeetup}
+              onClose={() => setIsMeetupComposerOpen(false)}
+              onSend={(draft) => {
+                void handleCreateMeetup(draft);
+              }}
+            />
+          ) : null}
 
           <View style={styles.composerRow}>
             <Pressable
@@ -706,7 +850,7 @@ export default function GroupChatThreadScreen() {
         <AttachSheet
           visible={isAttachSheetOpen}
           isGroup
-          allowedTypes={["poll"]}
+          allowedTypes={["poll", "meetup"]}
           onClose={() => setIsAttachSheetOpen(false)}
           onPick={handlePickAttachment}
         />
