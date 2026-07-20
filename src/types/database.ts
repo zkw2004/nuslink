@@ -400,6 +400,102 @@ export type Database = {
         };
         Relationships: [];
       };
+      chat_meetups: {
+        Row: {
+          closed_at: string | null;
+          closes_at: string;
+          community_message_id: string | null;
+          created_at: string;
+          created_by: string;
+          direct_message_id: string | null;
+          group_message_id: string | null;
+          id: string;
+          status: "open" | "closed_confirmed" | "closed_tie";
+          title: string;
+          winning_label: string | null;
+          winning_option_id: string | null;
+        };
+        Insert: {
+          closed_at?: string | null;
+          closes_at: string;
+          community_message_id?: string | null;
+          created_at?: string;
+          created_by: string;
+          direct_message_id?: string | null;
+          group_message_id?: string | null;
+          id?: string;
+          status?: "open" | "closed_confirmed" | "closed_tie";
+          title: string;
+          winning_label?: string | null;
+          winning_option_id?: string | null;
+        };
+        Update: {
+          closed_at?: string | null;
+          closes_at?: string;
+          community_message_id?: string | null;
+          created_at?: string;
+          created_by?: string;
+          direct_message_id?: string | null;
+          group_message_id?: string | null;
+          id?: string;
+          status?: "open" | "closed_confirmed" | "closed_tie";
+          title?: string;
+          winning_label?: string | null;
+          winning_option_id?: string | null;
+        };
+        Relationships: [];
+      };
+      chat_meetup_options: {
+        Row: {
+          created_at: string;
+          id: string;
+          label: string;
+          meetup_id: string;
+          position: number;
+          source: "suggested" | "custom";
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          label: string;
+          meetup_id: string;
+          position: number;
+          source?: "suggested" | "custom";
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          label?: string;
+          meetup_id?: string;
+          position?: number;
+          source?: "suggested" | "custom";
+        };
+        Relationships: [];
+      };
+      chat_meetup_votes: {
+        Row: {
+          created_at: string;
+          id: string;
+          meetup_id: string;
+          option_id: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          meetup_id: string;
+          option_id: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          meetup_id?: string;
+          option_id?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       chat_poll_options: {
         Row: {
           body: string;

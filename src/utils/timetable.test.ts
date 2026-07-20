@@ -24,8 +24,8 @@ test("parses NUSMods share URLs from normal query strings", () => {
     "MA1521",
   ]);
   assert.deepEqual(payload.moduleSelections.get("CS2040S"), [
-    { lessonType: "LEC", lessonIndexes: [0] },
-    { lessonType: "TUT", lessonIndexes: [3] },
+    { lessonType: "LEC", lessonReferences: ["0"] },
+    { lessonType: "TUT", lessonReferences: ["3"] },
   ]);
 });
 
@@ -37,20 +37,46 @@ test("parses NUSMods share URLs from hash query strings", () => {
 
   assert.equal(payload.semesterNumber, 2);
   assert.deepEqual(payload.moduleSelections.get("CS2030S"), [
-    { lessonType: "LAB", lessonIndexes: [2, 5] },
+    { lessonType: "LAB", lessonReferences: ["2", "5"] },
   ]);
+});
+
+test("parses full NUSMods share URLs that use comma-separated selections", () => {
+  const payload = parseNusmodsShareUrl(
+    "https://nusmods.com/timetable/sem-1/share?CS2100=TUT:39,LAB:39,LEC:2&CS2101=&CS2103T=LEC:G09&DAO2703=SEC:A8&FIN2704=LEC:A3,TUT:G12&RE1707=SEC:A2",
+    2,
+  );
+
+  assert.equal(payload.semesterNumber, 1);
+  assert.deepEqual(payload.moduleSelections.get("CS2100"), [
+    { lessonType: "TUT", lessonReferences: ["39"] },
+    { lessonType: "LAB", lessonReferences: ["39"] },
+    { lessonType: "LEC", lessonReferences: ["2"] },
+  ]);
+  assert.deepEqual(payload.moduleSelections.get("CS2103T"), [
+    { lessonType: "LEC", lessonReferences: ["G09"] },
+  ]);
+  assert.equal(payload.moduleSelections.has("CS2101"), false);
 });
 
 test("matches common NUSMods lesson abbreviations", () => {
   const lectureSelection = parseLessonSelections("LEC:0")[0];
   const recitationSelection = parseLessonSelections("REC:1")[0];
 
-  assert.equal(matchesLessonSelection(lectureSelection, "Lecture"), true);
-  assert.equal(matchesLessonSelection(lectureSelection, "Tutorial"), false);
+  assert.equal(matchesLessonSelection(lectureSelection, "Lecture", "1", 0), true);
+  assert.equal(matchesLessonSelection(lectureSelection, "Tutorial", "1", 0), false);
   assert.equal(
-    matchesLessonSelection(recitationSelection, "Sectional Teaching"),
+    matchesLessonSelection(recitationSelection, "Sectional Teaching", "A1", 1),
     true,
   );
+});
+
+test("matches class numbers from newer NUSMods share links", () => {
+  const selections = parseLessonSelections("TUT:39,LAB:39,LEC:G09");
+
+  assert.equal(matchesLessonSelection(selections[0], "Tutorial", "39", 2), true);
+  assert.equal(matchesLessonSelection(selections[1], "Laboratory", "39", 4), true);
+  assert.equal(matchesLessonSelection(selections[2], "Lecture", "G09", 1), true);
 });
 
 test("derives weekday free blocks from occupied lessons", () => {

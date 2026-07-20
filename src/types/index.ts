@@ -261,6 +261,50 @@ export interface DirectMessageAttachmentInput {
 }
 
 export type ChatKind = "direct" | "community" | "group";
+export type MeetupStatus = "open" | "closed_confirmed" | "closed_tie";
+
+export interface MeetupSuggestionCoverage {
+  total_participants: number;
+  included_participants: number;
+  excluded_participants: number;
+  available_participants: number;
+}
+
+export interface MeetupSuggestion {
+  id: string;
+  label: string;
+  sub: string;
+  day_of_week: number;
+  start_minute: number;
+  end_minute: number;
+  coverage: MeetupSuggestionCoverage;
+}
+
+export interface ChatMeetupOption {
+  id: string;
+  meetup_id: string;
+  label: string;
+  position: number;
+  source: "suggested" | "custom";
+  vote_count: number;
+  is_selected_by_current_user: boolean;
+  is_winner: boolean;
+}
+
+export interface ChatMeetup {
+  id: string;
+  message_id: string;
+  title: string;
+  created_by: string;
+  created_at: string;
+  closes_at: string;
+  closed_at: string | null;
+  status: MeetupStatus;
+  winning_option_id: string | null;
+  winning_label: string | null;
+  total_votes: number;
+  options: ChatMeetupOption[];
+}
 
 export interface ChatPollOption {
   id: string;

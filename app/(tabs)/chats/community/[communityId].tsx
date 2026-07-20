@@ -20,7 +20,8 @@ import * as ImagePicker from "expo-image-picker";
 import { Ionicons } from "@expo/vector-icons";
 
 import { GlassButton, GlassSurface } from "@components/shared";
-import type { ChatAttachmentKind } from "@appTypes/index";
+import type { ChatAttachmentKind, MeetupSuggestion } from "@appTypes/index";
+import { ChatMeetupCard } from "@features/chat/ChatMeetupCard";
 import {
   ChatPollCard,
   PinnedMessagesDrawer,
@@ -28,6 +29,8 @@ import {
   type PinnedMessagePreview,
 } from "@features/chat/ChatFeaturePanels";
 import { AttachSheet } from "@features/chat/AttachSheet";
+import { CreateMeetupSheet, type MeetupDraft } from "@features/chat/CreateMeetupSheet";
+import { getMeetupCloseIso } from "@features/chat/meetupDraft";
 import {
   MessageActionMenu,
   type MessageActionKey,
@@ -38,6 +41,7 @@ import {
   editCommunityMessage,
   uploadCommunityChatAttachment,
 } from "@services/communityMessagesService";
+import { fetchMeetupSuggestions } from "@services/meetupSuggestionsService";
 import {
   useAuthStore,
   useChatFeaturesStore,
@@ -275,16 +279,26 @@ export default function CommunityChatThreadScreen() {
   const pollsByMessageId = useChatFeaturesStore(
     (state) => state.pollsByMessageId,
   );
+  const meetupsByMessageId = useChatFeaturesStore(
+    (state) => state.meetupsByMessageId,
+  );
   const pinnedMessagesByChatKey = useChatFeaturesStore(
     (state) => state.pinnedMessagesByChatKey,
   );
   const isCreatingPoll = useChatFeaturesStore((state) => state.isCreatingPoll);
   const isVoting = useChatFeaturesStore((state) => state.isVoting);
+  const isCreatingMeetup = useChatFeaturesStore(
+    (state) => state.isCreatingMeetup,
+  );
+  const isVotingMeetup = useChatFeaturesStore((state) => state.isVotingMeetup);
   const isPinning = useChatFeaturesStore((state) => state.isPinning);
   const loadFeatures = useChatFeaturesStore((state) => state.loadFeatures);
   const createPoll = useChatFeaturesStore((state) => state.createPoll);
+  const createMeetup = useChatFeaturesStore((state) => state.createMeetup);
   const votePoll = useChatFeaturesStore((state) => state.votePoll);
   const unvotePoll = useChatFeaturesStore((state) => state.unvotePoll);
+  const voteMeetup = useChatFeaturesStore((state) => state.voteMeetup);
+  const unvoteMeetup = useChatFeaturesStore((state) => state.unvoteMeetup);
   const setPinned = useChatFeaturesStore((state) => state.setPinned);
   const subscribeToFeatureChanges = useChatFeaturesStore(
     (state) => state.subscribeToFeatureChanges,
@@ -296,6 +310,7 @@ export default function CommunityChatThreadScreen() {
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
   const [isPinnedDrawerOpen, setIsPinnedDrawerOpen] = useState(false);
   const [isPollComposerOpen, setIsPollComposerOpen] = useState(false);
+  const [isMeetupComposerOpen, setIsMeetupComposerOpen] = useState(false);
   const [isAttachSheetOpen, setIsAttachSheetOpen] = useState(false);
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(
     null,
@@ -303,6 +318,12 @@ export default function CommunityChatThreadScreen() {
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [pollQuestion, setPollQuestion] = useState("");
   const [pollOptions, setPollOptions] = useState(["", ""]);
+  const [meetupSuggestions, setMeetupSuggestions] = useState<MeetupSuggestion[]>(
+    [],
+  );
+  const [isLoadingMeetupSuggestions, setIsLoadingMeetupSuggestions] =
+    useState(false);
+  const [meetupHelperText, setMeetupHelperText] = useState<string | null>(null);
   const scrollViewRef = useRef<ScrollView | null>(null);
 
   const community = useMemo(
@@ -520,8 +541,34 @@ export default function CommunityChatThreadScreen() {
     setIsAttachSheetOpen(true);
   }
 
+  async function openMeetupComposer() {
+    setIsLoadingMeetupSuggestions(true);
+    setMeetupHelperText(null);
+    setIsMeetupComposerOpen(true);
+
+    try {
+      const response = await fetchMeetupSuggestions("community", communityId);
+      setMeetupSuggestions(response.suggestions);
+
+      if (response.suggestions.length === 0) {
+        setMeetupHelperText(
+          "Too few community members uploaded current-semester timetable availability to suggest overlap times yet.",
+        );
+      }
+    } catch (suggestionError) {
+      setMeetupSuggestions([]);
+      setMeetupHelperText(
+        suggestionError instanceof Error
+          ? suggestionError.message
+          : "Could not load meetup suggestions right now.",
+      );
+    } finally {
+      setIsLoadingMeetupSuggestions(false);
+    }
+  }
+
   function handlePickAttachment(
-    type: "photo" | "video" | "file" | "audio" | "poll",
+    type: "photo" | "video" | "file" | "audio" | "poll" | "meetup",
   ) {
     if (type === "file") {
       void handlePickFile();
@@ -535,6 +582,11 @@ export default function CommunityChatThreadScreen() {
 
     if (type === "poll") {
       setIsPollComposerOpen(true);
+      return;
+    }
+
+    if (type === "meetup") {
+      void openMeetupComposer();
       return;
     }
 
@@ -745,6 +797,96 @@ export default function CommunityChatThreadScreen() {
     }
   }
 
+  async function handleCreateMeetup(draft: MeetupDraft) {
+    if (!session?.user.id) {
+      Alert.alert(
+        "Sign in required",
+        "Please sign in again before creating meetups.",
+      );
+      return;
+    }
+
+    if (!draft.title.trim()) {
+      Alert.alert("Title required", "Add a meetup title before posting.");
+      return;
+    }
+
+    if (draft.options.length < 2) {
+      Alert.alert(
+        "Options required",
+        "Meetups need at least two suggested or custom time options.",
+      );
+      return;
+    }
+
+    try {
+      await createMeetup(
+        "community",
+        communityId,
+        draft.title.trim(),
+        draft.options,
+        getMeetupCloseIso(draft.countdown),
+      );
+      await Promise.all([
+        loadCommunityMessages(communityId, session.user.id),
+        refreshCommunityChats(session.user.id),
+      ]);
+    } catch (meetupError) {
+      Alert.alert(
+        "Could not create meetup",
+        meetupError instanceof Error ? meetupError.message : "Please try again.",
+      );
+    }
+  }
+
+  async function handleVoteMeetup(meetupId: string, optionId: string) {
+    if (!session?.user.id) {
+      Alert.alert("Sign in required", "Please sign in again before voting.");
+      return;
+    }
+
+    try {
+      await voteMeetup(
+        "community",
+        communityId,
+        messageIds,
+        session.user.id,
+        meetupId,
+        optionId,
+      );
+    } catch (meetupError) {
+      Alert.alert(
+        "Could not vote",
+        meetupError instanceof Error ? meetupError.message : "Please try again.",
+      );
+    }
+  }
+
+  async function handleUnvoteMeetup(meetupId: string) {
+    if (!session?.user.id) {
+      Alert.alert(
+        "Sign in required",
+        "Please sign in again before updating meetup votes.",
+      );
+      return;
+    }
+
+    try {
+      await unvoteMeetup(
+        "community",
+        communityId,
+        messageIds,
+        session.user.id,
+        meetupId,
+      );
+    } catch (meetupError) {
+      Alert.alert(
+        "Could not remove vote",
+        meetupError instanceof Error ? meetupError.message : "Please try again.",
+      );
+    }
+  }
+
   async function handleUnvotePoll(pollId: string) {
     if (!session?.user.id) {
       Alert.alert(
@@ -809,6 +951,7 @@ export default function CommunityChatThreadScreen() {
       return {
         ...pinnedMessage,
         body:
+          meetupsByMessageId[message.id]?.title ??
           pollsByMessageId[message.id]?.question ??
           message.body ??
           message.attachment_name ??
@@ -1085,6 +1228,7 @@ export default function CommunityChatThreadScreen() {
                 message.attachment_kind !== "video" &&
                 Boolean(message.attachment_url);
               const poll = pollsByMessageId[message.id];
+              const meetup = meetupsByMessageId[message.id];
               const isPinned = pinnedMessages.some(
                 (pinnedMessage) => pinnedMessage.message_id === message.id,
               );
@@ -1098,7 +1242,7 @@ export default function CommunityChatThreadScreen() {
                     styles.bubble,
                     isCurrentUser ? styles.bubbleMine : styles.bubbleTheirs,
                     isMediaBubble ? styles.bubbleMedia : null,
-                    poll ? styles.pollBubble : null,
+                    poll || meetup ? styles.pollBubble : null,
                   ]}
                 >
                   {!isCurrentUser ? (
@@ -1217,7 +1361,19 @@ export default function CommunityChatThreadScreen() {
                     </Pressable>
                   ) : null}
 
-                  {poll ? (
+                  {meetup ? (
+                    <ChatMeetupCard
+                      meetup={meetup}
+                      disabled={isVotingMeetup}
+                      isDark={isCurrentUser}
+                      onVote={(optionId) => {
+                        void handleVoteMeetup(meetup.id, optionId);
+                      }}
+                      onUnvote={() => {
+                        void handleUnvoteMeetup(meetup.id);
+                      }}
+                    />
+                  ) : poll ? (
                     <ChatPollCard
                       poll={poll}
                       disabled={isVoting}
@@ -1320,6 +1476,19 @@ export default function CommunityChatThreadScreen() {
                 }}
               />
             </View>
+          ) : null}
+          {isMeetupComposerOpen ? (
+            <CreateMeetupSheet
+              visible={isMeetupComposerOpen}
+              suggestions={meetupSuggestions}
+              isLoadingSuggestions={isLoadingMeetupSuggestions}
+              helperText={meetupHelperText}
+              isCreating={isCreatingMeetup}
+              onClose={() => setIsMeetupComposerOpen(false)}
+              onSend={(draft) => {
+                void handleCreateMeetup(draft);
+              }}
+            />
           ) : null}
 
           {pendingAttachment ? (

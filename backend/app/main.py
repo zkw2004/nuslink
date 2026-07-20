@@ -7,6 +7,7 @@ from app.routers import (
     group_drafts,
     health,
     matches,
+    meetups,
     profile_extraction,
     tags,
 )
@@ -23,6 +24,7 @@ app.add_middleware(
 
 app.include_router(health.router)
 app.include_router(matches.router)
+app.include_router(meetups.router)
 app.include_router(communities.router)
 app.include_router(group_drafts.router)
 app.include_router(profile_extraction.router)

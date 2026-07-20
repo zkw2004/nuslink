@@ -19,6 +19,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { GlassButton } from "@components/shared";
 import type {
   ChatAttachmentKind,
+  ChatMeetup,
   ChatPoll,
   CommunityChatMessage,
   DirectMessage,
@@ -241,6 +242,9 @@ export default function ChatInfoScreen() {
   const pollsByMessageId = useChatFeaturesStore(
     (state) => state.pollsByMessageId,
   );
+  const meetupsByMessageId = useChatFeaturesStore(
+    (state) => state.meetupsByMessageId,
+  );
   const muteCommunityChats = useCommunityMessagesStore(
     (state) => state.muteCommunityChats,
   );
@@ -338,6 +342,21 @@ export default function ChatInfoScreen() {
         .filter((poll): poll is ChatPoll => Boolean(poll)),
     [chatMessages, pollsByMessageId],
   );
+  const latestConfirmedMeetup = useMemo(() => {
+    const confirmedMeetups = chatMessages
+      .map((message) => meetupsByMessageId[message.id])
+      .filter(
+        (meetup): meetup is ChatMeetup =>
+          Boolean(meetup) && meetup.status === "closed_confirmed",
+      )
+      .sort(
+        (left, right) =>
+          new Date(right.closed_at ?? right.created_at).getTime() -
+          new Date(left.closed_at ?? left.created_at).getTime(),
+      );
+
+    return confirmedMeetups[0] ?? null;
+  }, [chatMessages, meetupsByMessageId]);
   const mediaCollections = useMemo(
     () => getMediaCollections(chatMessages, chatPolls),
     [chatMessages, chatPolls],
@@ -472,6 +491,18 @@ export default function ChatInfoScreen() {
                   width={actionWidth}
                 />
               </View>
+
+              {latestConfirmedMeetup ? (
+                <View style={styles.meetupSummary}>
+                  <Text style={styles.meetupSummaryLabel}>Planned Meetup</Text>
+                  <Text style={styles.meetupSummaryTitle}>
+                    {latestConfirmedMeetup.title}
+                  </Text>
+                  <Text style={styles.meetupSummaryText}>
+                    {latestConfirmedMeetup.winning_label ?? "Winning slot confirmed"}
+                  </Text>
+                </View>
+              ) : null}
 
               <ScrollView
                 horizontal
@@ -635,6 +666,33 @@ const styles = StyleSheet.create({
     gap: 12,
     justifyContent: "center",
     paddingHorizontal: 24,
+  },
+  meetupSummary: {
+    backgroundColor: "rgba(255,255,255,0.52)",
+    borderColor: "rgba(255,255,255,0.82)",
+    borderRadius: 22,
+    borderWidth: 1,
+    marginHorizontal: 24,
+    marginTop: 18,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+  },
+  meetupSummaryLabel: {
+    color: "#A4390F",
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 0.6,
+  },
+  meetupSummaryTitle: {
+    color: "#1A1A26",
+    fontSize: 17,
+    fontWeight: "700",
+    marginTop: 6,
+  },
+  meetupSummaryText: {
+    color: "#6F7387",
+    fontSize: 13,
+    marginTop: 4,
   },
   action: {
     borderRadius: 20,

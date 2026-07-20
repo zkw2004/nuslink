@@ -35,8 +35,12 @@ function buildOccupiedLessonSlots(
         .filter((lesson, lessonIndex) => {
           return selections.some((selection) => {
             return (
-              matchesLessonSelection(selection, lesson.lessonType) &&
-              selection.lessonIndexes.includes(lessonIndex)
+              matchesLessonSelection(
+                selection,
+                lesson.lessonType,
+                lesson.classNo,
+                lessonIndex,
+              )
             );
           });
         })
@@ -91,8 +95,9 @@ function buildOccupiedLessonSlots(
 
 export async function importTimetableFromNusmodsShareUrl(rawUrl: string) {
   const fallbackSemesterNumber = Number(getCurrentSemester().semester.slice(-1));
+  const resolvedUrl = await resolveNusmodsShareUrl(rawUrl);
   const { moduleSelections, semesterNumber } = parseNusmodsShareUrl(
-    rawUrl,
+    resolvedUrl,
     fallbackSemesterNumber,
   );
   const occupiedSlots = await buildOccupiedLessonSlots(
@@ -110,6 +115,31 @@ export async function importTimetableFromNusmodsShareUrl(rawUrl: string) {
     occupiedSlots,
     availabilitySlots: deriveFreeBlocksFromOccupiedSlots(occupiedSlots),
   };
+}
+
+async function resolveNusmodsShareUrl(rawUrl: string) {
+  let url: URL;
+
+  try {
+    url = new URL(rawUrl.trim());
+  } catch {
+    return rawUrl;
+  }
+
+  if (!url.hostname.includes("shorten.nusmods.com")) {
+    return rawUrl;
+  }
+
+  const response = await fetch(url.toString(), {
+    method: "GET",
+    redirect: "follow",
+  });
+
+  if (!response.ok) {
+    throw new Error("Unable to expand the shortened NUSMods link.");
+  }
+
+  return response.url || rawUrl;
 }
 
 export async function fetchCurrentSemesterTimetableSlots(userId: string) {

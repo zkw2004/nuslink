@@ -26,7 +26,7 @@ export const NUSMODS_DAY_INDEX: Record<string, number> = {
 
 export type LessonSelection = {
   lessonType: string;
-  lessonIndexes: number[];
+  lessonReferences: string[];
 };
 
 export type ImportPayload = {
@@ -81,22 +81,78 @@ function expandLessonTypeToken(value: string) {
 export function matchesLessonSelection(
   selection: LessonSelection,
   lessonType: string,
+  classNo?: string,
+  lessonIndex?: number,
 ) {
   const normalizedLessonType = normalizeLessonToken(lessonType);
   const allowedLessonTypes = expandLessonTypeToken(selection.lessonType);
+  const normalizedClassNo = classNo ? normalizeLessonToken(classNo) : null;
+  const normalizedLessonIndex =
+    typeof lessonIndex === "number" ? String(lessonIndex) : null;
 
-  return allowedLessonTypes.some((allowedType) => {
+  const hasMatchingReference = selection.lessonReferences.some((reference) => {
+    const normalizedReference = normalizeLessonToken(reference);
+
     return (
-      normalizedLessonType === allowedType ||
-      normalizedLessonType.startsWith(allowedType) ||
-      allowedType.startsWith(normalizedLessonType)
+      normalizedReference === normalizedClassNo ||
+      normalizedReference === normalizedLessonIndex
     );
   });
+
+  return hasMatchingReference
+    ? allowedLessonTypes.some((allowedType) => {
+        return (
+          normalizedLessonType === allowedType ||
+          normalizedLessonType.startsWith(allowedType) ||
+          allowedType.startsWith(normalizedLessonType)
+        );
+      })
+    : false;
+}
+
+function splitLessonSelectionParts(rawSelection: string) {
+  const parts: string[] = [];
+  let current = "";
+  let depth = 0;
+
+  for (const character of rawSelection) {
+    if (character === "(") {
+      depth += 1;
+      current += character;
+      continue;
+    }
+
+    if (character === ")") {
+      depth = Math.max(0, depth - 1);
+      current += character;
+      continue;
+    }
+
+    if ((character === ";" || character === ",") && depth === 0) {
+      const trimmed = current.trim();
+
+      if (trimmed) {
+        parts.push(trimmed);
+      }
+
+      current = "";
+      continue;
+    }
+
+    current += character;
+  }
+
+  const trimmed = current.trim();
+
+  if (trimmed) {
+    parts.push(trimmed);
+  }
+
+  return parts;
 }
 
 export function parseLessonSelections(rawSelection: string) {
-  return rawSelection
-    .split(";")
+  return splitLessonSelectionParts(rawSelection)
     .map((part) => part.trim())
     .filter(Boolean)
     .flatMap((part) => {
@@ -107,19 +163,19 @@ export function parseLessonSelections(rawSelection: string) {
       }
 
       const lessonType = match[1].trim();
-      const lessonIndexes = match[2]
+      const lessonReferences = match[2]
         .split(",")
-        .map((lessonIndex) => Number.parseInt(lessonIndex.trim(), 10))
-        .filter((lessonIndex) => Number.isFinite(lessonIndex));
+        .map((reference) => reference.trim())
+        .filter(Boolean);
 
-      if (lessonIndexes.length === 0) {
+      if (lessonReferences.length === 0) {
         return [];
       }
 
       return [
         {
           lessonType,
-          lessonIndexes,
+          lessonReferences,
         },
       ];
     });
