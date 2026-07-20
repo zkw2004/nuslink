@@ -104,7 +104,8 @@ export async function fetchJoinedGroupChats(
     .from("group_members")
     .select("*")
     .eq("user_id", userId)
-    .is("deleted_at", null);
+    .is("deleted_at", null)
+    .is("left_at", null);
 
   if (scope === "active") {
     membershipQuery = membershipQuery.is("archived_at", null);
@@ -291,7 +292,8 @@ export async function markGroupChatRead(groupId: string, userId: string) {
     .from("group_members")
     .update({ last_read_at: new Date().toISOString() })
     .eq("group_id", groupId)
-    .eq("user_id", userId);
+    .eq("user_id", userId)
+    .is("left_at", null);
 
   if (error) {
     throw new Error(error.message);
@@ -307,7 +309,8 @@ export async function markGroupChatsRead(groupIds: string[], userId: string) {
     .from("group_members")
     .update({ last_read_at: new Date().toISOString() })
     .eq("user_id", userId)
-    .in("group_id", groupIds);
+    .in("group_id", groupIds)
+    .is("left_at", null);
 
   if (error) {
     throw new Error(error.message);
@@ -326,7 +329,8 @@ export async function archiveGroupChats(groupIds: string[], userId: string) {
       deleted_at: null,
     })
     .eq("user_id", userId)
-    .in("group_id", groupIds);
+    .in("group_id", groupIds)
+    .is("left_at", null);
 
   if (error) {
     throw new Error(error.message);
@@ -345,7 +349,8 @@ export async function unarchiveGroupChats(groupIds: string[], userId: string) {
       deleted_at: null,
     })
     .eq("user_id", userId)
-    .in("group_id", groupIds);
+    .in("group_id", groupIds)
+    .is("left_at", null);
 
   if (error) {
     throw new Error(error.message);
@@ -357,17 +362,21 @@ export async function deleteGroupChats(groupIds: string[], userId: string) {
     return;
   }
 
-  const { error } = await supabase
-    .from("group_members")
-    .update({
-      archived_at: null,
-      deleted_at: new Date().toISOString(),
-    })
-    .eq("user_id", userId)
-    .in("group_id", groupIds);
+  const supabaseClient = supabase;
+  const results = await Promise.all(
+    groupIds.map(async (groupId) => {
+      const { error } = await supabaseClient.rpc("leave_group", {
+        group_id_input: groupId,
+      });
 
-  if (error) {
-    throw new Error(error.message);
+      if (error) {
+        throw new Error(error.message);
+      }
+    }),
+  );
+
+  if (results.length !== groupIds.length) {
+    throw new Error("Could not leave all selected groups.");
   }
 }
 
@@ -384,7 +393,8 @@ export async function muteGroupChats(
     .from("group_members")
     .update({ muted_at: muted ? new Date().toISOString() : null })
     .eq("user_id", userId)
-    .in("group_id", groupIds);
+    .in("group_id", groupIds)
+    .is("left_at", null);
 
   if (error) {
     throw new Error(error.message);
@@ -456,7 +466,8 @@ export async function restoreGroupChat(groupId: string, userId: string) {
       deleted_at: null,
     })
     .eq("user_id", userId)
-    .eq("group_id", groupId);
+    .eq("group_id", groupId)
+    .is("left_at", null);
 
   if (error) {
     throw new Error(error.message);

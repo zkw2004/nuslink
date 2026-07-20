@@ -610,6 +610,7 @@ export type Database = {
           module_code: string | null;
           name: string;
           privacy: "public" | "semi_private" | "private";
+          review_min_membership_days: number;
           restriction: "same_module" | "same_year" | "same_faculty" | null;
           scheduled_time: string | null;
           semester: string;
@@ -630,6 +631,7 @@ export type Database = {
           module_code?: string | null;
           name: string;
           privacy?: "public" | "semi_private" | "private";
+          review_min_membership_days?: number;
           restriction?: "same_module" | "same_year" | "same_faculty" | null;
           scheduled_time?: string | null;
           semester: string;
@@ -650,6 +652,7 @@ export type Database = {
           module_code?: string | null;
           name?: string;
           privacy?: "public" | "semi_private" | "private";
+          review_min_membership_days?: number;
           restriction?: "same_module" | "same_year" | "same_faculty" | null;
           scheduled_time?: string | null;
           semester?: string;
@@ -669,6 +672,7 @@ export type Database = {
           id: string;
           joined_at: string;
           last_read_at: string | null;
+          left_at: string | null;
           muted_at: string | null;
           role: "member" | "co_admin" | "admin";
           user_id: string;
@@ -680,6 +684,7 @@ export type Database = {
           id?: string;
           joined_at?: string;
           last_read_at?: string | null;
+          left_at?: string | null;
           muted_at?: string | null;
           role?: "member" | "co_admin" | "admin";
           user_id: string;
@@ -691,9 +696,76 @@ export type Database = {
           id?: string;
           joined_at?: string;
           last_read_at?: string | null;
+          left_at?: string | null;
           muted_at?: string | null;
           role?: "member" | "co_admin" | "admin";
           user_id?: string;
+        };
+        Relationships: [];
+      };
+      badge_tier_rules: {
+        Row: {
+          created_at: string;
+          min_average_score: number;
+          min_review_count: number;
+          priority: number;
+          tier: "bronze" | "silver" | "gold";
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          min_average_score: number;
+          min_review_count: number;
+          priority: number;
+          tier: "bronze" | "silver" | "gold";
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          min_average_score?: number;
+          min_review_count?: number;
+          priority?: number;
+          tier?: "bronze" | "silver" | "gold";
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      group_reviews: {
+        Row: {
+          communication_score: number;
+          contribution_score: number;
+          created_at: string;
+          group_id: string;
+          id: string;
+          reliability_score: number;
+          reviewee_id: string;
+          reviewer_id: string;
+          updated_at: string;
+          written_review: string | null;
+        };
+        Insert: {
+          communication_score: number;
+          contribution_score: number;
+          created_at?: string;
+          group_id: string;
+          id?: string;
+          reliability_score: number;
+          reviewee_id: string;
+          reviewer_id: string;
+          updated_at?: string;
+          written_review?: string | null;
+        };
+        Update: {
+          communication_score?: number;
+          contribution_score?: number;
+          created_at?: string;
+          group_id?: string;
+          id?: string;
+          reliability_score?: number;
+          reviewee_id?: string;
+          reviewer_id?: string;
+          updated_at?: string;
+          written_review?: string | null;
         };
         Relationships: [];
       };
@@ -1164,6 +1236,35 @@ export type Database = {
           invite_code: string | null;
         }[];
       };
+      get_group_review_eligibility: {
+        Args: {
+          group_id_input: string;
+          reviewee_id_input: string;
+        };
+        Returns: {
+          eligible_at: string | null;
+          is_eligible: boolean;
+          reason: string;
+          required_days: number | null;
+          reviewee_joined_at: string | null;
+          reviewer_joined_at: string | null;
+        }[];
+      };
+      get_profile_review_summary: {
+        Args: {
+          profile_id_input: string;
+        };
+        Returns: {
+          badge_tier: "bronze" | "silver" | "gold" | null;
+          communication_average: number | null;
+          contribution_average: number | null;
+          overall_average: number | null;
+          received_review_count: number;
+          reliability_average: number | null;
+          reviewee_id: string;
+          written_review_count: number;
+        }[];
+      };
       join_group_with_invite: {
         Args: {
           invite_code_input: string;
@@ -1175,6 +1276,32 @@ export type Database = {
           group_id_input: string;
         };
         Returns: void;
+      };
+      leave_group: {
+        Args: {
+          group_id_input: string;
+        };
+        Returns: void;
+      };
+      list_profile_reviews: {
+        Args: {
+          limit_input?: number | null;
+          offset_input?: number | null;
+          profile_id_input: string;
+        };
+        Returns: {
+          created_at: string;
+          group_id: string;
+          group_name: string;
+          group_type: "study_group" | "hackathon_team" | "project_team" | "tutoring_session";
+          id: string;
+          reviewee_id: string;
+          reviewer_avatar_url: string | null;
+          reviewer_display_name: string;
+          reviewer_id: string;
+          updated_at: string;
+          written_review: string;
+        }[];
       };
       pin_community_chat_message: {
         Args: {
@@ -1232,6 +1359,17 @@ export type Database = {
           attachment_url_input?: string | null;
           body_input?: string | null;
           conversation_id_input: string;
+        };
+        Returns: string;
+      };
+      submit_group_review: {
+        Args: {
+          communication_input: number;
+          contribution_input: number;
+          group_id_input: string;
+          reliability_input: number;
+          reviewee_id_input: string;
+          written_review_input?: string | null;
         };
         Returns: string;
       };
