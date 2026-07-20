@@ -106,7 +106,10 @@ def _rank_segments(
                 excluded_participants=excluded_count,
                 available_participants=available_count,
             )
-            label = f"{DAY_LABELS[day_of_week]} · {_format_time_range(start_minute, end_minute)}"
+            label = (
+                f"{DAY_LABELS[day_of_week]} · "
+                f"{_format_time_range(start_minute, end_minute)}"
+            )
             sub = f"{available_count}/{total_participants} free"
 
             segments.append(
