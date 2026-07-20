@@ -274,6 +274,7 @@ export interface MeetupSuggestion {
   id: string;
   label: string;
   sub: string;
+  suggestion_date: string;
   day_of_week: number;
   start_minute: number;
   end_minute: number;

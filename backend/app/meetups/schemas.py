@@ -16,6 +16,7 @@ class MeetupSuggestionItem(BaseModel):
     id: str
     label: str
     sub: str
+    suggestion_date: str
     day_of_week: int
     start_minute: int
     end_minute: int
