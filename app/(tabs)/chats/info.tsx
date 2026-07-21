@@ -34,6 +34,7 @@ import {
   fetchGroupReviewableMembers,
   getGroupReviewEligibility,
 } from "@services/index";
+import { getEligibleLeavePromptMembers } from "@utils/reviewFlow";
 import {
   useAuthStore,
   useChatFeaturesStore,
@@ -374,6 +375,7 @@ export default function ChatInfoScreen() {
   const activeMediaItems = mediaCollections[activeTab];
   const [groupMembers, setGroupMembers] = useState<ReviewableGroupMember[]>([]);
   const [isLoadingGroupMembers, setIsLoadingGroupMembers] = useState(false);
+  const [groupMembersError, setGroupMembersError] = useState<string | null>(null);
   const [composerTarget, setComposerTarget] = useState<ReviewComposerTarget | null>(
     null,
   );
@@ -401,15 +403,20 @@ export default function ChatInfoScreen() {
       }
 
       setIsLoadingGroupMembers(true);
+      setGroupMembersError(null);
 
       try {
         const members = await fetchGroupReviewableMembers(id);
         if (isActive) {
           setGroupMembers(members);
+          setGroupMembersError(null);
         }
-      } catch {
+      } catch (error) {
         if (isActive) {
           setGroupMembers([]);
+          setGroupMembersError(
+            error instanceof Error ? error.message : "Could not load group members.",
+          );
         }
       } finally {
         if (isActive) {
@@ -431,48 +438,39 @@ export default function ChatInfoScreen() {
     }
 
     setIsLoadingGroupMembers(true);
+    setGroupMembersError(null);
 
     try {
       const members = await fetchGroupReviewableMembers(id);
       setGroupMembers(members);
+      setGroupMembersError(null);
       return members;
+    } catch (error) {
+      setGroupMembersError(
+        error instanceof Error ? error.message : "Could not load group members.",
+      );
+      throw error;
     } finally {
       setIsLoadingGroupMembers(false);
     }
   }
 
-  async function getEligibleLeavePromptMembers(members: ReviewableGroupMember[]) {
+  async function loadEligibleLeavePromptMembers(members: ReviewableGroupMember[]) {
     if (kind !== "group" || !id) {
       return [] as ReviewableGroupMember[];
     }
 
     const eligibilityResults = await Promise.all(
       members.map(async (member) => {
-        try {
-          const eligibility = await getGroupReviewEligibility(id, member.id);
-          return {
-            eligibility,
-            member,
-          };
-        } catch {
-          return null;
-        }
+        const state = await getGroupReviewEligibility(id, member.id);
+        return {
+          member,
+          state,
+        };
       }),
     );
 
-    return eligibilityResults
-      .filter(
-        (
-          item,
-        ): item is {
-          eligibility: Awaited<ReturnType<typeof getGroupReviewEligibility>>;
-          member: ReviewableGroupMember;
-        } => item !== null,
-      )
-      .filter(
-        (item) => item.eligibility.is_eligible && !item.eligibility.already_reviewed,
-      )
-      .map((item) => item.member);
+    return getEligibleLeavePromptMembers(eligibilityResults);
   }
 
   async function handleMute() {
@@ -496,6 +494,19 @@ export default function ChatInfoScreen() {
       return;
     }
 
+    function confirmGroupLeave(message: string) {
+      Alert.alert("Leave chat?", message, [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Leave",
+          style: "destructive",
+          onPress: () => {
+            void proceedWithLeave();
+          },
+        },
+      ]);
+    }
+
     async function proceedWithLeave() {
       if (!currentUserId || !chat) {
         return;
@@ -509,7 +520,7 @@ export default function ChatInfoScreen() {
       try {
         const members =
           reviewableMembers.length > 0 ? reviewableMembers : await loadGroupMembers();
-        const eligibleMembers = await getEligibleLeavePromptMembers(
+        const eligibleMembers = await loadEligibleLeavePromptMembers(
           members.filter((member) => member.id !== currentUserId),
         );
 
@@ -518,27 +529,15 @@ export default function ChatInfoScreen() {
           setLeavePromptVisible(true);
           return;
         }
-      } catch (error) {
-        Alert.alert(
-          "Could not check review eligibility",
-          error instanceof Error ? error.message : "Please try again.",
+      } catch {
+        confirmGroupLeave(
+          "We could not check whether any pending reviews are available. You can still leave this group now.",
         );
         return;
       }
 
-      Alert.alert(
-        "Leave chat?",
+      confirmGroupLeave(
         "You will leave this group/community. Other members keep the chat.",
-        [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "Leave",
-            style: "destructive",
-            onPress: () => {
-              void proceedWithLeave();
-            },
-          },
-        ],
       );
     }
 
@@ -582,7 +581,7 @@ export default function ChatInfoScreen() {
     const refreshedMembers = await loadGroupMembers();
 
     if (leavePromptVisible) {
-      const eligibleMembers = await getEligibleLeavePromptMembers(
+      const eligibleMembers = await loadEligibleLeavePromptMembers(
         refreshedMembers.filter((member) => member.id !== currentUserId),
       );
       setLeavePromptMembers(eligibleMembers);
@@ -693,6 +692,24 @@ export default function ChatInfoScreen() {
                     <View style={styles.membersCardInner}>
                       {isLoadingGroupMembers ? (
                         <Text style={styles.membersEmptyText}>Loading members…</Text>
+                      ) : groupMembersError ? (
+                        <View style={styles.membersErrorState}>
+                          <Text style={styles.membersEmptyText}>
+                            Could not load members right now.
+                          </Text>
+                          <Text style={styles.membersErrorDetail}>
+                            {groupMembersError}
+                          </Text>
+                          <GlassButton
+                            label="Retry"
+                            onPress={() => {
+                              void loadGroupMembers();
+                            }}
+                            radius={14}
+                            style={styles.membersRetryButton}
+                            variant="light"
+                          />
+                        </View>
                       ) : reviewableMembers.length > 0 ? (
                         reviewableMembers.map((member, index) => (
                           <MemberReviewRow
@@ -835,10 +852,7 @@ export default function ChatInfoScreen() {
         visible={composerTarget !== null}
         target={composerTarget}
         onClose={() => setComposerTarget(null)}
-        onSubmitted={() => {
-          setComposerTarget(null);
-          void handleReviewSubmitted();
-        }}
+        onSubmitted={handleReviewSubmitted}
       />
       <LeaveGroupReviewPrompt
         visible={leavePromptVisible}
@@ -963,10 +977,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
   },
+  membersErrorState: {
+    alignItems: "flex-start",
+    paddingVertical: 12,
+  },
   membersEmptyText: {
     color: "#7A7A8C",
     fontSize: 13,
-    paddingVertical: 12,
+    paddingVertical: 4,
+  },
+  membersErrorDetail: {
+    color: "#8A8FA6",
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 2,
+  },
+  membersRetryButton: {
+    marginTop: 10,
+    minWidth: 88,
   },
   action: {
     borderRadius: 20,

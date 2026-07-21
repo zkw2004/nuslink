@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   Modal,
   Pressable,
   StyleSheet,
@@ -11,6 +12,12 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppAvatar, GlassButton } from "@components/shared";
+import {
+  canSubmitGroupReview,
+  getReviewRefreshFailureAlertCopy,
+  getReviewSubmissionErrorAlertCopy,
+  getReviewSubmittedAlertCopy,
+} from "@utils/reviewFlow";
 import type { ReviewComposerTarget } from "@appTypes/index";
 import { submitGroupReview, type SubmittedGroupReview } from "@services/reviewService";
 
@@ -43,7 +50,7 @@ type Props = {
   visible: boolean;
   target: ReviewComposerTarget | null;
   onClose: () => void;
-  onSubmitted?: (review: SubmittedGroupReview) => void;
+  onSubmitted?: (review: SubmittedGroupReview) => Promise<void> | void;
 };
 
 function StarRating({
@@ -115,12 +122,7 @@ export function ReviewComposerSheet({
   }, [visible]);
 
   const canSubmit = useMemo(
-    () =>
-      ratings.reliability > 0 &&
-      ratings.communication > 0 &&
-      ratings.contribution > 0 &&
-      !isSubmitting &&
-      target !== null,
+    () => canSubmitGroupReview(ratings, target, isSubmitting),
     [isSubmitting, ratings, target],
   );
 
@@ -141,9 +143,19 @@ export function ReviewComposerSheet({
         written_review: writtenReview.trim() || null,
       });
 
-      onSubmitted?.(result);
+      try {
+        await onSubmitted?.(result);
+        const copy = getReviewSubmittedAlertCopy();
+        Alert.alert(copy.title, copy.message);
+      } catch {
+        const copy = getReviewRefreshFailureAlertCopy();
+        Alert.alert(copy.title, copy.message);
+      }
+
       onClose();
-    } catch {
+    } catch (error) {
+      const copy = getReviewSubmissionErrorAlertCopy(error);
+      Alert.alert(copy.title, copy.message);
       setIsSubmitting(false);
     }
   }

@@ -164,7 +164,8 @@ export type GroupReviewEligibilityStatus =
   | "loading"
   | "eligible"
   | "notYet"
-  | "reviewed";
+  | "reviewed"
+  | "error";
 
 export interface ReviewableGroupMember {
   id: string;

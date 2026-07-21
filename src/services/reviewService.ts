@@ -1,15 +1,16 @@
 import { supabase } from "@lib/supabase";
 import type {
-  GroupReviewEligibility,
   GroupReviewInput,
   ProfileReviewSummary,
   PublicProfileReview,
 } from "@appTypes/index";
+import {
+  createGroupReviewEligibilityErrorState,
+  resolveGroupReviewEligibilityState,
+  type GroupReviewEligibilityState,
+} from "@utils/reviewFlow";
 
-export type GroupReviewEligibilityResult = GroupReviewEligibility & {
-  already_reviewed: boolean;
-  display_reason: string;
-};
+export type { GroupReviewEligibilityState } from "@utils/reviewFlow";
 
 export type SubmittedGroupReview = {
   id: string;
@@ -17,31 +18,12 @@ export type SubmittedGroupReview = {
   reviewee_id: string;
 };
 
-function formatEligibilityReason(
-  eligibility: GroupReviewEligibility,
-): string {
-  if (
-    eligibility.is_eligible ||
-    !eligibility.eligible_at ||
-    eligibility.reason !== "Not enough shared membership time yet"
-  ) {
-    return eligibility.reason;
-  }
-
-  const eligibleDate = new Intl.DateTimeFormat("en-SG", {
-    month: "short",
-    day: "numeric",
-  }).format(new Date(eligibility.eligible_at));
-
-  return `Eligible from ${eligibleDate}`;
-}
-
 export async function getGroupReviewEligibility(
   groupId: string,
   revieweeId: string,
-): Promise<GroupReviewEligibilityResult> {
+): Promise<GroupReviewEligibilityState> {
   if (!supabase) {
-    throw new Error("Supabase is not configured.");
+    return createGroupReviewEligibilityErrorState("Supabase is not configured.");
   }
 
   const {
@@ -50,11 +32,13 @@ export async function getGroupReviewEligibility(
   } = await supabase.auth.getUser();
 
   if (userError) {
-    throw new Error(userError.message);
+    return createGroupReviewEligibilityErrorState(userError.message);
   }
 
   if (!user) {
-    throw new Error("You need to be signed in to review a group member.");
+    return createGroupReviewEligibilityErrorState(
+      "You need to be signed in to review a group member.",
+    );
   }
 
   const [
@@ -74,24 +58,27 @@ export async function getGroupReviewEligibility(
   ]);
 
   if (eligibilityError) {
-    throw new Error(eligibilityError.message);
+    return createGroupReviewEligibilityErrorState(eligibilityError.message);
   }
 
   if (existingReviewError) {
-    throw new Error(existingReviewError.message);
+    return createGroupReviewEligibilityErrorState(
+      "We could not confirm whether you already reviewed this member.",
+    );
   }
 
-  const eligibility = eligibilityRows?.[0] as GroupReviewEligibility | undefined;
+  const eligibility = eligibilityRows?.[0];
 
   if (!eligibility) {
-    throw new Error("Could not load review eligibility right now.");
+    return createGroupReviewEligibilityErrorState(
+      "Could not load review eligibility right now.",
+    );
   }
 
-  return {
-    ...eligibility,
-    already_reviewed: (existingReviewCount ?? 0) > 0,
-    display_reason: formatEligibilityReason(eligibility),
-  };
+  return resolveGroupReviewEligibilityState({
+    eligibility,
+    alreadyReviewed: (existingReviewCount ?? 0) > 0,
+  });
 }
 
 export async function submitGroupReview(

@@ -2,6 +2,10 @@ import { Alert, StyleSheet, Text, View } from "react-native";
 
 import { AppAvatar, GlassButton } from "@components/shared";
 import { TierBadge, TierChip } from "@components/reviews/ReviewBadges";
+import {
+  getReviewEligibilityAlertCopy,
+  getReviewRowErrorAlertCopy,
+} from "@utils/reviewFlow";
 import { useGroupReviewEligibility } from "@hooks/useGroupReviewEligibility";
 import type { ReviewableGroupMember } from "@appTypes/index";
 
@@ -31,7 +35,13 @@ export function MemberReviewRow({
   });
 
   function handleNotYetPress() {
-    Alert.alert("Not eligible yet", reason || "You cannot review this member yet.");
+    const copy = getReviewEligibilityAlertCopy(reason);
+    Alert.alert(copy.title, copy.message);
+  }
+
+  function handleErrorPress() {
+    const copy = getReviewRowErrorAlertCopy(reason);
+    Alert.alert(copy.title, copy.message);
   }
 
   return (
@@ -83,6 +93,20 @@ export function MemberReviewRow({
           textStyle={styles.rateButtonLoadingText}
           variant="light"
         />
+      ) : status === "error" ? (
+        <GlassButton
+          onPress={handleErrorPress}
+          radius={14}
+          style={styles.notYetButton}
+          variant="light"
+        >
+          <View style={styles.notYetInner}>
+            <Text style={styles.notYetTitle}>Unavailable</Text>
+            <Text numberOfLines={1} style={styles.notYetReason}>
+              {reason || "Could not load status"}
+            </Text>
+          </View>
+        </GlassButton>
       ) : (
         <GlassButton
           label="Rate"

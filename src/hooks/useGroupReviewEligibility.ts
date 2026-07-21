@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { GroupReviewEligibilityStatus } from "@appTypes/index";
 import {
   getGroupReviewEligibility,
-  type GroupReviewEligibilityResult,
+  type GroupReviewEligibilityState,
 } from "@services/reviewService";
 
 type Options = {
@@ -12,7 +12,7 @@ type Options = {
 };
 
 type State = {
-  data: GroupReviewEligibilityResult | null;
+  data: GroupReviewEligibilityState | null;
   error: Error | null;
   loading: boolean;
 };
@@ -40,7 +40,10 @@ export function useGroupReviewEligibility(
       const data = await getGroupReviewEligibility(groupId, revieweeId);
       setState({
         data,
-        error: null,
+        error:
+          data.status === "error"
+            ? new Error(data.errorMessage ?? "Could not load eligibility.")
+            : null,
         loading: false,
       });
     } catch (error) {
@@ -59,18 +62,16 @@ export function useGroupReviewEligibility(
   let status: GroupReviewEligibilityStatus = "loading";
 
   if (!state.loading && state.data) {
-    status = state.data.already_reviewed
-      ? "reviewed"
-      : state.data.is_eligible
-        ? "eligible"
-        : "notYet";
+    status = state.data.status;
+  } else if (!state.loading && state.error) {
+    status = "error";
   }
 
   return {
     ...state,
     status,
-    reason: state.data?.display_reason ?? state.data?.reason ?? "",
-    eligibleAt: state.data?.eligible_at ?? null,
+    reason: state.data?.displayReason ?? state.data?.eligibility?.reason ?? "",
+    eligibleAt: state.data?.eligibility?.eligible_at ?? null,
     refresh: load,
   };
 }
