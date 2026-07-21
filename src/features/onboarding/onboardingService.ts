@@ -13,6 +13,7 @@ type AcademicProfileInput = {
 
 type ProfileSetupInput = {
   displayName: string;
+  headline?: string | null;
   bio: string;
   avatarUrl: string | null;
 };
@@ -148,6 +149,7 @@ export async function saveProfileSetup(input: ProfileSetupInput): Promise<UserPr
       avatar_url: input.avatarUrl,
       bio: input.bio.trim(),
       display_name: input.displayName.trim(),
+      headline: input.headline?.trim() || null,
     })
     .eq("id", userId)
     .select("*")

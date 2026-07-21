@@ -213,3 +213,68 @@ export async function deleteProfileEntry(entryId: string) {
     throw new Error(error.message);
   }
 }
+
+export async function upsertPrimaryProfessionalLink(
+  userId: string,
+  url: string,
+) {
+  if (!supabase) {
+    throw new Error("Supabase is not configured.");
+  }
+
+  const trimmedUrl = url.trim();
+  const { data: existingLinks, error: fetchError } = await supabase
+    .from("profile_links")
+    .select("id, label")
+    .eq("user_id", userId)
+    .in("label", ["portfolio", "other"])
+    .order("created_at", { ascending: true });
+
+  if (fetchError) {
+    throw new Error(fetchError.message);
+  }
+
+  const primaryLink = existingLinks[0] ?? null;
+
+  if (!trimmedUrl) {
+    if (primaryLink) {
+      const { error: deleteError } = await supabase
+        .from("profile_links")
+        .delete()
+        .eq("id", primaryLink.id);
+
+      if (deleteError) {
+        throw new Error(deleteError.message);
+      }
+    }
+
+    return;
+  }
+
+  if (primaryLink) {
+    const { error: updateError } = await supabase
+      .from("profile_links")
+      .update({
+        url: trimmedUrl,
+        label: primaryLink.label,
+      })
+      .eq("id", primaryLink.id);
+
+    if (updateError) {
+      throw new Error(updateError.message);
+    }
+
+    return;
+  }
+
+  const { error: insertError } = await supabase.from("profile_links").insert({
+    user_id: userId,
+    label: "portfolio",
+    url: trimmedUrl,
+    is_visible: false,
+  });
+
+  if (insertError) {
+    throw new Error(insertError.message);
+  }
+}
