@@ -160,6 +160,26 @@ export interface GroupReviewEligibility {
   eligible_at: string | null;
 }
 
+export type GroupReviewEligibilityStatus =
+  | "loading"
+  | "eligible"
+  | "notYet"
+  | "reviewed";
+
+export interface ReviewableGroupMember {
+  id: string;
+  display_name: string;
+  avatar_url: string | null;
+  role: UserRole;
+  badge_tier: BadgeTier | null;
+}
+
+export interface ReviewComposerTarget {
+  group_id: string;
+  group_name: string;
+  reviewee: ReviewableGroupMember;
+}
+
 export interface PublicProfileReview {
   id: string;
   group_id: string;

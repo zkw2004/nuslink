@@ -3,6 +3,7 @@ import type {
   ConnectedProfilePreview,
   GroupChatMessage,
   GroupChatSummary,
+  ReviewableGroupMember,
 } from "@appTypes/index";
 import type { Database } from "@appTypes/database";
 
@@ -255,6 +256,47 @@ export async function fetchGroupMessages(groupId: string) {
       return mapGroupMessage(message, senderProfile);
     })
     .filter((message): message is GroupChatMessage => message !== null);
+}
+
+export async function fetchGroupReviewableMembers(
+  groupId: string,
+): Promise<ReviewableGroupMember[]> {
+  if (!supabase) {
+    throw new Error("Supabase is not configured.");
+  }
+
+  const { data: membershipRows, error: membershipError } = await supabase
+    .from("group_members")
+    .select("user_id, role, joined_at")
+    .eq("group_id", groupId)
+    .is("left_at", null)
+    .order("joined_at", { ascending: true });
+
+  if (membershipError) {
+    throw new Error(membershipError.message);
+  }
+
+  const memberIds = (membershipRows ?? []).map((member) => member.user_id);
+  const profiles = await fetchProfilesByIds(memberIds);
+  const profilesById = new Map(profiles.map((profile) => [profile.id, profile]));
+
+  return (membershipRows ?? [])
+    .map((member) => {
+      const profile = profilesById.get(member.user_id);
+
+      if (!profile) {
+        return null;
+      }
+
+      return {
+        id: profile.id,
+        display_name: profile.display_name,
+        avatar_url: profile.avatar_url,
+        role: member.role,
+        badge_tier: profile.badge_tier,
+      } satisfies ReviewableGroupMember;
+    })
+    .filter((member): member is ReviewableGroupMember => member !== null);
 }
 
 export async function sendGroupMessage(
