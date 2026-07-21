@@ -71,7 +71,7 @@ function LiquidGlassTabBar({
   const activeNestedRouteName = activeRoute ? getNestedRouteName(activeRoute) : undefined;
 
   if (
-    activeRoute?.name === "chats" &&
+    (activeRoute?.name === "chats" || activeRoute?.name === "profile") &&
     activeNestedRouteName &&
     activeNestedRouteName !== "index"
   ) {

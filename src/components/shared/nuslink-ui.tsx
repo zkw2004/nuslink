@@ -185,11 +185,11 @@ export function AppScreenHeader({
 
 const styles = StyleSheet.create({
   notificationButton: {
-    alignItems: "flex-start",
-    height: 46,
+    alignItems: "center",
+    height: 42,
     justifyContent: "center",
     position: "relative",
-    width: 50,
+    width: 42,
   },
   notificationGlass: {
     alignItems: "center",
@@ -208,8 +208,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 5,
     position: "absolute",
-    right: 2,
-    top: 2,
+    right: -3,
+    top: -3,
     shadowColor: "#7A2230",
     shadowOpacity: 0.18,
     shadowRadius: 7,

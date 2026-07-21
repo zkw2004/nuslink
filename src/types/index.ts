@@ -51,6 +51,7 @@ export type NotificationType =
 export interface UserProfile {
   id: string;
   display_name: string;
+  headline: string | null;
   bio: string;
   avatar_url: string | null;
   faculty: string | null;

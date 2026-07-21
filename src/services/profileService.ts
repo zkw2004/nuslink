@@ -17,12 +17,14 @@ export type ProfileViewModel = {
   badgeTierLabel: "New" | "Reliable" | "Trusted" | "Standout";
   completion: number;
   currentSemesterLabel: string;
+  hasTimetable: boolean;
   modules: string[];
   profile: UserProfile;
 };
 
 type EditableProfileInput = {
   displayName: string;
+  headline: string;
   bio: string;
   faculty: string;
   major: string;
@@ -39,19 +41,6 @@ type EditableProfileInput = {
   timetableSlots: TimetableSlot[];
 };
 
-const COMPLETION_FIELDS: (keyof Pick<
-  UserProfile,
-  "display_name" | "bio" | "faculty" | "major" | "year_of_study" | "interests" | "intents"
->)[] = [
-  "display_name",
-  "bio",
-  "faculty",
-  "major",
-  "year_of_study",
-  "interests",
-  "intents",
-];
-
 function toBadgeTierLabel(tier: UserProfile["badge_tier"]): ProfileViewModel["badgeTierLabel"] {
   switch (tier) {
     case "gold":
@@ -65,21 +54,40 @@ function toBadgeTierLabel(tier: UserProfile["badge_tier"]): ProfileViewModel["ba
   }
 }
 
-function calculateProfileCompletion(profile: UserProfile, modules: string[]) {
-  const completedFields = COMPLETION_FIELDS.filter((field) => {
-    const value = profile[field];
+function hasValue(value: string | number | string[] | null | undefined) {
+  if (Array.isArray(value)) {
+    return value.length > 0;
+  }
 
-    if (Array.isArray(value)) {
-      return value.length > 0;
-    }
+  return value !== null && value !== "";
+}
 
-    return value !== null && value !== "";
-  }).length;
+function calculateProfileCompletion(
+  profile: UserProfile,
+  modules: string[],
+  hasTimetable: boolean,
+) {
+  const weights: { complete: boolean; weight: number }[] = [
+    { complete: hasValue(profile.display_name), weight: 1 },
+    { complete: hasValue(profile.headline), weight: 1 },
+    { complete: hasValue(profile.bio), weight: 1 },
+    { complete: hasValue(profile.faculty), weight: 1 },
+    { complete: hasValue(profile.major), weight: 1 },
+    { complete: hasValue(profile.year_of_study), weight: 1 },
+    { complete: hasValue(profile.intents), weight: 2 },
+    { complete: modules.length > 0, weight: 2 },
+    { complete: hasValue(profile.skills), weight: 2 },
+    { complete: hasTimetable, weight: 2 },
+    { complete: hasValue(profile.interests), weight: 1 },
+  ];
 
-  const totalFields = COMPLETION_FIELDS.length + 1;
-  const moduleScore = modules.length > 0 ? 1 : 0;
+  const earned = weights.reduce(
+    (total, item) => total + (item.complete ? item.weight : 0),
+    0,
+  );
+  const max = weights.reduce((total, item) => total + item.weight, 0);
 
-  return Math.round(((completedFields + moduleScore) / totalFields) * 100);
+  return Math.round((earned / max) * 100);
 }
 
 export async function fetchProfileViewModel(userId: string, profile: UserProfile) {
@@ -88,23 +96,37 @@ export async function fetchProfileViewModel(userId: string, profile: UserProfile
   }
 
   const { semester } = getCurrentSemester();
-  const { data, error } = await supabase
-    .from("user_modules")
-    .select("module_code")
-    .eq("user_id", userId)
-    .eq("semester", semester)
-    .order("module_code", { ascending: true });
+  const [{ data: modulesData, error }, { count, error: timetableError }] =
+    await Promise.all([
+      supabase
+        .from("user_modules")
+        .select("module_code")
+        .eq("user_id", userId)
+        .eq("semester", semester)
+        .order("module_code", { ascending: true }),
+      supabase
+        .from("timetable_slots")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .eq("semester", semester),
+    ]);
 
   if (error) {
     throw new Error(error.message);
   }
 
-  const modules = data.map((module) => module.module_code);
+  if (timetableError) {
+    throw new Error(timetableError.message);
+  }
+
+  const modules = modulesData.map((module) => module.module_code);
+  const hasTimetable = (count ?? 0) > 0;
 
   return {
     badgeTierLabel: toBadgeTierLabel(profile.badge_tier),
-    completion: calculateProfileCompletion(profile, modules),
+    completion: calculateProfileCompletion(profile, modules, hasTimetable),
     currentSemesterLabel: semester,
+    hasTimetable,
     modules,
     profile,
   };
@@ -206,6 +228,7 @@ export async function updateEditableProfile(
 
   const profileUpdates: Database["public"]["Tables"]["profiles"]["Update"] = {
     display_name: input.displayName.trim(),
+    headline: input.headline.trim() || null,
     bio: input.bio.trim(),
     faculty: input.faculty.trim(),
     major: input.major.trim(),
