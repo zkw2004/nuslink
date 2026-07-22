@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Image,
@@ -16,7 +16,10 @@ import { BlurView } from "expo-blur";
 import { router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
-import { GlassButton } from "@components/shared";
+import { GlassButton, GlassSurface } from "@components/shared";
+import { LeaveGroupReviewPrompt } from "@components/reviews/LeaveGroupReviewPrompt";
+import { MemberReviewRow } from "@components/reviews/MemberReviewRow";
+import { ReviewComposerSheet } from "@components/reviews/ReviewComposerSheet";
 import type {
   ChatAttachmentKind,
   ChatMeetup,
@@ -24,7 +27,14 @@ import type {
   CommunityChatMessage,
   DirectMessage,
   GroupChatMessage,
+  ReviewComposerTarget,
+  ReviewableGroupMember,
 } from "@appTypes/index";
+import {
+  fetchGroupReviewableMembers,
+  getGroupReviewEligibility,
+} from "@services/index";
+import { getEligibleLeavePromptMembers } from "@utils/reviewFlow";
 import {
   useAuthStore,
   useChatFeaturesStore,
@@ -200,6 +210,7 @@ export default function ChatInfoScreen() {
   const { width: screenWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const session = useAuthStore((state) => state.session);
+  const currentUserId = session?.user.id ?? null;
   const contentWidth = Math.max(screenWidth - 48, 0);
   const actionWidth = (contentWidth - 24) / 3;
   const tileSize = (contentWidth - 16) / 3;
@@ -362,6 +373,105 @@ export default function ChatInfoScreen() {
     [chatMessages, chatPolls],
   );
   const activeMediaItems = mediaCollections[activeTab];
+  const [groupMembers, setGroupMembers] = useState<ReviewableGroupMember[]>([]);
+  const [isLoadingGroupMembers, setIsLoadingGroupMembers] = useState(false);
+  const [groupMembersError, setGroupMembersError] = useState<string | null>(null);
+  const [composerTarget, setComposerTarget] = useState<ReviewComposerTarget | null>(
+    null,
+  );
+  const [leavePromptVisible, setLeavePromptVisible] = useState(false);
+  const [leavePromptMembers, setLeavePromptMembers] = useState<ReviewableGroupMember[]>(
+    [],
+  );
+  const [reviewRefreshToken, setReviewRefreshToken] = useState(0);
+
+  const reviewableMembers = useMemo(
+    () =>
+      groupMembers.filter((member) => member.id !== session?.user.id),
+    [groupMembers, session?.user.id],
+  );
+
+  useEffect(() => {
+    let isActive = true;
+
+    async function loadMembers() {
+      if (kind !== "group" || !id) {
+        if (isActive) {
+          setGroupMembers([]);
+        }
+        return;
+      }
+
+      setIsLoadingGroupMembers(true);
+      setGroupMembersError(null);
+
+      try {
+        const members = await fetchGroupReviewableMembers(id);
+        if (isActive) {
+          setGroupMembers(members);
+          setGroupMembersError(null);
+        }
+      } catch (error) {
+        if (isActive) {
+          setGroupMembers([]);
+          setGroupMembersError(
+            error instanceof Error ? error.message : "Could not load group members.",
+          );
+        }
+      } finally {
+        if (isActive) {
+          setIsLoadingGroupMembers(false);
+        }
+      }
+    }
+
+    void loadMembers();
+
+    return () => {
+      isActive = false;
+    };
+  }, [id, kind]);
+
+  async function loadGroupMembers() {
+    if (kind !== "group" || !id) {
+      return [] as ReviewableGroupMember[];
+    }
+
+    setIsLoadingGroupMembers(true);
+    setGroupMembersError(null);
+
+    try {
+      const members = await fetchGroupReviewableMembers(id);
+      setGroupMembers(members);
+      setGroupMembersError(null);
+      return members;
+    } catch (error) {
+      setGroupMembersError(
+        error instanceof Error ? error.message : "Could not load group members.",
+      );
+      throw error;
+    } finally {
+      setIsLoadingGroupMembers(false);
+    }
+  }
+
+  async function loadEligibleLeavePromptMembers(members: ReviewableGroupMember[]) {
+    if (kind !== "group" || !id) {
+      return [] as ReviewableGroupMember[];
+    }
+
+    const eligibilityResults = await Promise.all(
+      members.map(async (member) => {
+        const state = await getGroupReviewEligibility(id, member.id);
+        return {
+          member,
+          state,
+        };
+      }),
+    );
+
+    return getEligibleLeavePromptMembers(eligibilityResults);
+  }
 
   async function handleMute() {
     if (!session?.user.id || !chat) {
@@ -384,6 +494,58 @@ export default function ChatInfoScreen() {
       return;
     }
 
+    function confirmGroupLeave(message: string) {
+      Alert.alert("Leave chat?", message, [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Leave",
+          style: "destructive",
+          onPress: () => {
+            void proceedWithLeave();
+          },
+        },
+      ]);
+    }
+
+    async function proceedWithLeave() {
+      if (!currentUserId || !chat) {
+        return;
+      }
+
+      await deleteGroupChats([chat.id], currentUserId);
+      router.replace("/(tabs)/chats");
+    }
+
+    async function handleGroupLeave() {
+      try {
+        const members =
+          reviewableMembers.length > 0 ? reviewableMembers : await loadGroupMembers();
+        const eligibleMembers = await loadEligibleLeavePromptMembers(
+          members.filter((member) => member.id !== currentUserId),
+        );
+
+        if (eligibleMembers.length > 0) {
+          setLeavePromptMembers(eligibleMembers);
+          setLeavePromptVisible(true);
+          return;
+        }
+      } catch {
+        confirmGroupLeave(
+          "We could not check whether any pending reviews are available. You can still leave this group now.",
+        );
+        return;
+      }
+
+      confirmGroupLeave(
+        "You will leave this group/community. Other members keep the chat.",
+      );
+    }
+
+    if (kind === "group") {
+      void handleGroupLeave();
+      return;
+    }
+
     Alert.alert(
       chat.isGroup ? "Leave chat?" : "Delete chat?",
       chat.isGroup
@@ -403,10 +565,6 @@ export default function ChatInfoScreen() {
               void deleteConversations([chat.id], session.user.id).then(() =>
                 router.replace("/(tabs)/chats"),
               );
-            } else if (kind === "group") {
-              void deleteGroupChats([chat.id], session.user.id).then(() =>
-                router.replace("/(tabs)/chats"),
-              );
             } else {
               void deleteCommunityChats([chat.id], session.user.id).then(() =>
                 router.replace("/(tabs)/chats"),
@@ -416,6 +574,22 @@ export default function ChatInfoScreen() {
         },
       ],
     );
+  }
+
+  async function handleReviewSubmitted() {
+    setReviewRefreshToken((current) => current + 1);
+    const refreshedMembers = await loadGroupMembers();
+
+    if (leavePromptVisible) {
+      const eligibleMembers = await loadEligibleLeavePromptMembers(
+        refreshedMembers.filter((member) => member.id !== currentUserId),
+      );
+      setLeavePromptMembers(eligibleMembers);
+
+      if (eligibleMembers.length === 0) {
+        setLeavePromptVisible(false);
+      }
+    }
   }
 
   return (
@@ -501,6 +675,65 @@ export default function ChatInfoScreen() {
                   <Text style={styles.meetupSummaryText}>
                     {latestConfirmedMeetup.winning_label ?? "Winning slot confirmed"}
                   </Text>
+                </View>
+              ) : null}
+
+              {kind === "group" ? (
+                <View style={styles.membersSection}>
+                  <Text style={styles.membersLabel}>
+                    MEMBERS · {reviewableMembers.length}
+                  </Text>
+                  <GlassSurface
+                    tint="light"
+                    radius={20}
+                    intensity={35}
+                    style={styles.membersCard}
+                  >
+                    <View style={styles.membersCardInner}>
+                      {isLoadingGroupMembers ? (
+                        <Text style={styles.membersEmptyText}>Loading members…</Text>
+                      ) : groupMembersError ? (
+                        <View style={styles.membersErrorState}>
+                          <Text style={styles.membersEmptyText}>
+                            Could not load members right now.
+                          </Text>
+                          <Text style={styles.membersErrorDetail}>
+                            {groupMembersError}
+                          </Text>
+                          <GlassButton
+                            label="Retry"
+                            onPress={() => {
+                              void loadGroupMembers();
+                            }}
+                            radius={14}
+                            style={styles.membersRetryButton}
+                            variant="light"
+                          />
+                        </View>
+                      ) : reviewableMembers.length > 0 ? (
+                        reviewableMembers.map((member, index) => (
+                          <MemberReviewRow
+                            key={member.id}
+                            groupId={id}
+                            isLast={index === reviewableMembers.length - 1}
+                            member={member}
+                            onRate={(reviewee) =>
+                              setComposerTarget({
+                                group_id: id,
+                                group_name: chat.name,
+                                reviewee,
+                              })
+                            }
+                            refreshToken={reviewRefreshToken}
+                          />
+                        ))
+                      ) : (
+                        <Text style={styles.membersEmptyText}>
+                          No other active members to review yet.
+                        </Text>
+                      )}
+                    </View>
+                  </GlassSurface>
                 </View>
               ) : null}
 
@@ -615,6 +848,38 @@ export default function ChatInfoScreen() {
           )}
         </ScrollView>
       </View>
+      <ReviewComposerSheet
+        visible={composerTarget !== null}
+        target={composerTarget}
+        onClose={() => setComposerTarget(null)}
+        onSubmitted={handleReviewSubmitted}
+      />
+      <LeaveGroupReviewPrompt
+        visible={leavePromptVisible}
+        group={chat && kind === "group" ? { id: chat.id, name: chat.name } : null}
+        members={leavePromptMembers}
+        onCancel={() => setLeavePromptVisible(false)}
+        onLeave={() => {
+          if (!currentUserId || !chat) {
+            return;
+          }
+
+          setLeavePromptVisible(false);
+          void deleteGroupChats([chat.id], currentUserId).then(() =>
+            router.replace("/(tabs)/chats"),
+          );
+        }}
+        onRate={(reviewee) =>
+          chat && kind === "group"
+            ? setComposerTarget({
+                group_id: chat.id,
+                group_name: chat.name,
+                reviewee,
+              })
+            : undefined
+        }
+        refreshToken={reviewRefreshToken}
+      />
     </View>
   );
 }
@@ -693,6 +958,43 @@ const styles = StyleSheet.create({
     color: "#6F7387",
     fontSize: 13,
     marginTop: 4,
+  },
+  membersSection: {
+    gap: 10,
+    marginTop: 18,
+    paddingHorizontal: 24,
+  },
+  membersLabel: {
+    color: "#7A7A8C",
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.6,
+  },
+  membersCard: {
+    width: "100%",
+  },
+  membersCardInner: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  membersErrorState: {
+    alignItems: "flex-start",
+    paddingVertical: 12,
+  },
+  membersEmptyText: {
+    color: "#7A7A8C",
+    fontSize: 13,
+    paddingVertical: 4,
+  },
+  membersErrorDetail: {
+    color: "#8A8FA6",
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 2,
+  },
+  membersRetryButton: {
+    marginTop: 10,
+    minWidth: 88,
   },
   action: {
     borderRadius: 20,

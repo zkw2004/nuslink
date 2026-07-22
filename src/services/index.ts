@@ -9,5 +9,6 @@ export * from "./matchingService";
 export * from "./notificationsService";
 export * from "./profileService";
 export * from "./profileExtractionService";
+export * from "./reviewService";
 export * from "./sharedResourcesService";
 export * from "./timetableService";
