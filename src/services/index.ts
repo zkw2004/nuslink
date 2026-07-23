@@ -7,6 +7,7 @@ export * from "./groupMessagesService";
 export * from "./groupDraftingService";
 export * from "./matchingService";
 export * from "./notificationsService";
+export * from "./nudgesService";
 export * from "./profileService";
 export * from "./profileExtractionService";
 export * from "./reviewService";
