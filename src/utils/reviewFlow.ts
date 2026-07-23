@@ -55,8 +55,7 @@ export function formatGroupReviewEligibilityReason(
 ): string {
   if (
     eligibility.is_eligible ||
-    !eligibility.eligible_at ||
-    eligibility.reason !== "Not enough shared membership time yet"
+    !eligibility.eligible_at
   ) {
     return eligibility.reason;
   }
@@ -66,6 +65,14 @@ export function formatGroupReviewEligibilityReason(
     day: "numeric",
   }).format(new Date(eligibility.eligible_at));
 
+  if (eligibility.reason === "Review updated recently") {
+    return `Can update again from ${eligibleDate}`;
+  }
+
+  if (eligibility.reason !== "Not enough shared membership time yet") {
+    return eligibility.reason;
+  }
+
   return `Eligible from ${eligibleDate}`;
 }
 
@@ -74,10 +81,10 @@ export function resolveGroupReviewEligibilityState({
   alreadyReviewed,
 }: ResolveEligibilityStateInput): GroupReviewEligibilityState {
   return {
-    status: alreadyReviewed
-      ? "reviewed"
-      : eligibility.is_eligible
-        ? "eligible"
+    status: eligibility.is_eligible
+      ? "eligible"
+      : alreadyReviewed
+        ? "reviewed"
         : "notYet",
     eligibility,
     alreadyReviewed,

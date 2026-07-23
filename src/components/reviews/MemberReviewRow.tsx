@@ -30,9 +30,10 @@ export function MemberReviewRow({
   onRate,
   refreshToken = 0,
 }: Props) {
-  const { reason, status } = useGroupReviewEligibility(groupId, member.id, {
+  const { data, reason, status } = useGroupReviewEligibility(groupId, member.id, {
     refreshToken,
   });
+  const actionLabel = data?.alreadyReviewed ? "Update" : "Rate";
 
   function handleNotYetPress() {
     const copy = getReviewEligibilityAlertCopy(reason);
@@ -87,7 +88,7 @@ export function MemberReviewRow({
       ) : status === "loading" ? (
         <GlassButton
           disabled
-          label="Rate"
+          label={actionLabel}
           radius={100}
           style={styles.rateButton}
           textStyle={styles.rateButtonLoadingText}
@@ -109,7 +110,7 @@ export function MemberReviewRow({
         </GlassButton>
       ) : (
         <GlassButton
-          label="Rate"
+          label={actionLabel}
           onPress={() => onRate(member)}
           radius={100}
           style={styles.rateButton}

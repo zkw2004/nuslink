@@ -241,7 +241,7 @@ const styles = StyleSheet.create({
   },
   buttonIconContent: {
     alignItems: "center",
-    flex: 1,
+    flexGrow: 1,
     justifyContent: "center",
     position: "relative",
     zIndex: 1,

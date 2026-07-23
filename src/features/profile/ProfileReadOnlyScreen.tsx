@@ -3,9 +3,10 @@ import { LinearGradient } from "expo-linear-gradient";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { ReviewSummaryCluster } from "@components/reviews/ReviewSummaryCluster";
 import { AppAvatar, AppNotificationBell } from "@components/shared";
 import { GlassButton, GlassSurface } from "@components/shared";
-import type { UserProfile } from "@appTypes/index";
+import type { ProfileReviewSummary, UserProfile } from "@appTypes/index";
 
 const INTENT_LABELS: Record<UserProfile["intents"][number], string> = {
   study_group: "Study groups",
@@ -18,9 +19,11 @@ type Props = {
   badgeTierLabel: "New" | "Reliable" | "Trusted" | "Standout";
   modules: string[];
   onOpenNotifications: () => void;
+  onOpenReviews: () => void;
   onOpenSettings: () => void;
   onSignOut: () => void;
   profile: UserProfile;
+  reviewSummary: ProfileReviewSummary | null;
   unreadCount: number;
 };
 
@@ -32,7 +35,12 @@ function Section({
   title: string;
 }) {
   return (
-    <GlassSurface tint="light" radius={22} intensity={35} style={styles.section}>
+    <GlassSurface
+      tint="light"
+      radius={22}
+      intensity={35}
+      style={styles.section}
+    >
       <View style={styles.sectionInner}>
         <Text style={styles.sectionLabel}>{title}</Text>
         {children}
@@ -77,8 +85,11 @@ function Chip({
 
 function formatProgramYear(profile: UserProfile) {
   const academicParts = [profile.major, profile.faculty].filter(Boolean);
-  const yearLabel = profile.year_of_study ? `Year ${profile.year_of_study}` : null;
-  const firstLine = academicParts.length > 0 ? academicParts.join(" · ") : "NUS student";
+  const yearLabel = profile.year_of_study
+    ? `Year ${profile.year_of_study}`
+    : null;
+  const firstLine =
+    academicParts.length > 0 ? academicParts.join(" · ") : "NUS student";
 
   return yearLabel ? `${firstLine} · ${yearLabel}` : firstLine;
 }
@@ -87,9 +98,11 @@ export function ProfileReadOnlyScreen({
   badgeTierLabel,
   modules,
   onOpenNotifications,
+  onOpenReviews,
   onOpenSettings,
   onSignOut,
   profile,
+  reviewSummary,
   unreadCount,
 }: Props) {
   const headline =
@@ -148,13 +161,21 @@ export function ProfileReadOnlyScreen({
                 imageUri={profile.avatar_url}
               />
               <View style={styles.identityText}>
-                <View style={styles.nameRow}>
-                  <Text style={styles.name}>{profile.display_name}</Text>
-                  <View style={styles.badgePill}>
-                    <Text style={styles.badgePillText}>{badgeTierLabel}</Text>
-                  </View>
-                </View>
-                <Text style={styles.identitySub}>{formatProgramYear(profile)}</Text>
+                <Text numberOfLines={1} style={styles.name}>
+                  {profile.display_name}
+                </Text>
+                <Text
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.78}
+                  numberOfLines={1}
+                  style={styles.identitySub}
+                >
+                  {formatProgramYear(profile)}
+                </Text>
+                <ReviewSummaryCluster
+                  onPress={onOpenReviews}
+                  summary={reviewSummary}
+                />
               </View>
             </View>
             <Text style={styles.headline}>{headline}</Text>
@@ -266,7 +287,7 @@ const styles = StyleSheet.create({
   },
   identityText: {
     flex: 1,
-    gap: 4,
+    gap: 6,
   },
   nameRow: {
     alignItems: "center",
@@ -276,9 +297,9 @@ const styles = StyleSheet.create({
   },
   name: {
     color: "#1A1A26",
-    fontSize: 24,
-    fontWeight: "700",
-    letterSpacing: -0.3,
+    fontSize: 25,
+    fontWeight: "800",
+    letterSpacing: -0.5,
   },
   badgePill: {
     backgroundColor: "rgba(18,19,30,0.9)",
@@ -293,8 +314,8 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   identitySub: {
-    color: "#6E6E80",
-    fontSize: 14,
+    color: "#5B6472",
+    fontSize: 17,
   },
   headline: {
     color: "#3A3A48",

@@ -265,38 +265,24 @@ export async function fetchGroupReviewableMembers(
     throw new Error("Supabase is not configured.");
   }
 
-  const { data: membershipRows, error: membershipError } = await supabase
-    .from("group_members")
-    .select("user_id, role, joined_at")
-    .eq("group_id", groupId)
-    .is("left_at", null)
-    .order("joined_at", { ascending: true });
+  const { data, error } = await supabase.rpc("get_group_reviewable_members", {
+    group_id_input: groupId,
+  });
 
-  if (membershipError) {
-    throw new Error(membershipError.message);
+  if (error) {
+    throw new Error(error.message);
   }
 
-  const memberIds = (membershipRows ?? []).map((member) => member.user_id);
-  const profiles = await fetchProfilesByIds(memberIds);
-  const profilesById = new Map(profiles.map((profile) => [profile.id, profile]));
-
-  return (membershipRows ?? [])
-    .map((member) => {
-      const profile = profilesById.get(member.user_id);
-
-      if (!profile) {
-        return null;
-      }
-
-      return {
-        id: profile.id,
-        display_name: profile.display_name,
-        avatar_url: profile.avatar_url,
+  return (data ?? []).map(
+    (member) =>
+      ({
+        id: member.id,
+        display_name: member.display_name,
+        avatar_url: member.avatar_url,
         role: member.role,
-        badge_tier: profile.badge_tier,
-      } satisfies ReviewableGroupMember;
-    })
-    .filter((member): member is ReviewableGroupMember => member !== null);
+        badge_tier: member.badge_tier,
+      }) satisfies ReviewableGroupMember,
+  );
 }
 
 export async function sendGroupMessage(

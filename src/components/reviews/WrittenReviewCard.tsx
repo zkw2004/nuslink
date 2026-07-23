@@ -15,7 +15,7 @@ function getInitials(name: string) {
 }
 
 function formatRelativeTime(isoDate: string) {
-  const now = new Date("2026-07-21T12:00:00+08:00").getTime();
+  const now = Date.now();
   const then = new Date(isoDate).getTime();
   const dayDiff = Math.max(0, Math.round((now - then) / 86400000));
 

@@ -9,7 +9,12 @@ import {
 import { router } from "expo-router";
 
 import { ProfileReadOnlyScreen } from "@features/profile/ProfileReadOnlyScreen";
-import { fetchProfileViewModel, type ProfileViewModel } from "@services/index";
+import {
+  fetchProfileViewModel,
+  getProfileReviewSummary,
+  type ProfileViewModel,
+} from "@services/index";
+import type { ProfileReviewSummary } from "@appTypes/index";
 import { useAuthStore, useNotificationsStore } from "@store/index";
 
 export default function ProfileIndexScreen() {
@@ -18,6 +23,9 @@ export default function ProfileIndexScreen() {
   const unreadCount = useNotificationsStore((state) => state.unreadCount);
 
   const [viewModel, setViewModel] = useState<ProfileViewModel | null>(null);
+  const [reviewSummary, setReviewSummary] = useState<ProfileReviewSummary | null>(
+    null,
+  );
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -35,14 +43,25 @@ export default function ProfileIndexScreen() {
       setIsLoading(true);
 
       try {
-        const nextViewModel = await fetchProfileViewModel(profile.id, profile);
+        const [viewModelResult, reviewSummaryResult] = await Promise.allSettled([
+          fetchProfileViewModel(profile.id, profile),
+          getProfileReviewSummary(profile.id),
+        ]);
 
         if (isActive) {
-          setViewModel(nextViewModel);
+          setViewModel(
+            viewModelResult.status === "fulfilled" ? viewModelResult.value : null,
+          );
+          setReviewSummary(
+            reviewSummaryResult.status === "fulfilled"
+              ? reviewSummaryResult.value
+              : null,
+          );
         }
       } catch {
         if (isActive) {
           setViewModel(null);
+          setReviewSummary(null);
         }
       } finally {
         if (isActive) {
@@ -64,6 +83,10 @@ export default function ProfileIndexScreen() {
 
   function handleOpenSettings() {
     router.push("/profile/settings" as never);
+  }
+
+  function handleOpenReviews() {
+    router.push("/profile/reviews" as never);
   }
 
   function handleSignOut() {
@@ -103,9 +126,11 @@ export default function ProfileIndexScreen() {
       badgeTierLabel={viewModel?.badgeTierLabel ?? "New"}
       modules={viewModel?.modules ?? []}
       onOpenNotifications={handleOpenNotifications}
+      onOpenReviews={handleOpenReviews}
       onOpenSettings={handleOpenSettings}
       onSignOut={handleSignOut}
       profile={profile}
+      reviewSummary={reviewSummary}
       unreadCount={unreadCount}
     />
   );
