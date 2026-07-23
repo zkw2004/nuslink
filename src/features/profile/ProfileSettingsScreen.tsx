@@ -30,25 +30,31 @@ import { AppAvatar, GlassButton, GlassSurface } from "@components/shared";
 import { saveProfileSetup, uploadProfileImage } from "@features/onboarding/onboardingService";
 import { toSelectedModule, type SelectedModule } from "@features/onboarding/types";
 import { ProfessionalProfileSection } from "@features/profile/ProfessionalProfileSection";
+import { NudgePreferencesCard } from "@features/profile/NudgePreferencesCard";
 import { WeeklyTimetableView } from "@features/profile/WeeklyTimetableView";
 import { searchNusmodsModules } from "@lib/nusmods";
 import {
   fetchCurrentSemesterModules,
   fetchCurrentSemesterTimetableSlots,
+  fetchNudgePreferences,
   fetchProfileViewModel,
+  evaluateSmartNudges,
   formatClassSlotLabel,
   formatDayOfWeek,
   formatMinuteOfDay,
   importTimetableFromNusmodsShareUrl,
   parseManualTimeInput,
   searchInterestTagSuggestions,
+  updateNudgePreferences,
   updateEditableProfile,
 } from "@services/index";
+import { DEFAULT_NUDGE_PREFERENCES } from "@services/nudgesService";
 import {
   fetchProfessionalProfile,
   upsertPrimaryProfessionalLink,
 } from "@services/profileExtractionService";
 import type {
+  NudgePreferences,
   StudyMode,
   StudyStyle,
   TimetableClassSlot,
@@ -132,7 +138,7 @@ const SETTINGS_SECTIONS = [
   {
     key: "account",
     title: "Account",
-    sub: "Notification and privacy placeholders for later.",
+    sub: "Control smart nudges and account visibility.",
     feeds: false,
   },
 ] as const;
@@ -259,15 +265,6 @@ function RemovableChip({
   );
 }
 
-function AccountRow({ label }: { label: string }) {
-  return (
-    <View style={styles.accountRow}>
-      <Text style={styles.accountRowText}>{label}</Text>
-      <Ionicons name="chevron-forward" size={16} color="#9A9AAE" />
-    </View>
-  );
-}
-
 export function ProfileSettingsScreen() {
   const profile = useAuthStore((state) => state.profile);
   const refreshProfile = useAuthStore((state) => state.refreshProfile);
@@ -298,6 +295,8 @@ export function ProfileSettingsScreen() {
   const [editableModules, setEditableModules] = useState<SelectedModule[]>([]);
   const [timetableSlotsDraft, setTimetableSlotsDraft] = useState<TimetableSlot[]>([]);
   const [professionalLinkDraft, setProfessionalLinkDraft] = useState("");
+  const [nudgePreferencesDraft, setNudgePreferencesDraft] =
+    useState<NudgePreferences>(DEFAULT_NUDGE_PREFERENCES);
   const [avatarPreviewUri, setAvatarPreviewUri] = useState<string | null>(null);
 
   const [moduleQuery, setModuleQuery] = useState("");
@@ -328,12 +327,21 @@ export function ProfileSettingsScreen() {
       setIsLoading(true);
 
       try {
-        const [viewModel, modules, timetableSlots, professionalProfile] =
+        const [
+          viewModel,
+          modules,
+          timetableSlots,
+          professionalProfile,
+          nudgePreferences,
+        ] =
           await Promise.all([
             fetchProfileViewModel(profile.id, profile),
             fetchCurrentSemesterModules(profile.id),
             fetchCurrentSemesterTimetableSlots(profile.id),
             fetchProfessionalProfile(profile.id),
+            fetchNudgePreferences(profile.id).catch(
+              () => DEFAULT_NUDGE_PREFERENCES,
+            ),
           ]);
 
         if (!isActive) {
@@ -363,6 +371,7 @@ export function ProfileSettingsScreen() {
             (link) => link.label === "portfolio" || link.label === "other",
           )?.url ?? "",
         );
+        setNudgePreferencesDraft(nudgePreferences);
       } finally {
         if (isActive) {
           setIsLoading(false);
@@ -530,8 +539,29 @@ export function ProfileSettingsScreen() {
       return;
     }
 
-    if (section === "ai" || section === "account") {
+    if (section === "ai") {
       setSection(null);
+      return;
+    }
+
+    if (section === "account") {
+      if (!profile) {
+        return;
+      }
+
+      setIsSaving(true);
+      try {
+        await updateNudgePreferences(profile.id, nudgePreferencesDraft);
+        void evaluateSmartNudges().catch(() => undefined);
+        setSection(null);
+      } catch (error) {
+        Alert.alert(
+          "Could not save nudge settings",
+          error instanceof Error ? error.message : "Please try again.",
+        );
+      } finally {
+        setIsSaving(false);
+      }
       return;
     }
 
@@ -1368,13 +1398,19 @@ export function ProfileSettingsScreen() {
 
   function renderAccountSection() {
     return (
-      <Card title="ACCOUNT">
-        <AccountRow label="Notifications" />
-        <AccountRow label="Privacy & visibility" />
-        <Text style={styles.help}>
-          Sign out stays in the profile header, as requested for this redesign.
-        </Text>
-      </Card>
+      <>
+        <NudgePreferencesCard
+          disabled={isSaving}
+          onChange={setNudgePreferencesDraft}
+          preferences={nudgePreferencesDraft}
+        />
+        <Card title="DELIVERY">
+          <Text style={styles.help}>
+            Smart nudges are delivered in-app. Push delivery remains controlled
+            separately when device notifications are introduced.
+          </Text>
+        </Card>
+      </>
     );
   }
 
@@ -1448,7 +1484,7 @@ export function ProfileSettingsScreen() {
                 </View>
                 <GlassButton
                   label={
-                    section === "ai" || section === "account"
+                    section === "ai"
                       ? "Done"
                       : isSaving
                         ? "Saving..."
@@ -1765,17 +1801,5 @@ const styles = StyleSheet.create({
   previewRow: {
     color: "#5C6370",
     fontSize: 12.5,
-  },
-  accountRow: {
-    alignItems: "center",
-    borderBottomColor: CARD_BORDER,
-    borderBottomWidth: 1,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingVertical: 15,
-  },
-  accountRowText: {
-    color: "#22222E",
-    fontSize: 15,
   },
 });

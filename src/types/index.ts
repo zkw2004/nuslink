@@ -54,7 +54,16 @@ export type NotificationType =
   | "group_join_accepted"
   | "group_member_joined"
   | "resource_shared"
-  | "system_announcement";
+  | "system_announcement"
+  | "nudge_time"
+  | "nudge_behaviour"
+  | "nudge_network";
+
+export interface NudgePreferences {
+  time_enabled: boolean;
+  behaviour_enabled: boolean;
+  network_enabled: boolean;
+}
 
 export interface UserProfile {
   id: string;

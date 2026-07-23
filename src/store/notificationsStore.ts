@@ -6,6 +6,7 @@ import {
   markAllNotificationsAsRead,
   markNotificationAsRead,
 } from "@services/notificationsService";
+import { evaluateSmartNudges } from "@services/nudgesService";
 
 interface NotificationsState {
   notifications: AppNotification[];
@@ -17,6 +18,9 @@ interface NotificationsState {
   markAllAsRead: (userId: string) => Promise<void>;
   reset: () => void;
 }
+
+const NUDGE_EVALUATION_INTERVAL_MS = 15 * 60 * 1000;
+const lastNudgeEvaluationByUser = new Map<string, number>();
 
 function getUnreadCount(notifications: AppNotification[]) {
   return notifications.filter((notification) => notification.read_at === null).length;
@@ -32,6 +36,16 @@ export const useNotificationsStore = create<NotificationsState>((set) => ({
     set({ isLoading: true, error: null });
 
     try {
+      const lastEvaluation = lastNudgeEvaluationByUser.get(userId) ?? 0;
+      if (Date.now() - lastEvaluation >= NUDGE_EVALUATION_INTERVAL_MS) {
+        try {
+          await evaluateSmartNudges();
+          lastNudgeEvaluationByUser.set(userId, Date.now());
+        } catch {
+          // Existing notifications remain available if nudge evaluation is offline.
+        }
+      }
+
       const notifications = await fetchNotifications(userId);
       set({
         notifications,
@@ -61,6 +75,7 @@ export const useNotificationsStore = create<NotificationsState>((set) => ({
   },
 
   reset() {
+    lastNudgeEvaluationByUser.clear();
     set({
       notifications: [],
       unreadCount: 0,

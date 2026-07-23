@@ -1036,6 +1036,33 @@ export type Database = {
         };
         Relationships: [];
       };
+      nudge_preferences: {
+        Row: {
+          behaviour_enabled: boolean;
+          created_at: string;
+          network_enabled: boolean;
+          time_enabled: boolean;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          behaviour_enabled?: boolean;
+          created_at?: string;
+          network_enabled?: boolean;
+          time_enabled?: boolean;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          behaviour_enabled?: boolean;
+          created_at?: string;
+          network_enabled?: boolean;
+          time_enabled?: boolean;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       notifications: {
         Row: {
           actor_id: string | null;
@@ -1059,7 +1086,10 @@ export type Database = {
             | "group_join_accepted"
             | "group_member_joined"
             | "resource_shared"
-            | "system_announcement";
+            | "system_announcement"
+            | "nudge_time"
+            | "nudge_behaviour"
+            | "nudge_network";
         };
         Insert: {
           actor_id?: string | null;
@@ -1083,7 +1113,10 @@ export type Database = {
             | "group_join_accepted"
             | "group_member_joined"
             | "resource_shared"
-            | "system_announcement";
+            | "system_announcement"
+            | "nudge_time"
+            | "nudge_behaviour"
+            | "nudge_network";
         };
         Update: {
           actor_id?: string | null;
@@ -1107,7 +1140,10 @@ export type Database = {
             | "group_join_accepted"
             | "group_member_joined"
             | "resource_shared"
-            | "system_announcement";
+            | "system_announcement"
+            | "nudge_time"
+            | "nudge_behaviour"
+            | "nudge_network";
         };
         Relationships: [];
       };
@@ -1440,7 +1476,10 @@ export type Database = {
         | "group_join_accepted"
         | "group_member_joined"
         | "resource_shared"
-        | "system_announcement";
+        | "system_announcement"
+        | "nudge_time"
+        | "nudge_behaviour"
+        | "nudge_network";
     };
   };
 };

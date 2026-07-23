@@ -8,6 +8,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { router } from "expo-router";
 
 import { AppButton, AppScreenHeader, SectionCard } from "@components/shared";
 import type { AppNotification, NotificationType } from "@appTypes/index";
@@ -33,6 +34,9 @@ const NOTIFICATION_LABELS: Record<NotificationType, string> = {
   group_member_joined: "Group activity",
   resource_shared: "Resource",
   system_announcement: "Announcement",
+  nudge_time: "Semester nudge",
+  nudge_behaviour: "Next step",
+  nudge_network: "Network nudge",
 };
 
 function getNotificationLabel(type: string) {
@@ -70,6 +74,7 @@ function NotificationCard({
   const isUnread = notification.read_at === null;
   const isGroupInvite = notification.type === "group_invite_received";
   const isJoinRequest = notification.type === "group_join_requested";
+  const isNudge = notification.type.startsWith("nudge_");
   const canRespond = isUnread && (isGroupInvite || isJoinRequest);
   const handleRespond = isGroupInvite ? onRespondGroupInvite : onRespondJoinRequest;
 
@@ -83,6 +88,9 @@ function NotificationCard({
       onPress={() => {
         if (isUnread) {
           onMarkRead(notification.id);
+        }
+        if (isNudge && notification.href) {
+          router.push(notification.href as never);
         }
       }}
     >
@@ -257,7 +265,7 @@ export default function NotificationsScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: "#EEF3F9" }}>
       <AppScreenHeader
         title="Notifications"
-        subtitle="High-signal updates for requests, matches, groups, and resources."
+        subtitle="High-signal updates, including the smart nudges you control."
         hideNotificationsAction
       />
 
