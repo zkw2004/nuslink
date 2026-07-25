@@ -24,9 +24,9 @@ test("formats not-yet-eligible review reasons with the eligible date", () => {
 test("resolves reviewed and eligible states explicitly", () => {
   const reviewed = resolveGroupReviewEligibilityState({
     eligibility: {
-      is_eligible: true,
-      reason: "Eligible to review",
-      eligible_at: null,
+      is_eligible: false,
+      reason: "Review updated recently",
+      eligible_at: "2026-07-30T00:00:00.000Z",
     },
     alreadyReviewed: true,
   });
@@ -41,6 +41,17 @@ test("resolves reviewed and eligible states explicitly", () => {
 
   assert.equal(reviewed.status, "reviewed");
   assert.equal(eligible.status, "eligible");
+});
+
+test("formats review cooldown reasons with the next update date", () => {
+  assert.equal(
+    formatGroupReviewEligibilityReason({
+      is_eligible: false,
+      reason: "Review updated recently",
+      eligible_at: "2026-07-30T00:00:00.000Z",
+    }),
+    "Can update again from 30 Jul",
+  );
 });
 
 test("creates an explicit error eligibility state", () => {
@@ -70,9 +81,9 @@ test("filters leave prompt members down to eligible-only rows", () => {
       member: { id: "reviewed-user" },
       state: resolveGroupReviewEligibilityState({
         eligibility: {
-          is_eligible: true,
-          reason: "Eligible to review",
-          eligible_at: null,
+          is_eligible: false,
+          reason: "Review updated recently",
+          eligible_at: "2026-07-30T00:00:00.000Z",
         },
         alreadyReviewed: true,
       }),

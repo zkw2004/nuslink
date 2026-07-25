@@ -41,14 +41,16 @@ export function TierBadge({ tier }: { tier: BadgeTier | null }) {
 export function StarRow({
   average = 0,
   size = 13,
+  gap = 1,
 }: {
   average?: number;
   size?: number;
+  gap?: number;
 }) {
   const roundedAverage = Math.round(average);
 
   return (
-    <View style={styles.starRow}>
+    <View style={[styles.starRow, { gap }]}>
       {[1, 2, 3, 4, 5].map((index) => (
         <Ionicons
           key={index}
@@ -68,12 +70,14 @@ const styles = StyleSheet.create({
   },
   badge: {
     alignItems: "center",
+    alignSelf: "flex-start",
     borderRadius: 100,
     flexDirection: "row",
+    flexShrink: 0,
     gap: 5,
+    paddingVertical: 3,
     paddingLeft: 4,
     paddingRight: 10,
-    paddingVertical: 3,
   },
   badgeText: {
     fontSize: 12,
@@ -81,6 +85,5 @@ const styles = StyleSheet.create({
   },
   starRow: {
     flexDirection: "row",
-    gap: 1,
   },
 });

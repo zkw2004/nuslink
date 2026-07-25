@@ -1289,6 +1289,18 @@ export type Database = {
           reviewer_joined_at: string | null;
         }[];
       };
+      get_group_reviewable_members: {
+        Args: {
+          group_id_input: string;
+        };
+        Returns: {
+          avatar_url: string | null;
+          badge_tier: "bronze" | "silver" | "gold" | null;
+          display_name: string;
+          id: string;
+          role: "member" | "co_admin" | "admin";
+        }[];
+      };
       get_profile_review_summary: {
         Args: {
           profile_id_input: string;

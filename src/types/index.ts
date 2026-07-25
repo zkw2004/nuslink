@@ -36,6 +36,7 @@ export type GroupReviewEligibilityReason =
   | "Group not found"
   | "Missing required ids"
   | "Not enough shared membership time yet"
+  | "Review updated recently"
   | "Reviewee has no membership in this group"
   | "Reviewer has no membership in this group"
   | "You cannot review yourself";
