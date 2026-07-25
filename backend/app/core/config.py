@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     app_version: str = "0.1.0"
     openai_api_key: str = ""
     openai_model: str = "gpt-5-mini"
+    openai_moderation_model: str = "gpt-5-mini"
     openai_profile_extraction_model: str = "gpt-5-mini"
 
 

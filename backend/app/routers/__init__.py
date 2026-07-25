@@ -3,6 +3,7 @@ from . import group_drafts as group_drafts
 from . import health as health
 from . import matches as matches
 from . import meetups as meetups
+from . import moderation as moderation
 from . import nudges as nudges
 from . import profile_extraction as profile_extraction
 from . import tags as tags
@@ -13,6 +14,7 @@ __all__ = [
     "health",
     "matches",
     "meetups",
+    "moderation",
     "nudges",
     "profile_extraction",
     "tags",

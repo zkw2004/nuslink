@@ -8,6 +8,7 @@ from app.routers import (
     health,
     matches,
     meetups,
+    moderation,
     nudges,
     profile_extraction,
     tags,
@@ -26,6 +27,7 @@ app.add_middleware(
 app.include_router(health.router)
 app.include_router(matches.router)
 app.include_router(meetups.router)
+app.include_router(moderation.router)
 app.include_router(nudges.router)
 app.include_router(communities.router)
 app.include_router(group_drafts.router)
