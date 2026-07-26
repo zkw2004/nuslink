@@ -2,7 +2,7 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
-import { useAuthBootstrap } from "@hooks/index";
+import { useAuthBootstrap, usePushNotifications } from "@hooks/index";
 
 import "../global.css";
 
@@ -14,6 +14,7 @@ export const unstable_settings = {
 
 export default function RootLayout() {
   useAuthBootstrap();
+  usePushNotifications();
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

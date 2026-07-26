@@ -1,7 +1,11 @@
+import asyncio
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
+from app.push.worker import run_push_worker
 from app.routers import (
     communities,
     group_drafts,
@@ -14,7 +18,27 @@ from app.routers import (
     tags,
 )
 
-app = FastAPI(title="NUSLink API", version=settings.app_version)
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    stop_event = asyncio.Event()
+    worker_task: asyncio.Task[None] | None = None
+
+    if (
+        settings.push_worker_enabled
+        and settings.supabase_url
+        and settings.supabase_service_key
+    ):
+        worker_task = asyncio.create_task(run_push_worker(stop_event))
+
+    yield
+
+    if worker_task:
+        stop_event.set()
+        await worker_task
+
+
+app = FastAPI(title="NUSLink API", version=settings.app_version, lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

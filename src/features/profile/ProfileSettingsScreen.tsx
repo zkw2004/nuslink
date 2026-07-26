@@ -32,6 +32,7 @@ import { saveProfileSetup, uploadProfileImage } from "@features/onboarding/onboa
 import { toSelectedModule, type SelectedModule } from "@features/onboarding/types";
 import { ProfessionalProfileSection } from "@features/profile/ProfessionalProfileSection";
 import { NudgePreferencesCard } from "@features/profile/NudgePreferencesCard";
+import { PushNotificationsCard } from "@features/profile/PushNotificationsCard";
 import { WeeklyTimetableView } from "@features/profile/WeeklyTimetableView";
 import { searchNusmodsModules } from "@lib/nusmods";
 import {
@@ -1447,10 +1448,7 @@ export function ProfileSettingsScreen() {
           preferences={nudgePreferencesDraft}
         />
         <Card title="DELIVERY">
-          <Text style={styles.help}>
-            Smart nudges are delivered in-app. Push delivery remains controlled
-            separately when device notifications are introduced.
-          </Text>
+          <PushNotificationsCard />
         </Card>
       </>
     );

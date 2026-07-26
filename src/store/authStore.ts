@@ -6,6 +6,7 @@ import type { Database } from "@appTypes/database";
 import type { StudyMode, StudyStyle, UserProfile } from "@appTypes/index";
 import { normalizeInterestTags, normalizeProfileTags } from "@utils/interestTags";
 import { normalizeInterestTagsForSave } from "@services/tagNormalizationService";
+import { unregisterStoredPushToken } from "@services/pushNotificationsService";
 
 type ProfileUpdate = Database["public"]["Tables"]["profiles"]["Update"];
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
@@ -275,6 +276,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       return;
     }
 
+    await unregisterStoredPushToken().catch(() => undefined);
     const { error } = await supabase.auth.signOut();
 
     if (error) {

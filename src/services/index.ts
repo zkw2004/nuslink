@@ -11,6 +11,7 @@ export * from "./notificationsService";
 export * from "./nudgesService";
 export * from "./profileService";
 export * from "./profileExtractionService";
+export * from "./pushNotificationsService";
 export * from "./reviewService";
 export * from "./sharedResourcesService";
 export * from "./timetableService";
