@@ -119,6 +119,12 @@ export const useGroupMessagesStore = create<GroupMessagesState>((set, get) => ({
       }
 
       set((state) => ({
+        groupChats: state.groupChats.map((group) =>
+          group.id === groupId ? { ...group, unread_count: 0 } : group,
+        ),
+        archivedGroupChats: state.archivedGroupChats.map((group) =>
+          group.id === groupId ? { ...group, unread_count: 0 } : group,
+        ),
         messagesByGroup: {
           ...state.messagesByGroup,
           [groupId]: messages,
@@ -205,10 +211,9 @@ export const useGroupMessagesStore = create<GroupMessagesState>((set, get) => ({
 
   subscribeToGroup(groupId, userId) {
     return subscribeToGroupMessages(groupId, () => {
-      void Promise.all([
-        get().loadGroupMessages(groupId, userId),
-        get().refreshGroupChats(userId),
-      ]);
+      void get()
+        .loadGroupMessages(groupId, userId)
+        .then(() => get().refreshGroupChats(userId));
     });
   },
 

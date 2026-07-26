@@ -125,6 +125,16 @@ export const useCommunityMessagesStore = create<CommunityMessagesState>((set, ge
       }
 
       set((state) => ({
+        communityChats: state.communityChats.map((community) =>
+          community.id === communityId
+            ? { ...community, unread_count: 0 }
+            : community,
+        ),
+        archivedCommunityChats: state.archivedCommunityChats.map((community) =>
+          community.id === communityId
+            ? { ...community, unread_count: 0 }
+            : community,
+        ),
         messagesByCommunity: {
           ...state.messagesByCommunity,
           [communityId]: messages,
@@ -212,10 +222,9 @@ export const useCommunityMessagesStore = create<CommunityMessagesState>((set, ge
 
   subscribeToCommunity(communityId, userId) {
     return subscribeToCommunityMessages(communityId, () => {
-      void Promise.all([
-        get().loadCommunityMessages(communityId, userId),
-        get().refreshCommunityChats(userId),
-      ]);
+      void get()
+        .loadCommunityMessages(communityId, userId)
+        .then(() => get().refreshCommunityChats(userId));
     });
   },
 
