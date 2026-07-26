@@ -29,6 +29,20 @@ export type UserRole = "member" | "co_admin" | "admin";
 export type TimetableSource = "manual" | "nusmods";
 export type ConnectionRequestStatus = "pending" | "accepted" | "declined";
 export type MatchFeedbackEventType = "view" | "skip" | "accept" | "chat_start";
+export type ModerationVerdict = "allowed" | "flagged" | "blocked";
+export type ModerationOutcome = ModerationVerdict | "error";
+export type ModerationSubjectType =
+  | "profile_bio"
+  | "profile_headline"
+  | "group_name"
+  | "group_description"
+  | "group_tag"
+  | "community_name"
+  | "community_description"
+  | "community_tag"
+  | "direct_chat_message"
+  | "group_chat_message"
+  | "community_chat_message";
 export type ProfileEntryCategory = "work" | "project" | "competition";
 export type ProfileLinkLabel = "linkedin" | "github" | "portfolio" | "other";
 export type GroupReviewEligibilityReason =
@@ -70,7 +84,9 @@ export interface UserProfile {
   id: string;
   display_name: string;
   headline: string | null;
+  headline_moderation_outcome?: ModerationOutcome;
   bio: string;
+  bio_moderation_outcome?: ModerationOutcome;
   avatar_url: string | null;
   faculty: string | null;
   major: string | null;
@@ -89,6 +105,23 @@ export interface UserProfile {
   onboarding_completed: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface ModerationResult {
+  subject_type: ModerationSubjectType;
+  subject_id: string | null;
+  source_table: string | null;
+  source_column: string | null;
+  verdict: ModerationVerdict;
+  categories: string[];
+  confidence: number | null;
+  reason: string | null;
+  visible: boolean;
+}
+
+export interface ProfileModerationState {
+  headline?: ModerationVerdict;
+  about?: ModerationVerdict;
 }
 
 export interface ProfileLink {
@@ -125,6 +158,7 @@ export interface Group {
   tags: string[];
   max_size: number | null;
   review_min_membership_days?: number;
+  moderation_outcome?: ModerationOutcome;
   scheduled_time: string | null;
   venue: string | null;
   creator_id: string;
@@ -268,7 +302,10 @@ export interface MatchBreakdown {
 export interface PeopleMatch {
   user_id: string;
   display_name: string;
+  headline: string | null;
+  headline_moderation_outcome?: ModerationOutcome;
   bio: string;
+  bio_moderation_outcome?: ModerationOutcome;
   avatar_url: string | null;
   faculty: string | null;
   major: string | null;
