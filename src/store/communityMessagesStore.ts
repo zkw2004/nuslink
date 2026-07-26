@@ -47,7 +47,7 @@ interface CommunityMessagesState {
     userId: string,
     attachment?: DirectMessageAttachmentInput | null,
     moderationOutcome?: ModerationOutcome,
-  ) => Promise<void>;
+  ) => Promise<string>;
   subscribeToCommunity: (communityId: string, userId: string) => () => void;
   reset: () => void;
 }
@@ -147,7 +147,7 @@ export const useCommunityMessagesStore = create<CommunityMessagesState>((set, ge
     set({ isSending: true, error: null });
 
     try {
-      await sendCommunityMessage(
+      const messageId = await sendCommunityMessage(
         communityId,
         body,
         userId,
@@ -167,6 +167,7 @@ export const useCommunityMessagesStore = create<CommunityMessagesState>((set, ge
         isSending: false,
         error: null,
       }));
+      return messageId;
     } catch (error) {
       set({
         isSending: false,

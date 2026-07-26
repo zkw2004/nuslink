@@ -51,7 +51,7 @@ interface DirectMessagesState {
     userId: string,
     attachment?: DirectMessageAttachmentInput | null,
     moderationOutcome?: ModerationOutcome,
-  ) => Promise<void>;
+  ) => Promise<string | null>;
   appendMessage: (message: DirectMessage) => void;
   subscribeToConversation: (conversationId: string, userId: string) => () => void;
   reset: () => void;
@@ -199,7 +199,12 @@ export const useDirectMessagesStore = create<DirectMessagesState>((set, get) => 
     set({ isSending: true, error: null });
 
     try {
-      await sendDirectMessage(conversationId, body, attachment, moderationOutcome);
+      const messageId = await sendDirectMessage(
+        conversationId,
+        body,
+        attachment,
+        moderationOutcome,
+      );
       const [messages] = await Promise.all([
         fetchDirectMessages(conversationId),
         get().refreshInbox(userId),
@@ -213,6 +218,7 @@ export const useDirectMessagesStore = create<DirectMessagesState>((set, get) => 
         isSending: false,
         error: null,
       }));
+      return messageId;
     } catch (error) {
       set({
         isSending: false,

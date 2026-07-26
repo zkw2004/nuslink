@@ -725,7 +725,7 @@ export async function sendDirectMessage(
     }
   }
 
-  return data;
+  return messageId;
 }
 
 export function subscribeToDirectMessages(

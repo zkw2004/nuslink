@@ -30,7 +30,7 @@ export type TimetableSource = "manual" | "nusmods";
 export type ConnectionRequestStatus = "pending" | "accepted" | "declined";
 export type MatchFeedbackEventType = "view" | "skip" | "accept" | "chat_start";
 export type ModerationVerdict = "allowed" | "flagged" | "blocked";
-export type ModerationOutcome = ModerationVerdict | "error";
+export type ModerationOutcome = ModerationVerdict | "pending" | "error";
 export type ModerationSubjectType =
   | "profile_bio"
   | "profile_headline"
