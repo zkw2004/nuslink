@@ -1084,6 +1084,90 @@ export type Database = {
         };
         Relationships: [];
       };
+      push_tokens: {
+        Row: {
+          created_at: string;
+          enabled: boolean;
+          expo_push_token: string;
+          id: string;
+          last_registered_at: string;
+          platform: string;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          enabled?: boolean;
+          expo_push_token: string;
+          id?: string;
+          last_registered_at?: string;
+          platform: string;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          enabled?: boolean;
+          expo_push_token?: string;
+          id?: string;
+          last_registered_at?: string;
+          platform?: string;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      notification_push_deliveries: {
+        Row: {
+          attempt_count: number;
+          created_at: string;
+          delivered_at: string | null;
+          expo_ticket_id: string | null;
+          id: string;
+          last_error: string | null;
+          next_attempt_at: string;
+          notification_id: string;
+          processing_at: string | null;
+          push_token_id: string;
+          receipt_checked_at: string | null;
+          status: string;
+          ticketed_at: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          attempt_count?: number;
+          created_at?: string;
+          delivered_at?: string | null;
+          expo_ticket_id?: string | null;
+          id?: string;
+          last_error?: string | null;
+          next_attempt_at?: string;
+          notification_id: string;
+          processing_at?: string | null;
+          push_token_id: string;
+          receipt_checked_at?: string | null;
+          status?: string;
+          ticketed_at?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          attempt_count?: number;
+          created_at?: string;
+          delivered_at?: string | null;
+          expo_ticket_id?: string | null;
+          id?: string;
+          last_error?: string | null;
+          next_attempt_at?: string;
+          notification_id?: string;
+          processing_at?: string | null;
+          push_token_id?: string;
+          receipt_checked_at?: string | null;
+          status?: string;
+          ticketed_at?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       notifications: {
         Row: {
           actor_id: string | null;
@@ -1171,6 +1255,19 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      register_push_token: {
+        Args: {
+          expo_push_token_input: string;
+          platform_input: string;
+        };
+        Returns: string;
+      };
+      unregister_push_token: {
+        Args: {
+          expo_push_token_input: string;
+        };
+        Returns: undefined;
+      };
       apply_profile_import: {
         Args: {
           bio_input: string | null;

@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-5-mini"
     openai_moderation_model: str = "gpt-5-mini"
     openai_profile_extraction_model: str = "gpt-5-mini"
+    expo_push_access_token: str = ""
+    push_worker_enabled: bool = True
+    push_worker_interval_seconds: float = 10.0
 
 
 settings = Settings()
