@@ -423,12 +423,16 @@ def test_gemini_provider_sends_structured_generate_content_request(monkeypatch):
     assert request_body["generationConfig"]["responseMimeType"] == (
         "application/json"
     )
-    assert request_body["generationConfig"]["responseSchema"]["type"] == "object"
-    assert request_body["generationConfig"]["responseSchema"]["properties"][
-        "confidence"
-    ]["nullable"] is True
-    assert request_body["generationConfig"]["responseSchema"]["properties"][
-        "reason"
-    ]["nullable"] is True
+    response_schema = request_body["generationConfig"]["responseJsonSchema"]
+    assert response_schema["type"] == "object"
+    assert response_schema["properties"]["confidence"]["type"] == [
+        "number",
+        "null",
+    ]
+    assert response_schema["properties"]["reason"]["type"] == [
+        "string",
+        "null",
+    ]
+    assert "nullable" not in json.dumps(response_schema)
     assert "temperature" not in request_body["generationConfig"]
     assert result.outcome == "allowed"

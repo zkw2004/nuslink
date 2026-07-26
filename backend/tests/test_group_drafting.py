@@ -228,5 +228,8 @@ def test_gemini_provider_sends_structured_generate_content_request(
     assert request_body["generationConfig"]["responseMimeType"] == (
         "application/json"
     )
-    assert request_body["generationConfig"]["responseSchema"]["type"] == "object"
+    response_schema = request_body["generationConfig"]["responseJsonSchema"]
+    assert response_schema["type"] == "object"
+    assert "nullable" not in json.dumps(response_schema)
+    assert "maxLength" not in json.dumps(response_schema)
     assert result["module_code"] == "CS2040S"
