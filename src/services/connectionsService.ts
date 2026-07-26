@@ -11,12 +11,23 @@ type ConnectionRequestRow =
 type ConnectionRow = Database["public"]["Tables"]["connections"]["Row"];
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
 
+type UntypedRpcClient = {
+  rpc: (
+    fn: string,
+    args?: Record<string, unknown>,
+  ) => Promise<{ data: unknown; error: { message: string } | null }>;
+};
+
 type ConnectionStatePayload = {
   connectedUserIds: string[];
   incomingRequests: IncomingConnectionRequest[];
   incomingRequesterIds: string[];
   outgoingRequestRecipientIds: string[];
 };
+
+function getUntypedRpcClient() {
+  return supabase as unknown as UntypedRpcClient;
+}
 
 function mapProfileToPreview(profile: ProfileRow): ConnectionPreviewProfile {
   return {
@@ -158,6 +169,20 @@ export async function cancelConnectionRequest(recipientId: string) {
 
   const { error } = await supabase.rpc("cancel_connection_request", {
     recipient_id_input: recipientId,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function disconnectConnection(otherUserId: string) {
+  if (!supabase) {
+    throw new Error("Supabase is not configured.");
+  }
+
+  const { error } = await getUntypedRpcClient().rpc("disconnect_connection", {
+    other_user_id_input: otherUserId,
   });
 
   if (error) {

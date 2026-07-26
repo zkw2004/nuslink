@@ -8,6 +8,7 @@ import {
   buildRelationshipStatusMap,
   cancelConnectionRequest as cancelConnectionRequestRpc,
   createConnectionRequest,
+  disconnectConnection as disconnectConnectionRpc,
   fetchConnectionState,
   respondToConnectionRequest,
 } from "@services/connectionsService";
@@ -22,6 +23,7 @@ interface ConnectionsState {
   refreshConnections: (userId: string) => Promise<void>;
   sendConnectionRequest: (recipientId: string, userId: string) => Promise<void>;
   cancelConnectionRequest: (recipientId: string, userId: string) => Promise<void>;
+  disconnectConnection: (otherUserId: string, userId: string) => Promise<void>;
   handleConnectionRequest: (
     requestId: string,
     decision: "accepted" | "declined",
@@ -76,6 +78,11 @@ export const useConnectionsStore = create<ConnectionsState>((set, get) => ({
 
   async cancelConnectionRequest(recipientId, userId) {
     await cancelConnectionRequestRpc(recipientId);
+    await get().refreshConnections(userId);
+  },
+
+  async disconnectConnection(otherUserId, userId) {
+    await disconnectConnectionRpc(otherUserId);
     await get().refreshConnections(userId);
   },
 
