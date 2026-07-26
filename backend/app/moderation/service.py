@@ -141,7 +141,6 @@ class GeminiModerationProvider:
                 "generationConfig": {
                     "responseMimeType": "application/json",
                     "responseSchema": schema,
-                    "temperature": 0,
                 },
             }
         ).encode("utf-8")

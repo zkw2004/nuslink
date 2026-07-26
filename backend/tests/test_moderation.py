@@ -430,5 +430,5 @@ def test_gemini_provider_sends_structured_generate_content_request(monkeypatch):
     assert request_body["generationConfig"]["responseSchema"]["properties"][
         "reason"
     ]["nullable"] is True
-    assert request_body["generationConfig"]["temperature"] == 0
+    assert "temperature" not in request_body["generationConfig"]
     assert result.outcome == "allowed"
