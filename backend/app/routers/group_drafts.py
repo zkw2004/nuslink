@@ -28,7 +28,7 @@ def draft_group(
         detail = str(exc)
         response_status = (
             status.HTTP_503_SERVICE_UNAVAILABLE
-            if detail == "AI group drafting is not configured."
+            if detail == "Gemini group drafting is not configured."
             else status.HTTP_502_BAD_GATEWAY
         )
         raise HTTPException(status_code=response_status, detail=detail) from exc

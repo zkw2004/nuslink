@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     push_worker_enabled: bool = True
     push_worker_interval_seconds: float = 10.0
     gemini_api_key: str = ""
+    gemini_group_drafting_model: str = "gemini-3.5-flash"
     gemini_model: str = "gemini-3.5-flash"
     gemini_moderation_model: str = "gemini-3.5-flash"
     gemini_profile_extraction_model: str = "gemini-3.5-flash"

@@ -9,7 +9,7 @@ from app.group_drafting import service
 from app.group_drafting.service import (
     GeminiGroupDraftProvider,
     GroupDraftingError,
-    _find_output_text,
+    _find_gemini_output_text,
 )
 from app.main import app
 from app.routers.group_drafts import get_current_user as get_group_drafts_current_user
@@ -145,14 +145,14 @@ def test_draft_group_rejects_whitespace_only_prompt_before_provider_call():
     assert provider.prompts == []
 
 
-def test_find_output_text_reads_gemini_candidate_content():
-    output_text = _find_output_text(
+def test_find_gemini_output_text_reads_candidate_content():
+    output_text = _find_gemini_output_text(
         {
             "candidates": [
                 {
                     "content": {
                         "parts": [{"text": '{"name":"Draft"}'}],
-                    }
+                    },
                 }
             ]
         }
@@ -161,11 +161,15 @@ def test_find_output_text_reads_gemini_candidate_content():
     assert output_text == '{"name":"Draft"}'
 
 
-def test_find_output_text_rejects_provider_refusal():
+def test_find_gemini_output_text_rejects_safety_block():
     try:
-        _find_output_text({"candidates": [{"finishReason": "SAFETY"}]})
+        _find_gemini_output_text(
+            {
+                "candidates": [{"finishReason": "SAFETY"}],
+            }
+        )
     except GroupDraftingError as exc:
-        assert str(exc) == "The AI provider declined this request."
+        assert str(exc) == "Gemini declined this group draft request."
     else:
         raise AssertionError("Expected a provider refusal to raise an error.")
 
@@ -174,7 +178,7 @@ def test_gemini_provider_sends_structured_generate_content_request(
     monkeypatch: pytest.MonkeyPatch,
 ):
     monkeypatch.setattr(settings, "gemini_api_key", "test-key")
-    monkeypatch.setattr(settings, "gemini_model", "test-model")
+    monkeypatch.setattr(settings, "gemini_group_drafting_model", "test-model")
     captured_request: dict[str, object] = {}
 
     def fake_urlopen(api_request: object, timeout: int) -> FakeGeminiResponse:
@@ -221,6 +225,8 @@ def test_gemini_provider_sends_structured_generate_content_request(
     )
     assert api_request.get_header("X-goog-api-key") == "test-key"
     assert captured_request["timeout"] == 25
-    assert request_body["generationConfig"]["responseMimeType"] == "application/json"
-    assert request_body["generationConfig"]["responseJsonSchema"]["type"] == "object"
+    assert request_body["generationConfig"]["responseMimeType"] == (
+        "application/json"
+    )
+    assert request_body["generationConfig"]["responseSchema"]["type"] == "object"
     assert result["module_code"] == "CS2040S"
