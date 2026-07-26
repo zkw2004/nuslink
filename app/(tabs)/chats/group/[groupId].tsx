@@ -258,7 +258,9 @@ export default function GroupChatThreadScreen() {
       }
 
       if (moderationResult.verdict === "error") {
-        const confirmed = await confirmModerationUnavailable();
+        const confirmed = await confirmModerationUnavailable(
+          moderationResult.reason,
+        );
         if (!confirmed) {
           return;
         }

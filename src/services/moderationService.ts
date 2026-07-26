@@ -208,11 +208,12 @@ export function confirmFlaggedContent(message: string): Promise<boolean> {
   });
 }
 
-export function confirmModerationUnavailable(): Promise<boolean> {
+export function confirmModerationUnavailable(reason?: string | null): Promise<boolean> {
   return new Promise((resolve) => {
+    const detail = reason ? `\n\nReason: ${reason}` : "";
     Alert.alert(
       "Moderation unavailable",
-      "We could not check this content right now. Send it anyway?",
+      `We could not check this content right now. Send it anyway?${detail}`,
       [
         { text: "Keep editing", style: "cancel", onPress: () => resolve(false) },
         { text: "Send anyway", onPress: () => resolve(true) },

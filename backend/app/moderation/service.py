@@ -105,7 +105,7 @@ class GeminiModerationProvider:
 
         body = json.dumps(
             {
-                "system_instruction": {
+                "systemInstruction": {
                     "parts": [
                         {
                             "text": (
@@ -130,9 +130,9 @@ class GeminiModerationProvider:
                         ],
                     }
                 ],
-                "generation_config": {
-                    "response_mime_type": "application/json",
-                    "response_schema": schema,
+                "generationConfig": {
+                    "responseMimeType": "application/json",
+                    "responseSchema": schema,
                     "temperature": 0,
                 },
             }

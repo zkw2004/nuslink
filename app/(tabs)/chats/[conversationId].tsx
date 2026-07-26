@@ -639,7 +639,9 @@ export default function ConversationThreadScreen() {
       }
 
       if (moderationResult.verdict === "error") {
-        const confirmed = await confirmModerationUnavailable();
+        const confirmed = await confirmModerationUnavailable(
+          moderationResult.reason,
+        );
         if (!confirmed) {
           return;
         }

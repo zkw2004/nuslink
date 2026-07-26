@@ -420,9 +420,9 @@ def test_gemini_provider_sends_structured_generate_content_request(monkeypatch):
     )
     assert api_request.get_header("X-goog-api-key") == "test-key"
     assert captured_request["timeout"] == 25
-    assert request_body["generation_config"]["response_mime_type"] == (
+    assert request_body["generationConfig"]["responseMimeType"] == (
         "application/json"
     )
-    assert request_body["generation_config"]["response_schema"]["type"] == "object"
-    assert request_body["generation_config"]["temperature"] == 0
+    assert request_body["generationConfig"]["responseSchema"]["type"] == "object"
+    assert request_body["generationConfig"]["temperature"] == 0
     assert result.outcome == "allowed"
