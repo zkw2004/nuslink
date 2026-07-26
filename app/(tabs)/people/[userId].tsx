@@ -84,11 +84,15 @@ export default function PeopleProfileScreen() {
   const openConversationWithUser = useDirectMessagesStore(
     (state) => state.openConversationWithUser,
   );
+  const refreshInbox = useDirectMessagesStore((state) => state.refreshInbox);
   const sendConnectionRequest = useConnectionsStore(
     (state) => state.sendConnectionRequest,
   );
   const cancelConnectionRequest = useConnectionsStore(
     (state) => state.cancelConnectionRequest,
+  );
+  const disconnectConnection = useConnectionsStore(
+    (state) => state.disconnectConnection,
   );
   const connectedUserIds = useConnectionsStore((state) => state.connectedUserIds);
   const incomingRequesterIds = useConnectionsStore(
@@ -127,6 +131,7 @@ export default function PeopleProfileScreen() {
     outgoingRequestRecipientIds,
   ]);
   const [summary, setSummary] = useState<ProfileReviewSummary | null>(null);
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
 
   useEffect(() => {
     if (!candidate && peopleMatches.length === 0) {
@@ -194,6 +199,45 @@ export default function PeopleProfileScreen() {
     );
   }
 
+  function handleDisconnect() {
+    if (!session?.user.id || !candidate) {
+      Alert.alert(
+        "Sign in required",
+        "Please sign in again before disconnecting.",
+      );
+      return;
+    }
+
+    Alert.alert(
+      "Disconnect?",
+      `You and ${candidate.display_name} will no longer be connected, and your direct message will be removed from both inboxes.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Disconnect",
+          style: "destructive",
+          onPress: () => {
+            void (async () => {
+              setIsDisconnecting(true);
+
+              try {
+                await disconnectConnection(candidate.user_id, session.user.id);
+                await refreshInbox(session.user.id);
+              } catch (error) {
+                Alert.alert(
+                  "Could not disconnect",
+                  error instanceof Error ? error.message : "Please try again.",
+                );
+              } finally {
+                setIsDisconnecting(false);
+              }
+            })();
+          },
+        },
+      ],
+    );
+  }
+
   async function handleMessage() {
     if (!session?.user.id || !candidate) {
       Alert.alert(
@@ -239,13 +283,19 @@ export default function PeopleProfileScreen() {
   const canMessage = relationshipStatus === "connected";
   const hasOutgoingRequest = relationshipStatus === "outgoing_request";
   const hasIncomingRequest = relationshipStatus === "incoming_request";
+  const isConnected = relationshipStatus === "connected";
   const primaryActionLabel = hasOutgoingRequest
     ? "Requested"
     : hasIncomingRequest
       ? "Request received"
-      : relationshipStatus === "connected"
-        ? "Connected"
+      : isConnected
+        ? isDisconnecting
+          ? "Disconnecting..."
+          : "Disconnect"
         : "Request";
+  const primaryActionDisabled =
+    hasOutgoingRequest || hasIncomingRequest || isDisconnecting;
+  const handlePrimaryAction = isConnected ? handleDisconnect : handleConnect;
 
   return (
     <LinearGradient colors={APP_GRADIENT} style={styles.root}>
@@ -289,9 +339,9 @@ export default function PeopleProfileScreen() {
 
           <View style={styles.actions}>
             <GlassButton
-              disabled={!canConnect}
+              disabled={(!canConnect && !isConnected) || primaryActionDisabled}
               label={primaryActionLabel}
-              onPress={handleConnect}
+              onPress={handlePrimaryAction}
               style={styles.actionButton}
               variant="dark"
             />

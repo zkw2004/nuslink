@@ -474,9 +474,6 @@ export default function PeopleScreen() {
             <Text className="text-[17px] font-bold text-[#0F1115]">
               Incoming requests
             </Text>
-            <Text className="mt-2 text-[14px] leading-6 text-[#5C6370]">
-              Accept connections here before opening direct messages in a later Milestone 2 slice.
-            </Text>
 
             <View className="mt-4 gap-3">
               {incomingRequests.map((request) => (

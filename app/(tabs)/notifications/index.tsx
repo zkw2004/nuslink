@@ -18,6 +18,8 @@ import {
 } from "@services/notificationsService";
 import {
   useAuthStore,
+  useConnectionsStore,
+  useDirectMessagesStore,
   useGroupMessagesStore,
   useGroupsStore,
   useNotificationsStore,
@@ -55,12 +57,17 @@ function formatNotificationTime(value: string) {
 function NotificationCard({
   notification,
   onMarkRead,
+  onRespondConnectionRequest,
   onRespondGroupInvite,
   onRespondJoinRequest,
   actionLoadingId,
 }: {
   notification: AppNotification;
   onMarkRead: (notificationId: string) => void;
+  onRespondConnectionRequest: (
+    notification: AppNotification,
+    decision: "accepted" | "declined",
+  ) => void;
   onRespondGroupInvite: (
     notification: AppNotification,
     decision: "accepted" | "declined",
@@ -72,11 +79,17 @@ function NotificationCard({
   actionLoadingId: string | null;
 }) {
   const isUnread = notification.read_at === null;
+  const isConnectionRequest = notification.type === "connection_request";
   const isGroupInvite = notification.type === "group_invite_received";
   const isJoinRequest = notification.type === "group_join_requested";
   const isNudge = notification.type.startsWith("nudge_");
-  const canRespond = isUnread && (isGroupInvite || isJoinRequest);
-  const handleRespond = isGroupInvite ? onRespondGroupInvite : onRespondJoinRequest;
+  const canRespond =
+    isUnread && (isConnectionRequest || isGroupInvite || isJoinRequest);
+  const handleRespond = isConnectionRequest
+    ? onRespondConnectionRequest
+    : isGroupInvite
+      ? onRespondGroupInvite
+      : onRespondJoinRequest;
 
   return (
     <Pressable
@@ -119,10 +132,14 @@ function NotificationCard({
               <AppButton
                 label={
                   actionLoadingId === `${notification.id}:accepted`
-                    ? isJoinRequest
+                    ? isConnectionRequest
+                      ? "Accepting..."
+                      : isJoinRequest
                       ? "Approving..."
                       : "Joining..."
-                    : isJoinRequest
+                    : isConnectionRequest || isGroupInvite
+                      ? "Accept"
+                      : isJoinRequest
                       ? "Approve"
                       : "Accept"
                 }
@@ -161,8 +178,12 @@ export default function NotificationsScreen() {
   );
   const markAsRead = useNotificationsStore((state) => state.markAsRead);
   const markAllAsRead = useNotificationsStore((state) => state.markAllAsRead);
+  const handleConnectionRequest = useConnectionsStore(
+    (state) => state.handleConnectionRequest,
+  );
   const refreshGroups = useGroupsStore((state) => state.refreshGroups);
   const refreshGroupChats = useGroupMessagesStore((state) => state.refreshGroupChats);
+  const refreshInbox = useDirectMessagesStore((state) => state.refreshInbox);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -187,6 +208,39 @@ export default function NotificationsScreen() {
     }
 
     void markAllAsRead(session.user.id);
+  }
+
+  async function handleRespondConnectionRequest(
+    notification: AppNotification,
+    decision: "accepted" | "declined",
+  ) {
+    if (!session?.user.id) {
+      return;
+    }
+
+    const requestId = notification.metadata.request_id;
+    if (typeof requestId !== "string") {
+      Alert.alert(
+        "Could not handle request",
+        "This notification is missing its connection request details.",
+      );
+      return;
+    }
+
+    setActionLoadingId(`${notification.id}:${decision}`);
+
+    try {
+      await handleConnectionRequest(requestId, decision, session.user.id);
+      await markAsRead(notification.id, session.user.id);
+      await refreshInbox(session.user.id);
+    } catch (error) {
+      Alert.alert(
+        "Could not handle request",
+        error instanceof Error ? error.message : "Please try again.",
+      );
+    } finally {
+      setActionLoadingId(null);
+    }
   }
 
   async function handleRespondGroupInvite(
@@ -329,6 +383,9 @@ export default function NotificationsScreen() {
               key={notification.id}
               notification={notification}
               onMarkRead={handleMarkRead}
+              onRespondConnectionRequest={(targetNotification, decision) => {
+                void handleRespondConnectionRequest(targetNotification, decision);
+              }}
               onRespondGroupInvite={(targetNotification, decision) => {
                 void handleRespondGroupInvite(targetNotification, decision);
               }}
