@@ -1,5 +1,10 @@
 from app.push.expo_client import ExpoPushClient
-from app.push.models import ExpoPushResult, ExpoReceiptResult, PushDelivery, PushReceiptRequest
+from app.push.models import (
+    ExpoPushResult,
+    ExpoReceiptResult,
+    PushDelivery,
+    PushReceiptRequest,
+)
 
 TERMINAL_TOKEN_ERRORS = {"DeviceNotRegistered"}
 RETRYABLE_TICKET_ERRORS = {"MessageRateExceeded"}

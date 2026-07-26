@@ -92,7 +92,10 @@ def _parse_ticket(payload: object) -> ExpoPushResult:
     status = payload.get("status")
     if status == "ok" and isinstance(payload.get("id"), str):
         return ExpoPushResult(status="ok", ticket_id=payload["id"])
-    return ExpoPushResult(status="error", error=_get_error(payload) or "UnknownPushError")
+    return ExpoPushResult(
+        status="error",
+        error=_get_error(payload) or "UnknownPushError",
+    )
 
 
 def _parse_receipt(payload: object) -> ExpoReceiptResult:
@@ -100,4 +103,7 @@ def _parse_receipt(payload: object) -> ExpoReceiptResult:
         return ExpoReceiptResult(status="error", error="InvalidReceipt")
     if payload.get("status") == "ok":
         return ExpoReceiptResult(status="ok")
-    return ExpoReceiptResult(status="error", error=_get_error(payload) or "UnknownReceiptError")
+    return ExpoReceiptResult(
+        status="error",
+        error=_get_error(payload) or "UnknownReceiptError",
+    )

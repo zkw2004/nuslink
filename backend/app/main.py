@@ -18,6 +18,7 @@ from app.routers import (
     tags,
 )
 
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     stop_event = asyncio.Event()
