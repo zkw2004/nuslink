@@ -19,43 +19,49 @@ class GroupDraftProvider(Protocol):
 GROUP_DRAFT_SCHEMA = {
     "type": "object",
     "properties": {
-        "name": {"type": "string", "nullable": True, "maxLength": 50},
+        "name": {"type": ["string", "null"]},
         "type": {
-            "type": "string",
-            "nullable": True,
-            "enum": [
-                "study_group",
-                "hackathon_team",
-                "project_team",
-                "tutoring_session",
+            "anyOf": [
+                {
+                    "type": "string",
+                    "enum": [
+                        "study_group",
+                        "hackathon_team",
+                        "project_team",
+                        "tutoring_session",
+                    ],
+                },
+                {"type": "null"},
             ],
         },
-        "module_code": {"type": "string", "nullable": True, "maxLength": 12},
+        "module_code": {"type": ["string", "null"]},
         "privacy": {
-            "type": "string",
-            "nullable": True,
-            "enum": ["public", "semi_private", "private"],
+            "anyOf": [
+                {
+                    "type": "string",
+                    "enum": ["public", "semi_private", "private"],
+                },
+                {"type": "null"},
+            ],
         },
         "restriction": {
-            "type": "string",
-            "nullable": True,
-            "enum": ["same_module", "same_year", "same_faculty"],
+            "anyOf": [
+                {
+                    "type": "string",
+                    "enum": ["same_module", "same_year", "same_faculty"],
+                },
+                {"type": "null"},
+            ],
         },
-        "description": {
-            "type": "string",
-            "nullable": True,
-            "maxLength": 500,
-        },
-        "venue": {"type": "string", "nullable": True, "maxLength": 120},
+        "description": {"type": ["string", "null"]},
+        "venue": {"type": ["string", "null"]},
         "min_size": {
-            "type": "integer",
-            "nullable": True,
+            "type": ["integer", "null"],
             "minimum": 1,
             "maximum": 99,
         },
         "max_size": {
-            "type": "integer",
-            "nullable": True,
+            "type": ["integer", "null"],
             "minimum": 1,
             "maximum": 99,
         },
@@ -103,7 +109,7 @@ class GeminiGroupDraftProvider:
                 ],
                 "generationConfig": {
                     "responseMimeType": "application/json",
-                    "responseSchema": GROUP_DRAFT_SCHEMA,
+                    "responseJsonSchema": GROUP_DRAFT_SCHEMA,
                 },
             }
         ).encode("utf-8")

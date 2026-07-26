@@ -98,14 +98,12 @@ class GeminiModerationProvider:
                     "maxItems": 4,
                 },
                 "confidence": {
-                    "type": "number",
+                    "type": ["number", "null"],
                     "description": "Confidence from 0 to 1, or null if unavailable.",
-                    "nullable": True,
                 },
                 "reason": {
-                    "type": "string",
+                    "type": ["string", "null"],
                     "description": "Short reason, or null when no issue is found.",
-                    "nullable": True,
                 },
             },
             "required": ["outcome", "categories", "confidence", "reason"],
@@ -140,7 +138,7 @@ class GeminiModerationProvider:
                 ],
                 "generationConfig": {
                     "responseMimeType": "application/json",
-                    "responseSchema": schema,
+                    "responseJsonSchema": schema,
                 },
             }
         ).encode("utf-8")
