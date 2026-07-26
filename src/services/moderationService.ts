@@ -2,9 +2,9 @@ import { Alert } from "react-native";
 
 import { api } from "@lib/api";
 import type {
+  ModerationOutcome,
   ModerationResult,
   ModerationSubjectType,
-  ModerationVerdict,
 } from "@appTypes/index";
 
 type ModerationCheckResponse = {
@@ -12,7 +12,7 @@ type ModerationCheckResponse = {
   subject_id: string | null;
   source_table: string | null;
   source_column: string | null;
-  outcome: ModerationVerdict | "error";
+  outcome: ModerationOutcome;
   categories: string[];
   confidence: number | null;
   reason: string | null;
@@ -20,7 +20,7 @@ type ModerationCheckResponse = {
 };
 
 type ModerationBatchResponse = {
-  overall_outcome: ModerationVerdict | "error";
+  overall_outcome: ModerationOutcome;
   visible: boolean;
   results: ModerationCheckResponse[];
 };
@@ -37,8 +37,15 @@ export type ModerationBatchItem = ModerationCheckInput & {
   key: string;
 };
 
-function normalizeVerdict(outcome: string | null | undefined): ModerationVerdict {
-  return outcome === "blocked" || outcome === "flagged" ? outcome : "allowed";
+function normalizeVerdict(outcome: string | null | undefined): ModerationOutcome {
+  if (
+    outcome === "blocked" ||
+    outcome === "flagged" ||
+    outcome === "error"
+  ) {
+    return outcome;
+  }
+  return "allowed";
 }
 
 function mapResult(response: ModerationCheckResponse): ModerationResult {
@@ -91,7 +98,7 @@ export async function checkContent(
       subject_id: input.subjectId ?? null,
       source_table: input.sourceTable ?? null,
       source_column: input.sourceColumn ?? null,
-      verdict: "allowed",
+      verdict: "error",
       categories: [],
       confidence: null,
       reason: error instanceof Error ? error.message : "Moderation unavailable.",
@@ -153,7 +160,7 @@ export async function checkContentBatch(
         subject_id: item.subjectId ?? null,
         source_table: item.sourceTable ?? null,
         source_column: item.sourceColumn ?? null,
-        verdict: "allowed",
+        verdict: "error",
         categories: [],
         confidence: null,
         reason: "Moderation unavailable.",
@@ -179,12 +186,15 @@ export function hasFlaggedModeration(
 
 export function getAggregateModerationVerdict(
   results: Record<string, ModerationResult>,
-): ModerationVerdict {
+): ModerationOutcome {
   if (hasBlockedModeration(results)) {
     return "blocked";
   }
   if (hasFlaggedModeration(results)) {
     return "flagged";
+  }
+  if (Object.values(results).some((result) => result.verdict === "error")) {
+    return "error";
   }
   return "allowed";
 }
@@ -195,5 +205,18 @@ export function confirmFlaggedContent(message: string): Promise<boolean> {
       { text: "Revise", style: "cancel", onPress: () => resolve(false) },
       { text: "Post anyway", onPress: () => resolve(true) },
     ]);
+  });
+}
+
+export function confirmModerationUnavailable(): Promise<boolean> {
+  return new Promise((resolve) => {
+    Alert.alert(
+      "Moderation unavailable",
+      "We could not check this content right now. Send it anyway?",
+      [
+        { text: "Keep editing", style: "cancel", onPress: () => resolve(false) },
+        { text: "Send anyway", onPress: () => resolve(true) },
+      ],
+    );
   });
 }

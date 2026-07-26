@@ -1,5 +1,6 @@
 import hashlib
 import json
+import re
 from typing import Any, Protocol, cast
 from urllib import error, request
 
@@ -35,6 +36,20 @@ Violation categories are illegal_activity, commercial_spam, harassment,
 hate_speech, explicit_content, spam_phishing, impersonation, and other.
 Return concise reasons. Do not over-flag normal academic discussion."""
 
+CHAT_SUBJECT_TYPES = {
+    "direct_chat_message",
+    "group_chat_message",
+    "community_chat_message",
+}
+ABUSIVE_PROFANITY_PATTERN = re.compile(
+    r"\b(f+u+c+k+(?:ing|er|ed)?|f+ck(?:ing|er|ed)?|shit+|bitch+|cunt+)\b",
+    re.IGNORECASE,
+)
+DIRECTED_ATTACK_PATTERN = re.compile(
+    r"\b(u|you|ur|your|idiot|moron|stupid|dumb|loser)\b",
+    re.IGNORECASE,
+)
+
 
 class ModerationProviderError(Exception):
     pass
@@ -56,16 +71,16 @@ class ModerationProvider(Protocol):
         ...
 
 
-class OpenAIModerationProvider:
-    provider_name = "openai"
+class GeminiModerationProvider:
+    provider_name = "gemini"
 
     @property
     def model_name(self) -> str:
-        return settings.openai_moderation_model
+        return settings.gemini_moderation_model
 
     def moderate(self, *, subject_type: str, content: str) -> ProviderModerationResult:
-        if not settings.openai_api_key:
-            raise ModerationProviderError("AI moderation is not configured.")
+        if not settings.gemini_api_key:
+            raise ModerationProviderError("Gemini moderation is not configured.")
 
         schema = {
             "type": "object",
@@ -86,41 +101,51 @@ class OpenAIModerationProvider:
                 "reason": {"type": ["string", "null"], "maxLength": 240},
             },
             "required": ["outcome", "categories", "confidence", "reason"],
-            "additionalProperties": False,
         }
 
         body = json.dumps(
             {
-                "model": settings.openai_moderation_model,
-                "input": [
-                    {"role": "system", "content": SYSTEM_PROMPT},
+                "system_instruction": {
+                    "parts": [
+                        {
+                            "text": (
+                                f"{SYSTEM_PROMPT}\n"
+                                "Return only JSON matching the response schema."
+                            )
+                        }
+                    ]
+                },
+                "contents": [
                     {
                         "role": "user",
-                        "content": json.dumps(
+                        "parts": [
                             {
-                                "subject_type": subject_type,
-                                "content": content,
+                                "text": json.dumps(
+                                    {
+                                        "subject_type": subject_type,
+                                        "content": content,
+                                    }
+                                )
                             }
-                        ),
-                    },
-                ],
-                "text": {
-                    "format": {
-                        "type": "json_schema",
-                        "name": "nuslink_content_moderation",
-                        "strict": True,
-                        "schema": schema,
+                        ],
                     }
+                ],
+                "generation_config": {
+                    "response_mime_type": "application/json",
+                    "response_schema": schema,
+                    "temperature": 0,
                 },
-                "store": False,
             }
         ).encode("utf-8")
         api_request = request.Request(
-            "https://api.openai.com/v1/responses",
+            (
+                "https://generativelanguage.googleapis.com/v1beta/models/"
+                f"{settings.gemini_moderation_model}:generateContent"
+            ),
             data=body,
             headers={
-                "Authorization": f"Bearer {settings.openai_api_key}",
                 "Content-Type": "application/json",
+                "x-goog-api-key": settings.gemini_api_key,
             },
             method="POST",
         )
@@ -130,24 +155,24 @@ class OpenAIModerationProvider:
                 payload = json.loads(response.read().decode("utf-8"))
         except error.HTTPError as exc:
             raise ModerationProviderError(
-                "The AI provider rejected the moderation request."
+                "Gemini rejected the moderation request."
             ) from exc
         except (error.URLError, TimeoutError) as exc:
             raise ModerationProviderError(
-                "The AI provider is temporarily unavailable."
+                "Gemini is temporarily unavailable."
             ) from exc
         except json.JSONDecodeError as exc:
             raise ModerationProviderError(
-                "The AI provider returned an invalid moderation response."
+                "Gemini returned an invalid moderation response."
             ) from exc
 
-        output_text = _find_output_text(payload)
+        output_text = _find_gemini_output_text(payload)
 
         try:
             parsed = json.loads(output_text)
         except json.JSONDecodeError as exc:
             raise ModerationProviderError(
-                "The AI moderation output was not valid JSON."
+                "Gemini moderation output was not valid JSON."
             ) from exc
 
         return _parse_provider_result(parsed, payload)
@@ -173,6 +198,26 @@ def moderate_content(
             reason=None,
             visible=True,
         )
+
+    rule_based_result = _rule_based_chat_result(cleaned_content, item)
+    if rule_based_result:
+        repository.record_event(
+            actor_id=actor_id,
+            subject_type=item.subject_type,
+            subject_id=item.subject_id,
+            source_table=item.source_table,
+            source_column=item.source_column,
+            content_hash=_content_hash(cleaned_content),
+            content_excerpt=_content_excerpt(cleaned_content),
+            outcome=rule_based_result.outcome,
+            categories=rule_based_result.categories,
+            confidence=rule_based_result.confidence,
+            reason=rule_based_result.reason,
+            provider="rule_based",
+            provider_model=None,
+            provider_response={"rule": "abusive_chat_profanity"},
+        )
+        return rule_based_result
 
     try:
         provider_result = provider.moderate(
@@ -255,24 +300,55 @@ def is_content_visible(outcome: ModerationOutcome) -> bool:
     return outcome in {"allowed", "error"}
 
 
-def _find_output_text(payload: dict[str, Any]) -> str:
-    for output in payload.get("output", []):
-        if not isinstance(output, dict):
-            continue
-        for content in output.get("content", []):
-            if not isinstance(content, dict):
-                continue
-            if content.get("type") == "output_text" and isinstance(
-                content.get("text"),
-                str,
-            ):
-                return content["text"]
-            if content.get("type") == "refusal":
-                raise ModerationProviderError(
-                    "The AI provider declined this moderation request."
-                )
+def _rule_based_chat_result(
+    content: str,
+    item: ModerationItem,
+) -> ModerationResult | None:
+    if item.subject_type not in CHAT_SUBJECT_TYPES:
+        return None
 
-    raise ModerationProviderError("The AI provider did not return moderation text.")
+    has_abusive_profanity = ABUSIVE_PROFANITY_PATTERN.search(content) is not None
+    is_directed_attack = DIRECTED_ATTACK_PATTERN.search(content) is not None
+
+    if not has_abusive_profanity or not is_directed_attack:
+        return None
+
+    return ModerationResult(
+        subject_type=item.subject_type,
+        subject_id=item.subject_id,
+        source_table=item.source_table,
+        source_column=item.source_column,
+        outcome="blocked",
+        categories=["harassment"],
+        confidence=0.98,
+        reason="Targets another user with abusive profanity.",
+        visible=False,
+    )
+
+
+def _find_gemini_output_text(payload: dict[str, Any]) -> str:
+    for candidate in payload.get("candidates", []):
+        if not isinstance(candidate, dict):
+            continue
+
+        finish_reason = candidate.get("finishReason")
+        if finish_reason in {"SAFETY", "RECITATION"}:
+            raise ModerationProviderError(
+                "Gemini declined this moderation request."
+            )
+
+        content = candidate.get("content")
+        if not isinstance(content, dict):
+            continue
+
+        for part in content.get("parts", []):
+            if not isinstance(part, dict):
+                continue
+            text = part.get("text")
+            if isinstance(text, str):
+                return text
+
+    raise ModerationProviderError("Gemini did not return moderation text.")
 
 
 def _parse_provider_result(

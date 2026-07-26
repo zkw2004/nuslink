@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-5-mini"
     openai_moderation_model: str = "gpt-5-mini"
     openai_profile_extraction_model: str = "gpt-5-mini"
+    gemini_api_key: str = ""
+    gemini_moderation_model: str = "gemini-2.5-flash"
 
 
 settings = Settings()

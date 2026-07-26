@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 
 ModerationSubjectType = Literal[
     "profile_bio",
+    "profile_headline",
     "group_name",
     "group_description",
     "group_tag",

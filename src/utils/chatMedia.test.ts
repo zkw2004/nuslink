@@ -40,6 +40,7 @@ test("builds direct message media collections", () => {
       created_at: "2026-06-20T10:00:00.000Z",
       deleted_at: null,
       edited_at: null,
+      moderation_outcome: "allowed",
     },
     {
       id: "msg-2",
@@ -54,6 +55,7 @@ test("builds direct message media collections", () => {
       created_at: "2026-06-20T10:05:00.000Z",
       deleted_at: null,
       edited_at: null,
+      moderation_outcome: "allowed",
     },
   ]);
 
@@ -94,6 +96,7 @@ test("combines community chat media with shared resources", () => {
         created_at: "2026-06-21T10:00:00.000Z",
         deleted_at: null,
         edited_at: null,
+        moderation_outcome: "allowed",
         sender_profile: {
           id: "user-1",
           display_name: "Joel",

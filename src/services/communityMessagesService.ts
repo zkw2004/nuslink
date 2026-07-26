@@ -5,6 +5,7 @@ import type {
   CommunityChatSummary,
   ConnectedProfilePreview,
   DirectMessageAttachmentInput,
+  ModerationOutcome,
 } from "@appTypes/index";
 import type { Database } from "@appTypes/database";
 
@@ -75,6 +76,7 @@ function mapCommunityMessage(
     created_at: message.created_at,
     deleted_at: message.deleted_at,
     edited_at: message.edited_at,
+    moderation_outcome: message.moderation_outcome,
     sender_profile: senderProfile,
   };
 }
@@ -519,6 +521,7 @@ export async function sendCommunityMessage(
   body: string,
   senderId: string,
   attachment?: DirectMessageAttachmentInput | null,
+  moderationOutcome: ModerationOutcome = "allowed",
 ) {
   if (!supabase) {
     throw new Error("Supabase is not configured.");
@@ -539,6 +542,7 @@ export async function sendCommunityMessage(
     attachment_mime_type: attachment?.mime_type ?? null,
     attachment_size: attachment?.size ?? null,
     attachment_kind: attachment?.kind ?? null,
+    moderation_outcome: moderationOutcome,
   });
 
   if (error) {

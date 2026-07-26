@@ -4,6 +4,7 @@ import type {
   CommunityChatMessage,
   CommunityChatSummary,
   DirectMessageAttachmentInput,
+  ModerationOutcome,
 } from "@appTypes/index";
 import {
   archiveCommunityChats as archiveCommunityChatsService,
@@ -45,6 +46,7 @@ interface CommunityMessagesState {
     body: string,
     userId: string,
     attachment?: DirectMessageAttachmentInput | null,
+    moderationOutcome?: ModerationOutcome,
   ) => Promise<void>;
   subscribeToCommunity: (communityId: string, userId: string) => () => void;
   reset: () => void;
@@ -141,11 +143,17 @@ export const useCommunityMessagesStore = create<CommunityMessagesState>((set, ge
     }
   },
 
-  async sendMessage(communityId, body, userId, attachment) {
+  async sendMessage(communityId, body, userId, attachment, moderationOutcome) {
     set({ isSending: true, error: null });
 
     try {
-      await sendCommunityMessage(communityId, body, userId, attachment);
+      await sendCommunityMessage(
+        communityId,
+        body,
+        userId,
+        attachment,
+        moderationOutcome,
+      );
       const [messages] = await Promise.all([
         fetchCommunityMessages(communityId),
         get().refreshCommunityChats(userId),

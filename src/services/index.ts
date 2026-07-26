@@ -6,6 +6,7 @@ export * from "./directMessagesService";
 export * from "./groupMessagesService";
 export * from "./groupDraftingService";
 export * from "./matchingService";
+export * from "./moderationService";
 export * from "./notificationsService";
 export * from "./nudgesService";
 export * from "./profileService";

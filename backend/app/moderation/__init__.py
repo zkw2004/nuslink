@@ -17,13 +17,13 @@ from .schemas import (
     ModerationResult as ModerationResult,
 )
 from .service import (
+    GeminiModerationProvider as GeminiModerationProvider,
+)
+from .service import (
     ModerationProvider as ModerationProvider,
 )
 from .service import (
     ModerationRepository as ModerationRepository,
-)
-from .service import (
-    OpenAIModerationProvider as OpenAIModerationProvider,
 )
 from .service import (
     moderate_batch as moderate_batch,
@@ -41,7 +41,7 @@ __all__ = [
     "ModerationProvider",
     "ModerationRepository",
     "ModerationResult",
-    "OpenAIModerationProvider",
+    "GeminiModerationProvider",
     "moderate_batch",
     "moderate_content",
 ]

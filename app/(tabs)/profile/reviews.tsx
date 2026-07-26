@@ -1,20 +1,22 @@
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 
 import { ProfileReviewsScreen } from "@features/profile/ProfileReviewsScreen";
 import { useAuthStore } from "@store/index";
 
 export default function ProfileReviewsRoute() {
+  const { profileId } = useLocalSearchParams<{ profileId?: string }>();
   const profile = useAuthStore((state) => state.profile);
+  const resolvedProfileId = profileId ?? profile?.id;
 
-  if (!profile) {
+  if (!resolvedProfileId) {
     return null;
   }
 
   return (
     <ProfileReviewsScreen
-      isSelf
+      isSelf={resolvedProfileId === profile?.id}
       onBack={() => router.back()}
-      profileId={profile.id}
+      profileId={resolvedProfileId}
     />
   );
 }

@@ -27,6 +27,7 @@ import { router } from "expo-router";
 
 import { CCA_TAG_OPTIONS } from "@constants/index";
 import { AppAvatar, GlassButton, GlassSurface } from "@components/shared";
+import { ModerationAlert } from "@components/moderation";
 import { saveProfileSetup, uploadProfileImage } from "@features/onboarding/onboardingService";
 import { toSelectedModule, type SelectedModule } from "@features/onboarding/types";
 import { ProfessionalProfileSection } from "@features/profile/ProfessionalProfileSection";
@@ -45,6 +46,10 @@ import {
   importTimetableFromNusmodsShareUrl,
   parseManualTimeInput,
   searchInterestTagSuggestions,
+  checkContentBatch,
+  confirmFlaggedContent,
+  hasBlockedModeration,
+  hasFlaggedModeration,
   updateNudgePreferences,
   updateEditableProfile,
 } from "@services/index";
@@ -274,6 +279,7 @@ export function ProfileSettingsScreen() {
   const [completion, setCompletion] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isModerationAlertVisible, setIsModerationAlertVisible] = useState(false);
   const [isImportingTimetable, setIsImportingTimetable] = useState(false);
   const [isSearchingModules, setIsSearchingModules] = useState(false);
   const [isUpdatingPhoto, setIsUpdatingPhoto] = useState(false);
@@ -498,6 +504,39 @@ export function ProfileSettingsScreen() {
     setIsSaving(true);
 
     try {
+      const moderationResults = await checkContentBatch([
+        {
+          key: "headline",
+          subjectType: "profile_headline",
+          content: headlineDraft,
+          subjectId: profile.id,
+          sourceTable: "profiles",
+          sourceColumn: "headline",
+        },
+        {
+          key: "bio",
+          subjectType: "profile_bio",
+          content: bioDraft,
+          subjectId: profile.id,
+          sourceTable: "profiles",
+          sourceColumn: "bio",
+        },
+      ]);
+
+      if (hasBlockedModeration(moderationResults)) {
+        setIsModerationAlertVisible(true);
+        return;
+      }
+
+      if (hasFlaggedModeration(moderationResults)) {
+        const confirmed = await confirmFlaggedContent(
+          "Your profile text may be hidden behind a warning. Do you still want to save it?",
+        );
+        if (!confirmed) {
+          return;
+        }
+      }
+
       await updateEditableProfile(profile.id, {
         displayName: displayNameDraft,
         headline: headlineDraft,
@@ -515,6 +554,9 @@ export function ProfileSettingsScreen() {
         intents: intentsDraft,
         modules: editableModules,
         timetableSlots: timetableSlotsDraft,
+        headlineModerationOutcome:
+          moderationResults.headline?.verdict ?? "allowed",
+        bioModerationOutcome: moderationResults.bio?.verdict ?? "allowed",
       });
       await upsertPrimaryProfessionalLink(profile.id, professionalLinkDraft);
       const refreshed = await refreshProfile(profile.id);
@@ -1501,6 +1543,10 @@ export function ProfileSettingsScreen() {
           )}
         </ScrollView>
       </SafeAreaView>
+      <ModerationAlert
+        visible={isModerationAlertVisible}
+        onClose={() => setIsModerationAlertVisible(false)}
+      />
     </View>
   );
 }

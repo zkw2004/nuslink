@@ -1256,6 +1256,12 @@ export type Database = {
         };
         Returns: string;
       };
+      cancel_connection_request: {
+        Args: {
+          recipient_id_input: string;
+        };
+        Returns: undefined;
+      };
       create_group_invitation: {
         Args: {
           group_id_input: string;
