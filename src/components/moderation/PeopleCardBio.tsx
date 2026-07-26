@@ -1,13 +1,13 @@
 import { StyleSheet, Text } from "react-native";
 
-import type { ModerationVerdict } from "@appTypes/index";
+import type { ModerationOutcome } from "@appTypes/index";
 
 import { FlaggedVeil } from "./FlaggedVeil";
 import { RemovedTombstone } from "./RemovedTombstone";
 
 type PeopleCardBioProps = {
   bio: string;
-  verdict?: ModerationVerdict | null;
+  verdict?: ModerationOutcome | null;
 };
 
 export function PeopleCardBio({ bio, verdict = "allowed" }: PeopleCardBioProps) {

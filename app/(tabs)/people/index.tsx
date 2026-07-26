@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -199,6 +198,7 @@ function toProfileCardData(candidate: PeopleMatch): ProfileCardData {
     matchPct: candidate.compatibility_percentage,
     intentText: toIntentText(candidate.intents ?? []),
     bio: candidate.bio.trim() || "No bio added yet.",
+    bioModerationOutcome: candidate.bio_moderation_outcome ?? "allowed",
     modules: candidate.shared_modules ?? [],
     skills: candidate.skills ?? [],
     metaSignals: selectZoneFiveSignals(candidate),
@@ -654,10 +654,7 @@ export default function PeopleScreen() {
                   }
                 }}
                 onViewProfile={() => {
-                  Alert.alert(
-                    candidate.display_name,
-                    "Full profile drill-down can be added in the next People-card slice.",
-                  );
+                  router.push(`/(tabs)/people/${candidate.user_id}` as never);
                 }}
               />
             );

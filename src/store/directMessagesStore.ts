@@ -5,6 +5,7 @@ import type {
   DirectConversationSummary,
   DirectMessageAttachmentInput,
   DirectMessage,
+  ModerationOutcome,
 } from "@appTypes/index";
 import {
   archiveDirectConversations,
@@ -49,6 +50,7 @@ interface DirectMessagesState {
     body: string,
     userId: string,
     attachment?: DirectMessageAttachmentInput | null,
+    moderationOutcome?: ModerationOutcome,
   ) => Promise<void>;
   appendMessage: (message: DirectMessage) => void;
   subscribeToConversation: (conversationId: string, userId: string) => () => void;
@@ -193,11 +195,11 @@ export const useDirectMessagesStore = create<DirectMessagesState>((set, get) => 
     await get().refreshInbox(userId);
   },
 
-  async sendMessage(conversationId, body, userId, attachment) {
+  async sendMessage(conversationId, body, userId, attachment, moderationOutcome) {
     set({ isSending: true, error: null });
 
     try {
-      await sendDirectMessage(conversationId, body, attachment);
+      await sendDirectMessage(conversationId, body, attachment, moderationOutcome);
       const [messages] = await Promise.all([
         fetchDirectMessages(conversationId),
         get().refreshInbox(userId),

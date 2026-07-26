@@ -18,11 +18,19 @@ import {
   SectionCard,
   SectionHeader,
 } from "@components/shared";
+import { ModerationAlert } from "@components/moderation";
 import { getCurrentSemester, searchNusmodsModules } from "@lib/nusmods";
 import { useAuthStore, useCommunitiesStore, useGroupsStore } from "@store/index";
 import { toSelectedModule, type SelectedModule } from "@features/onboarding/types";
 import { AiGroupDraftPanel } from "@features/groups/AiGroupDraftPanel";
 import type { GroupDraft } from "@services/groupDraftingService";
+import {
+  checkContentBatch,
+  confirmFlaggedContent,
+  getAggregateModerationVerdict,
+  hasBlockedModeration,
+  hasFlaggedModeration,
+} from "@services/moderationService";
 import type { Database } from "@appTypes/database";
 
 type CreateMode = "group" | "community";
@@ -136,6 +144,7 @@ export default function CreateScreen() {
   const [communityPrivacy, setCommunityPrivacy] =
     useState<CommunityJoinPolicy>("open");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isModerationAlertVisible, setIsModerationAlertVisible] = useState(false);
   const currentSemester = useMemo(() => getCurrentSemester(), []);
 
   useEffect(() => {
@@ -323,6 +332,37 @@ export default function CreateScreen() {
     setIsSubmitting(true);
 
     try {
+      const moderationResults = await checkContentBatch([
+        {
+          key: "name",
+          subjectType: "group_name",
+          content: groupName,
+          sourceTable: "groups",
+          sourceColumn: "name",
+        },
+        {
+          key: "description",
+          subjectType: "group_description",
+          content: description,
+          sourceTable: "groups",
+          sourceColumn: "description",
+        },
+      ]);
+
+      if (hasBlockedModeration(moderationResults)) {
+        setIsModerationAlertVisible(true);
+        return;
+      }
+
+      if (hasFlaggedModeration(moderationResults)) {
+        const confirmed = await confirmFlaggedContent(
+          "This group may be hidden behind a warning. Do you still want to create it?",
+        );
+        if (!confirmed) {
+          return;
+        }
+      }
+
       const result = await createGroup({
         creatorId: session.user.id,
         module: {
@@ -341,6 +381,7 @@ export default function CreateScreen() {
         minSize: parsedMinSize,
         maxSize: parsedMaxSize,
         venue,
+        moderationOutcome: getAggregateModerationVerdict(moderationResults),
       });
 
       setGroupName("");
@@ -388,12 +429,51 @@ export default function CreateScreen() {
     setIsSubmitting(true);
 
     try {
+      const moderationResults = await checkContentBatch([
+        {
+          key: "name",
+          subjectType: "community_name",
+          content: communityName,
+          sourceTable: "communities",
+          sourceColumn: "name",
+        },
+        {
+          key: "description",
+          subjectType: "community_description",
+          content: communityDescription,
+          sourceTable: "communities",
+          sourceColumn: "description",
+        },
+        ...communityTags.map((tag, index) => ({
+          key: `tag-${index}`,
+          subjectType: "community_tag" as const,
+          content: tag,
+          sourceTable: "communities",
+          sourceColumn: "tags",
+        })),
+      ]);
+
+      if (hasBlockedModeration(moderationResults)) {
+        setIsModerationAlertVisible(true);
+        return;
+      }
+
+      if (hasFlaggedModeration(moderationResults)) {
+        const confirmed = await confirmFlaggedContent(
+          "This community may be hidden behind a warning. Do you still want to create it?",
+        );
+        if (!confirmed) {
+          return;
+        }
+      }
+
       await createCommunity({
         userId: session.user.id,
         name: communityName.trim(),
         description: communityDescription.trim(),
         tags: communityTags,
         privacy: communityPrivacy,
+        moderationOutcome: getAggregateModerationVerdict(moderationResults),
       });
 
       setCommunityName("");
@@ -820,6 +900,10 @@ export default function CreateScreen() {
           </>
         )}
       </ScrollView>
+      <ModerationAlert
+        visible={isModerationAlertVisible}
+        onClose={() => setIsModerationAlertVisible(false)}
+      />
     </SafeAreaView>
   );
 }

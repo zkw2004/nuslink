@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     expo_push_access_token: str = ""
     push_worker_enabled: bool = True
     push_worker_interval_seconds: float = 10.0
+    gemini_api_key: str = ""
+    gemini_moderation_model: str = "gemini-2.5-flash"
 
 
 settings = Settings()

@@ -20,6 +20,7 @@ import * as ImagePicker from "expo-image-picker";
 import { Ionicons } from "@expo/vector-icons";
 
 import { GlassButton, GlassSurface } from "@components/shared";
+import { ModeratedMessageText, ModerationAlert } from "@components/moderation";
 import type { ChatAttachmentKind, MeetupSuggestion } from "@appTypes/index";
 import { ChatMeetupCard } from "@features/chat/ChatMeetupCard";
 import {
@@ -42,6 +43,11 @@ import {
   uploadCommunityChatAttachment,
 } from "@services/communityMessagesService";
 import { fetchMeetupSuggestions } from "@services/meetupSuggestionsService";
+import {
+  checkContent,
+  confirmFlaggedContent,
+  confirmModerationUnavailable,
+} from "@services/moderationService";
 import {
   useAuthStore,
   useChatFeaturesStore,
@@ -305,6 +311,7 @@ export default function CommunityChatThreadScreen() {
   );
 
   const [messageDraft, setMessageDraft] = useState("");
+  const [isModerationAlertVisible, setIsModerationAlertVisible] = useState(false);
   const [pendingAttachment, setPendingAttachment] =
     useState<PendingAttachment | null>(null);
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
@@ -630,6 +637,34 @@ export default function CommunityChatThreadScreen() {
     setIsUploadingAttachment(true);
 
     try {
+      const moderationResult = await checkContent({
+        subjectType: "community_chat_message",
+        content: trimmedDraft,
+        sourceTable: "community_messages",
+        sourceColumn: "body",
+      });
+
+      if (moderationResult.verdict === "blocked") {
+        setIsModerationAlertVisible(true);
+        return;
+      }
+
+      if (moderationResult.verdict === "flagged") {
+        const confirmed = await confirmFlaggedContent(
+          "This message will appear behind a warning. Do you still want to send it?",
+        );
+        if (!confirmed) {
+          return;
+        }
+      }
+
+      if (moderationResult.verdict === "error") {
+        const confirmed = await confirmModerationUnavailable();
+        if (!confirmed) {
+          return;
+        }
+      }
+
       const uploadedAttachment = pendingAttachment
         ? await uploadCommunityChatAttachment({
             bytes: pendingAttachment.bytes,
@@ -646,6 +681,7 @@ export default function CommunityChatThreadScreen() {
         trimmedDraft,
         session.user.id,
         uploadedAttachment,
+        moderationResult.verdict,
       );
       setMessageDraft("");
       setPendingAttachment(null);
@@ -1265,16 +1301,17 @@ export default function CommunityChatThreadScreen() {
                         />
                       </Pressable>
                       {message.body ? (
-                        <Text
-                          style={[
+                        <ModeratedMessageText
+                          text={message.body}
+                          verdict={message.moderation_outcome}
+                          mine={isCurrentUser}
+                          textStyle={[
                             styles.attachmentCaption,
                             isCurrentUser
                               ? styles.bubbleTextMine
                               : styles.bubbleTextTheirs,
                           ]}
-                        >
-                          {message.body}
-                        </Text>
+                        />
                       ) : null}
                     </View>
                   ) : null}
@@ -1296,16 +1333,17 @@ export default function CommunityChatThreadScreen() {
                         </LinearGradient>
                       </Pressable>
                       {message.body ? (
-                        <Text
-                          style={[
+                        <ModeratedMessageText
+                          text={message.body}
+                          verdict={message.moderation_outcome}
+                          mine={isCurrentUser}
+                          textStyle={[
                             styles.attachmentCaption,
                             isCurrentUser
                               ? styles.bubbleTextMine
                               : styles.bubbleTextTheirs,
                           ]}
-                        >
-                          {message.body}
-                        </Text>
+                        />
                       ) : null}
                     </View>
                   ) : null}
@@ -1386,16 +1424,17 @@ export default function CommunityChatThreadScreen() {
                       }}
                     />
                   ) : message.body && !isMediaBubble ? (
-                    <Text
-                      style={[
+                    <ModeratedMessageText
+                      text={message.body}
+                      verdict={message.moderation_outcome}
+                      mine={isCurrentUser}
+                      textStyle={[
                         styles.bubbleText,
                         isCurrentUser
                           ? styles.bubbleTextMine
                           : styles.bubbleTextTheirs,
                       ]}
-                    >
-                      {message.body}
-                    </Text>
+                    />
                   ) : null}
 
                   <View
@@ -1582,6 +1621,10 @@ export default function CommunityChatThreadScreen() {
           }}
         />
       </SafeAreaView>
+      <ModerationAlert
+        visible={isModerationAlertVisible}
+        onClose={() => setIsModerationAlertVisible(false)}
+      />
     </View>
   );
 }

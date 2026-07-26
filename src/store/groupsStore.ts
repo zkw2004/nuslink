@@ -3,6 +3,7 @@ import { create } from "zustand";
 import { supabase } from "@lib/supabase";
 import { getCurrentSemester } from "@lib/nusmods";
 import type { Database } from "@appTypes/database";
+import type { ModerationOutcome } from "@appTypes/index";
 
 type GroupRow = Database["public"]["Tables"]["groups"]["Row"];
 type GroupType = Database["public"]["Tables"]["groups"]["Row"]["type"];
@@ -44,6 +45,7 @@ type CreateGroupInput = {
   minSize: number | null;
   maxSize: number | null;
   venue: string;
+  moderationOutcome?: ModerationOutcome;
 };
 
 type CreateGroupResult = {
@@ -146,12 +148,23 @@ export const useGroupsStore = create<GroupsState>((set, get) => ({
       throw new Error(error.message);
     }
 
-    await get().refreshGroups(input.creatorId);
-
     const createdGroup = data?.[0];
     if (!createdGroup) {
       throw new Error("Group was created, but no group id was returned.");
     }
+
+    if (input.moderationOutcome) {
+      const { error: moderationError } = await supabase
+        .from("groups")
+        .update({ moderation_outcome: input.moderationOutcome })
+        .eq("id", createdGroup.group_id);
+
+      if (moderationError) {
+        throw new Error(moderationError.message);
+      }
+    }
+
+    await get().refreshGroups(input.creatorId);
 
     return {
       groupId: createdGroup.group_id,

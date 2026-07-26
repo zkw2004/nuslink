@@ -16,6 +16,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
 import { GlassButton, GlassSurface } from "@components/shared";
+import { ModeratedMessageText, ModerationAlert } from "@components/moderation";
 import { ChatMeetupCard } from "@features/chat/ChatMeetupCard";
 import {
   ChatPollCard,
@@ -37,6 +38,11 @@ import {
   editGroupMessage,
 } from "@services/groupMessagesService";
 import { fetchMeetupSuggestions } from "@services/meetupSuggestionsService";
+import {
+  checkContent,
+  confirmFlaggedContent,
+  confirmModerationUnavailable,
+} from "@services/moderationService";
 import {
   useAuthStore,
   useChatFeaturesStore,
@@ -132,6 +138,7 @@ export default function GroupChatThreadScreen() {
     (state) => state.subscribeToFeatureChanges,
   );
   const [messageDraft, setMessageDraft] = useState("");
+  const [isModerationAlertVisible, setIsModerationAlertVisible] = useState(false);
   const [isAttachSheetOpen, setIsAttachSheetOpen] = useState(false);
   const [isPinnedDrawerOpen, setIsPinnedDrawerOpen] = useState(false);
   const [isPollComposerOpen, setIsPollComposerOpen] = useState(false);
@@ -229,8 +236,41 @@ export default function GroupChatThreadScreen() {
     }
 
     try {
+      const moderationResult = await checkContent({
+        subjectType: "group_chat_message",
+        content: trimmedDraft,
+        sourceTable: "group_messages",
+        sourceColumn: "body",
+      });
+
+      if (moderationResult.verdict === "blocked") {
+        setIsModerationAlertVisible(true);
+        return;
+      }
+
+      if (moderationResult.verdict === "flagged") {
+        const confirmed = await confirmFlaggedContent(
+          "This message will appear behind a warning. Do you still want to send it?",
+        );
+        if (!confirmed) {
+          return;
+        }
+      }
+
+      if (moderationResult.verdict === "error") {
+        const confirmed = await confirmModerationUnavailable();
+        if (!confirmed) {
+          return;
+        }
+      }
+
       setMessageDraft("");
-      await sendMessage(groupId, trimmedDraft, session.user.id);
+      await sendMessage(
+        groupId,
+        trimmedDraft,
+        session.user.id,
+        moderationResult.verdict,
+      );
     } catch (sendError) {
       setMessageDraft(trimmedDraft);
       Alert.alert(
@@ -721,16 +761,17 @@ export default function GroupChatThreadScreen() {
                         void handleUnvotePoll(poll.id);
                       }}
                     />
-                  ) : (
-                      <Text
-                      style={[
+                  ) : message.body ? (
+                    <ModeratedMessageText
+                      text={message.body}
+                      verdict={message.moderation_outcome}
+                      mine={isMine}
+                      textStyle={[
                         styles.bubbleText,
                         isMine ? styles.bubbleTextMine : styles.bubbleTextTheirs,
                       ]}
-                    >
-                      {message.body}
-                    </Text>
-                  )}
+                    />
+                  ) : null}
                   <View style={styles.bubbleMeta}>
                     <Text
                       style={[
@@ -866,6 +907,10 @@ export default function GroupChatThreadScreen() {
           }}
         />
       </SafeAreaView>
+      <ModerationAlert
+        visible={isModerationAlertVisible}
+        onClose={() => setIsModerationAlertVisible(false)}
+      />
     </View>
   );
 }

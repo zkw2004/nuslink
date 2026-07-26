@@ -56,6 +56,11 @@ function LiquidGlassTabBar({
     });
 
     if (!isRouteActive(key) && !event.defaultPrevented) {
+      if (key === "profile") {
+        navigation.navigate(route.name, { screen: "index" });
+        return;
+      }
+
       navigation.navigate(route.name, route.params);
     }
   }
@@ -200,7 +205,13 @@ export default function TabLayout() {
           href: null,
         }}
       />
-      <Tabs.Screen name="profile" options={{ title: "Profile" }} />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: "Profile",
+          popToTopOnBlur: true,
+        }}
+      />
     </Tabs>
   );
 }

@@ -6,6 +6,7 @@ import type {
 } from "@appTypes/index";
 import {
   buildRelationshipStatusMap,
+  cancelConnectionRequest as cancelConnectionRequestRpc,
   createConnectionRequest,
   fetchConnectionState,
   respondToConnectionRequest,
@@ -20,6 +21,7 @@ interface ConnectionsState {
   error: string | null;
   refreshConnections: (userId: string) => Promise<void>;
   sendConnectionRequest: (recipientId: string, userId: string) => Promise<void>;
+  cancelConnectionRequest: (recipientId: string, userId: string) => Promise<void>;
   handleConnectionRequest: (
     requestId: string,
     decision: "accepted" | "declined",
@@ -69,6 +71,11 @@ export const useConnectionsStore = create<ConnectionsState>((set, get) => ({
 
   async sendConnectionRequest(recipientId, userId) {
     await createConnectionRequest(recipientId);
+    await get().refreshConnections(userId);
+  },
+
+  async cancelConnectionRequest(recipientId, userId) {
+    await cancelConnectionRequestRpc(recipientId);
     await get().refreshConnections(userId);
   },
 

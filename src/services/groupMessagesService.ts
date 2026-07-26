@@ -3,6 +3,7 @@ import type {
   ConnectedProfilePreview,
   GroupChatMessage,
   GroupChatSummary,
+  ModerationOutcome,
   ReviewableGroupMember,
 } from "@appTypes/index";
 import type { Database } from "@appTypes/database";
@@ -89,6 +90,7 @@ function mapGroupMessage(
     created_at: message.created_at,
     deleted_at: message.deleted_at,
     edited_at: message.edited_at,
+    moderation_outcome: message.moderation_outcome,
     sender_profile: senderProfile,
   };
 }
@@ -289,6 +291,7 @@ export async function sendGroupMessage(
   groupId: string,
   body: string,
   senderId: string,
+  moderationOutcome: ModerationOutcome = "allowed",
 ) {
   if (!supabase) {
     throw new Error("Supabase is not configured.");
@@ -304,6 +307,7 @@ export async function sendGroupMessage(
     group_id: groupId,
     sender_id: senderId,
     body: trimmedBody,
+    moderation_outcome: moderationOutcome,
   });
 
   if (error) {

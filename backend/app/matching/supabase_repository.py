@@ -13,7 +13,8 @@ from app.matching.models import (
 from app.matching.repository import MatchRepository
 
 PROFILE_SELECT_FIELDS = (
-    "id,display_name,bio,avatar_url,faculty,major,"
+    "id,display_name,headline,headline_moderation_outcome,"
+    "bio,bio_moderation_outcome,avatar_url,faculty,major,"
     "year_of_study,hall_residence,study_mode,study_style,preferred_group_size,"
     "badge_tier,interests,cca_tags,skills,intents,onboarding_completed"
 )
@@ -316,7 +317,11 @@ def _map_profile(row: dict) -> ProfileSummary:
     return ProfileSummary(
         id=row["id"],
         display_name=row.get("display_name") or "",
+        headline=row.get("headline"),
+        headline_moderation_outcome=row.get("headline_moderation_outcome")
+        or "allowed",
         bio=row.get("bio") or "",
+        bio_moderation_outcome=row.get("bio_moderation_outcome") or "allowed",
         avatar_url=row.get("avatar_url"),
         faculty=row.get("faculty"),
         major=row.get("major"),
