@@ -1,7 +1,13 @@
 import { supabase } from "@lib/supabase";
 import { getCurrentSemester } from "@lib/nusmods";
 import type { Database } from "@appTypes/database";
-import type { StudyMode, StudyStyle, TimetableSlot, UserProfile } from "@appTypes/index";
+import type {
+  ModerationOutcome,
+  StudyMode,
+  StudyStyle,
+  TimetableSlot,
+  UserProfile,
+} from "@appTypes/index";
 import {
   normalizeInterestTag,
   normalizeProfileTags,
@@ -39,6 +45,8 @@ type EditableProfileInput = {
   intents: UserProfile["intents"];
   modules: SelectedModule[];
   timetableSlots: TimetableSlot[];
+  headlineModerationOutcome?: ModerationOutcome;
+  bioModerationOutcome?: ModerationOutcome;
 };
 
 function toBadgeTierLabel(tier: UserProfile["badge_tier"]): ProfileViewModel["badgeTierLabel"] {
@@ -229,7 +237,9 @@ export async function updateEditableProfile(
   const profileUpdates: Database["public"]["Tables"]["profiles"]["Update"] = {
     display_name: input.displayName.trim(),
     headline: input.headline.trim() || null,
+    headline_moderation_outcome: input.headlineModerationOutcome ?? "allowed",
     bio: input.bio.trim(),
+    bio_moderation_outcome: input.bioModerationOutcome ?? "allowed",
     faculty: input.faculty.trim(),
     major: input.major.trim(),
     year_of_study: input.yearOfStudy,

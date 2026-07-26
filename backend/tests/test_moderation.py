@@ -8,8 +8,8 @@ from app.main import app
 from app.moderation import service
 from app.moderation.schemas import ModerationItem
 from app.moderation.service import (
+    GeminiModerationProvider,
     ModerationProviderError,
-    OpenAIModerationProvider,
     ProviderModerationResult,
     aggregate_outcome,
     moderate_batch,
@@ -135,6 +135,27 @@ def test_moderate_content_blocks_unsafe_content():
     assert result.categories == ["harassment"]
     assert result.visible is False
     assert repository.events[0]["outcome"] == "blocked"
+
+
+def test_moderate_content_blocks_directed_chat_profanity_without_provider():
+    provider = FakeModerationProvider()
+    repository = FakeModerationRepository()
+
+    result = moderate_content(
+        actor_id="user-kaiwen",
+        item=moderation_item(
+            "U fucking idiot",
+            subject_type="direct_chat_message",
+        ),
+        provider=provider,
+        repository=repository,
+    )
+
+    assert result.outcome == "blocked"
+    assert result.categories == ["harassment"]
+    assert result.visible is False
+    assert provider.calls == []
+    assert repository.events[0]["provider"] == "rule_based"
 
 
 def test_moderate_content_flags_borderline_content():
@@ -351,9 +372,9 @@ def test_moderation_endpoint_requires_authentication():
     assert response.status_code == 401
 
 
-def test_openai_provider_sends_structured_responses_request(monkeypatch):
-    monkeypatch.setattr(settings, "openai_api_key", "test-key")
-    monkeypatch.setattr(settings, "openai_moderation_model", "test-model")
+def test_gemini_provider_sends_structured_generate_content_request(monkeypatch):
+    monkeypatch.setattr(settings, "gemini_api_key", "test-key")
+    monkeypatch.setattr(settings, "gemini_moderation_model", "test-model")
     captured_request: dict[str, object] = {}
 
     def fake_urlopen(api_request: object, timeout: int) -> FakeOpenAIResponse:
@@ -361,22 +382,22 @@ def test_openai_provider_sends_structured_responses_request(monkeypatch):
         captured_request["timeout"] = timeout
         return FakeOpenAIResponse(
             {
-                "output": [
+                "candidates": [
                     {
-                        "type": "message",
-                        "content": [
-                            {
-                                "type": "output_text",
-                                "text": json.dumps(
-                                    {
-                                        "outcome": "allowed",
-                                        "categories": [],
-                                        "confidence": 0.01,
-                                        "reason": None,
-                                    }
-                                ),
-                            }
-                        ],
+                        "content": {
+                            "parts": [
+                                {
+                                    "text": json.dumps(
+                                        {
+                                            "outcome": "allowed",
+                                            "categories": [],
+                                            "confidence": 0.01,
+                                            "reason": None,
+                                        }
+                                    )
+                                }
+                            ]
+                        }
                     }
                 ]
             }
@@ -384,7 +405,7 @@ def test_openai_provider_sends_structured_responses_request(monkeypatch):
 
     monkeypatch.setattr(service.request, "urlopen", fake_urlopen)
 
-    result = OpenAIModerationProvider().moderate(
+    result = GeminiModerationProvider().moderate(
         subject_type="group_description",
         content="Study dynamic programming together.",
     )
@@ -392,11 +413,16 @@ def test_openai_provider_sends_structured_responses_request(monkeypatch):
     assert isinstance(api_request, service.request.Request)
     request_body = json.loads(api_request.data.decode("utf-8"))
 
-    assert api_request.full_url == "https://api.openai.com/v1/responses"
-    assert api_request.get_header("Authorization") == "Bearer test-key"
+    assert (
+        api_request.full_url
+        == "https://generativelanguage.googleapis.com/v1beta/models/"
+        "test-model:generateContent"
+    )
+    assert api_request.get_header("X-goog-api-key") == "test-key"
     assert captured_request["timeout"] == 25
-    assert request_body["model"] == "test-model"
-    assert request_body["store"] is False
-    assert request_body["text"]["format"]["type"] == "json_schema"
-    assert request_body["text"]["format"]["strict"] is True
+    assert request_body["generation_config"]["response_mime_type"] == (
+        "application/json"
+    )
+    assert request_body["generation_config"]["response_schema"]["type"] == "object"
+    assert request_body["generation_config"]["temperature"] == 0
     assert result.outcome == "allowed"

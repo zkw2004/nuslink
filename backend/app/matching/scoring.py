@@ -638,7 +638,14 @@ def rank_candidates(
             {
                 "user_id": profile.id,
                 "display_name": profile.display_name,
+                "headline": profile.headline,
+                "headline_moderation_outcome": (
+                    profile.headline_moderation_outcome or "allowed"
+                ),
                 "bio": profile.bio,
+                "bio_moderation_outcome": (
+                    profile.bio_moderation_outcome or "allowed"
+                ),
                 "avatar_url": profile.avatar_url,
                 "faculty": profile.faculty,
                 "major": profile.major,

@@ -24,7 +24,14 @@ class MatchBreakdownResponse(BaseModel):
 class PeopleMatchResponseItem(BaseModel):
     user_id: str
     display_name: str
+    headline: str | None = None
+    headline_moderation_outcome: Literal[
+        "allowed", "flagged", "blocked", "error"
+    ] = "allowed"
     bio: str
+    bio_moderation_outcome: Literal[
+        "allowed", "flagged", "blocked", "error"
+    ] = "allowed"
     avatar_url: str | None
     faculty: str | None
     major: str | None

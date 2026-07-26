@@ -40,3 +40,6 @@ class ProfileSummary:
     study_mode: str | None = None
     study_style: str | None = None
     preferred_group_size: int | None = None
+    headline: str | None = None
+    headline_moderation_outcome: str | None = "allowed"
+    bio_moderation_outcome: str | None = "allowed"
