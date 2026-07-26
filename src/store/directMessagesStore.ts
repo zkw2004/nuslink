@@ -152,6 +152,16 @@ export const useDirectMessagesStore = create<DirectMessagesState>((set, get) => 
       }
 
       set((state) => ({
+        conversations: state.conversations.map((conversation) =>
+          conversation.id === conversationId
+            ? { ...conversation, unread_count: 0 }
+            : conversation,
+        ),
+        archivedConversations: state.archivedConversations.map((conversation) =>
+          conversation.id === conversationId
+            ? { ...conversation, unread_count: 0 }
+            : conversation,
+        ),
         messagesByConversation: {
           ...state.messagesByConversation,
           [conversationId]: messages,
@@ -256,7 +266,9 @@ export const useDirectMessagesStore = create<DirectMessagesState>((set, get) => 
   subscribeToConversation(conversationId, userId) {
     return subscribeToDirectMessages(conversationId, (message) => {
       get().appendMessage(message);
-      void get().refreshInbox(userId);
+      void get()
+        .loadConversationMessages(conversationId, userId)
+        .then(() => get().refreshInbox(userId));
     });
   },
 
