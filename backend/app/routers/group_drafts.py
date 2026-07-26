@@ -5,7 +5,7 @@ from app.group_drafting.schemas import GroupDraftRequest, GroupDraftResponse
 from app.group_drafting.service import (
     GroupDraftingError,
     GroupDraftProvider,
-    OpenAIGroupDraftProvider,
+    GeminiGroupDraftProvider,
     create_group_draft,
 )
 
@@ -13,7 +13,7 @@ router = APIRouter(prefix="/v1/groups", tags=["groups"])
 
 
 def get_group_draft_provider() -> GroupDraftProvider:
-    return OpenAIGroupDraftProvider()
+    return GeminiGroupDraftProvider()
 
 
 @router.post("/draft", response_model=GroupDraftResponse)
@@ -28,7 +28,7 @@ def draft_group(
         detail = str(exc)
         response_status = (
             status.HTTP_503_SERVICE_UNAVAILABLE
-            if detail == "AI group drafting is not configured."
+            if detail == "Gemini group drafting is not configured."
             else status.HTTP_502_BAD_GATEWAY
         )
         raise HTTPException(status_code=response_status, detail=detail) from exc

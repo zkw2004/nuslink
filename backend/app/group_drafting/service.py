@@ -19,30 +19,46 @@ class GroupDraftProvider(Protocol):
 GROUP_DRAFT_SCHEMA = {
     "type": "object",
     "properties": {
-        "name": {"type": ["string", "null"], "maxLength": 50},
+        "name": {"type": "string", "nullable": True, "maxLength": 50},
         "type": {
-            "type": ["string", "null"],
+            "type": "string",
+            "nullable": True,
             "enum": [
                 "study_group",
                 "hackathon_team",
                 "project_team",
                 "tutoring_session",
-                None,
             ],
         },
-        "module_code": {"type": ["string", "null"], "maxLength": 12},
+        "module_code": {"type": "string", "nullable": True, "maxLength": 12},
         "privacy": {
-            "type": ["string", "null"],
-            "enum": ["public", "semi_private", "private", None],
+            "type": "string",
+            "nullable": True,
+            "enum": ["public", "semi_private", "private"],
         },
         "restriction": {
-            "type": ["string", "null"],
-            "enum": ["same_module", "same_year", "same_faculty", None],
+            "type": "string",
+            "nullable": True,
+            "enum": ["same_module", "same_year", "same_faculty"],
         },
-        "description": {"type": ["string", "null"], "maxLength": 500},
-        "venue": {"type": ["string", "null"], "maxLength": 120},
-        "min_size": {"type": ["integer", "null"], "minimum": 1, "maximum": 99},
-        "max_size": {"type": ["integer", "null"], "minimum": 1, "maximum": 99},
+        "description": {
+            "type": "string",
+            "nullable": True,
+            "maxLength": 500,
+        },
+        "venue": {"type": "string", "nullable": True, "maxLength": 120},
+        "min_size": {
+            "type": "integer",
+            "nullable": True,
+            "minimum": 1,
+            "maximum": 99,
+        },
+        "max_size": {
+            "type": "integer",
+            "nullable": True,
+            "minimum": 1,
+            "maximum": 99,
+        },
     },
     "required": [
         "name",
@@ -55,7 +71,6 @@ GROUP_DRAFT_SCHEMA = {
         "min_size",
         "max_size",
     ],
-    "additionalProperties": False,
 }
 
 SYSTEM_PROMPT = """You extract an NUS student group draft from a short description.
@@ -66,35 +81,41 @@ Only set a restriction for semi_private privacy; semi_private must have a restri
 Do not invent dates, venues, modules, or group sizes."""
 
 
-class OpenAIGroupDraftProvider:
+class GeminiGroupDraftProvider:
     def generate(self, prompt: str) -> dict[str, object]:
-        if not settings.openai_api_key:
-            raise GroupDraftingError("AI group drafting is not configured.")
+        if not settings.gemini_api_key:
+            raise GroupDraftingError("Gemini group drafting is not configured.")
 
         body = json.dumps(
             {
-                "model": settings.openai_model,
-                "input": [
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": prompt},
-                ],
-                "text": {
-                    "format": {
-                        "type": "json_schema",
-                        "name": "nuslink_group_draft",
-                        "strict": True,
-                        "schema": GROUP_DRAFT_SCHEMA,
-                    }
+                "systemInstruction": {
+                    "parts": [
+                        {
+                            "text": (
+                                f"{SYSTEM_PROMPT}\n"
+                                "Return only JSON matching the response schema."
+                            )
+                        }
+                    ]
                 },
-                "store": False,
+                "contents": [
+                    {"role": "user", "parts": [{"text": prompt}]},
+                ],
+                "generationConfig": {
+                    "responseMimeType": "application/json",
+                    "responseSchema": GROUP_DRAFT_SCHEMA,
+                },
             }
         ).encode("utf-8")
         api_request = request.Request(
-            "https://api.openai.com/v1/responses",
+            (
+                "https://generativelanguage.googleapis.com/v1beta/models/"
+                f"{settings.gemini_group_drafting_model}:generateContent"
+            ),
             data=body,
             headers={
-                "Authorization": f"Bearer {settings.openai_api_key}",
                 "Content-Type": "application/json",
+                "x-goog-api-key": settings.gemini_api_key,
             },
             method="POST",
         )
@@ -103,21 +124,21 @@ class OpenAIGroupDraftProvider:
             with request.urlopen(api_request, timeout=25) as response:
                 payload = json.loads(response.read().decode("utf-8"))
         except error.HTTPError as exc:
-            raise GroupDraftingError("The AI provider rejected the request.") from exc
+            raise GroupDraftingError("Gemini rejected the group draft request.") from exc
         except (error.URLError, TimeoutError) as exc:
             raise GroupDraftingError(
-                "The AI provider is temporarily unavailable."
+                "Gemini is temporarily unavailable."
             ) from exc
         except json.JSONDecodeError as exc:
             raise GroupDraftingError(
-                "The AI provider returned an invalid response."
+                "Gemini returned an invalid group draft response."
             ) from exc
 
-        output_text = _find_output_text(payload)
+        output_text = _find_gemini_output_text(payload)
         try:
             parsed_output = json.loads(output_text)
         except json.JSONDecodeError as exc:
-            raise GroupDraftingError("The AI draft was not valid JSON.") from exc
+            raise GroupDraftingError("Gemini group draft was not valid JSON.") from exc
 
         if not isinstance(parsed_output, dict):
             raise GroupDraftingError("The AI draft had an unexpected shape.")
@@ -125,32 +146,33 @@ class OpenAIGroupDraftProvider:
         return parsed_output
 
 
-def _find_output_text(payload: object) -> str:
+def _find_gemini_output_text(payload: object) -> str:
     if not isinstance(payload, dict):
-        raise GroupDraftingError("The AI provider returned an invalid response.")
+        raise GroupDraftingError("Gemini returned an invalid group draft response.")
 
-    direct_output = payload.get("output_text")
-    if isinstance(direct_output, str) and direct_output:
-        return direct_output
+    candidates = payload.get("candidates")
+    if isinstance(candidates, list):
+        for candidate in candidates:
+            if not isinstance(candidate, dict):
+                continue
 
-    output = payload.get("output")
-    if isinstance(output, list):
-        for item in output:
-            if not isinstance(item, dict) or item.get("type") != "message":
+            if candidate.get("finishReason") in {"SAFETY", "RECITATION"}:
+                raise GroupDraftingError("Gemini declined this group draft request.")
+
+            content = candidate.get("content")
+            if not isinstance(content, dict):
                 continue
-            content = item.get("content")
-            if not isinstance(content, list):
+            parts = content.get("parts")
+            if not isinstance(parts, list):
                 continue
-            for part in content:
+            for part in parts:
                 if not isinstance(part, dict):
                     continue
-                if part.get("type") == "refusal":
-                    raise GroupDraftingError("The AI provider declined this request.")
                 text = part.get("text")
-                if part.get("type") == "output_text" and isinstance(text, str):
+                if isinstance(text, str) and text:
                     return text
 
-    raise GroupDraftingError("The AI provider returned no draft.")
+    raise GroupDraftingError("Gemini returned no group draft.")
 
 
 def create_group_draft(
