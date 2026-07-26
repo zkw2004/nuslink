@@ -97,8 +97,16 @@ class GeminiModerationProvider:
                     },
                     "maxItems": 4,
                 },
-                "confidence": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
-                "reason": {"type": ["string", "null"], "maxLength": 240},
+                "confidence": {
+                    "type": "number",
+                    "description": "Confidence from 0 to 1, or null if unavailable.",
+                    "nullable": True,
+                },
+                "reason": {
+                    "type": "string",
+                    "description": "Short reason, or null when no issue is found.",
+                    "nullable": True,
+                },
             },
             "required": ["outcome", "categories", "confidence", "reason"],
         }
@@ -154,8 +162,9 @@ class GeminiModerationProvider:
             with request.urlopen(api_request, timeout=25) as response:
                 payload = json.loads(response.read().decode("utf-8"))
         except error.HTTPError as exc:
+            error_detail = _read_http_error_detail(exc)
             raise ModerationProviderError(
-                "Gemini rejected the moderation request."
+                f"Gemini rejected the moderation request: {error_detail}"
             ) from exc
         except (error.URLError, TimeoutError) as exc:
             raise ModerationProviderError(
@@ -349,6 +358,18 @@ def _find_gemini_output_text(payload: dict[str, Any]) -> str:
                 return text
 
     raise ModerationProviderError("Gemini did not return moderation text.")
+
+
+def _read_http_error_detail(exc: error.HTTPError) -> str:
+    try:
+        body = exc.read().decode("utf-8")
+    except Exception:
+        body = ""
+
+    if not body:
+        return f"HTTP {exc.code}"
+
+    return body[:400]
 
 
 def _parse_provider_result(
