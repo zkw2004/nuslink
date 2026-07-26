@@ -12,6 +12,7 @@ from app.profile_extraction.service import (
     GeminiProfileExtractionProvider,
     ProfileExtractionError,
     _find_output_text,
+    _provider_http_error_message,
 )
 from app.routers.profile_extraction import (
     get_current_user as get_profile_extraction_current_user,
@@ -177,6 +178,22 @@ def test_find_output_text_rejects_provider_refusal():
         _find_output_text({"candidates": [{"finishReason": "SAFETY"}]})
 
 
+@pytest.mark.parametrize(
+    ("status_code", "expected_message"),
+    [
+        (400, "The AI provider could not process this resume. Try a PDF or image."),
+        (403, "AI profile extraction is not configured correctly."),
+        (429, "AI profile extraction is busy. Please try again shortly."),
+        (500, "The AI provider is temporarily unavailable."),
+    ],
+)
+def test_provider_http_errors_are_actionable(
+    status_code: int,
+    expected_message: str,
+):
+    assert _provider_http_error_message(status_code) == expected_message
+
+
 def test_gemini_provider_sends_private_structured_file_request(
     monkeypatch: pytest.MonkeyPatch,
 ):
@@ -224,7 +241,10 @@ def test_gemini_provider_sends_private_structured_file_request(
         "data": pdf_payload()["file_base64"],
     }
     assert request_body["generationConfig"]["responseMimeType"] == "application/json"
-    assert request_body["generationConfig"]["responseJsonSchema"]["type"] == "object"
+    response_schema = request_body["generationConfig"]["responseJsonSchema"]
+    assert response_schema["type"] == "object"
+    assert "maxLength" not in json.dumps(response_schema)
+    assert "minLength" not in json.dumps(response_schema)
     assert request_body["generationConfig"]["maxOutputTokens"] == 4000
     assert captured_request["timeout"] == 45
     assert result["skills"][0]["value"] == " Python "

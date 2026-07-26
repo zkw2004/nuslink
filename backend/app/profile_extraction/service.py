@@ -39,15 +39,15 @@ class ProfileExtractionProvider(Protocol):
 PROFILE_EXTRACTION_SCHEMA = {
     "type": "object",
     "properties": {
-        "suggested_bio": {"type": ["string", "null"], "maxLength": 200},
+        "suggested_bio": {"type": ["string", "null"]},
         "skills": {
             "type": "array",
             "maxItems": 30,
             "items": {
                 "type": "object",
                 "properties": {
-                    "value": {"type": "string", "minLength": 1, "maxLength": 100},
-                    "evidence": {"type": ["string", "null"], "maxLength": 240},
+                    "value": {"type": "string"},
+                    "evidence": {"type": ["string", "null"]},
                 },
                 "required": ["value", "evidence"],
                 "additionalProperties": False,
@@ -59,8 +59,8 @@ PROFILE_EXTRACTION_SCHEMA = {
             "items": {
                 "type": "object",
                 "properties": {
-                    "value": {"type": "string", "minLength": 1, "maxLength": 100},
-                    "evidence": {"type": ["string", "null"], "maxLength": 240},
+                    "value": {"type": "string"},
+                    "evidence": {"type": ["string", "null"]},
                 },
                 "required": ["value", "evidence"],
                 "additionalProperties": False,
@@ -72,8 +72,8 @@ PROFILE_EXTRACTION_SCHEMA = {
             "items": {
                 "type": "object",
                 "properties": {
-                    "value": {"type": "string", "minLength": 1, "maxLength": 100},
-                    "evidence": {"type": ["string", "null"], "maxLength": 240},
+                    "value": {"type": "string"},
+                    "evidence": {"type": ["string", "null"]},
                 },
                 "required": ["value", "evidence"],
                 "additionalProperties": False,
@@ -89,8 +89,8 @@ PROFILE_EXTRACTION_SCHEMA = {
                         "type": "string",
                         "enum": ["linkedin", "github", "portfolio", "other"],
                     },
-                    "url": {"type": "string", "minLength": 1, "maxLength": 500},
-                    "evidence": {"type": ["string", "null"], "maxLength": 240},
+                    "url": {"type": "string"},
+                    "evidence": {"type": ["string", "null"]},
                 },
                 "required": ["label", "url", "evidence"],
                 "additionalProperties": False,
@@ -106,17 +106,11 @@ PROFILE_EXTRACTION_SCHEMA = {
                         "type": "string",
                         "enum": ["work", "project", "competition"],
                     },
-                    "title": {"type": "string", "minLength": 1, "maxLength": 140},
-                    "organization": {
-                        "type": ["string", "null"],
-                        "maxLength": 140,
-                    },
-                    "date_label": {"type": ["string", "null"], "maxLength": 80},
-                    "description": {
-                        "type": ["string", "null"],
-                        "maxLength": 500,
-                    },
-                    "evidence": {"type": ["string", "null"], "maxLength": 240},
+                    "title": {"type": "string"},
+                    "organization": {"type": ["string", "null"]},
+                    "date_label": {"type": ["string", "null"]},
+                    "description": {"type": ["string", "null"]},
+                    "evidence": {"type": ["string", "null"]},
                 },
                 "required": [
                     "category",
@@ -132,7 +126,7 @@ PROFILE_EXTRACTION_SCHEMA = {
         "warnings": {
             "type": "array",
             "maxItems": 10,
-            "items": {"type": "string", "maxLength": 200},
+            "items": {"type": "string"},
         },
     },
     "required": [
@@ -216,9 +210,8 @@ class GeminiProfileExtractionProvider:
             with request.urlopen(api_request, timeout=45) as response:
                 payload = json.loads(response.read().decode("utf-8"))
         except error.HTTPError as exc:
-            raise ProfileExtractionError(
-                "The AI provider rejected the resume."
-            ) from exc
+            message = _provider_http_error_message(exc.code)
+            raise ProfileExtractionError(message) from exc
         except (error.URLError, TimeoutError) as exc:
             raise ProfileExtractionError(
                 "The AI provider is temporarily unavailable."
@@ -242,6 +235,16 @@ class GeminiProfileExtractionProvider:
             )
 
         return parsed_output
+
+
+def _provider_http_error_message(status_code: int) -> str:
+    if status_code in {401, 403}:
+        return "AI profile extraction is not configured correctly."
+    if status_code == 429:
+        return "AI profile extraction is busy. Please try again shortly."
+    if status_code == 400:
+        return "The AI provider could not process this resume. Try a PDF or image."
+    return "The AI provider is temporarily unavailable."
 
 
 def _find_output_text(payload: object) -> str:
