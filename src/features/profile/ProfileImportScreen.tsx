@@ -8,7 +8,6 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { File as ExpoFile } from "expo-file-system";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -50,6 +49,8 @@ type DocumentPickerModule = {
   }): Promise<DocumentPickerResult>;
 };
 
+type FileSystemModule = typeof import("expo-file-system");
+
 function inferMimeType(asset: DocumentPickerAsset): SupportedMimeType | null {
   if (
     asset.mimeType &&
@@ -77,13 +78,16 @@ export function ProfileImportScreen() {
 
   async function handleSelectResume() {
     let documentPicker: DocumentPickerModule;
+    let fileSystem: FileSystemModule;
     try {
-      documentPicker =
-        (await import("expo-document-picker")) as DocumentPickerModule;
+      [documentPicker, fileSystem] = await Promise.all([
+        import("expo-document-picker") as Promise<DocumentPickerModule>,
+        import("expo-file-system"),
+      ]);
     } catch {
       Alert.alert(
         "File picker unavailable",
-        "Install project dependencies again before importing a resume.",
+        "Update or rebuild the app before importing a resume.",
       );
       return;
     }
@@ -116,7 +120,7 @@ export function ProfileImportScreen() {
     setIsExtracting(true);
     setFilename(asset.name);
     try {
-      const file = new ExpoFile(asset.uri);
+      const file = new fileSystem.File(asset.uri);
       if (file.size > MAX_FILE_BYTES) {
         throw new Error("Resume files must be 10 MB or smaller.");
       }
