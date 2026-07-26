@@ -6,7 +6,6 @@ from app.group_drafting.service import (
     GeminiGroupDraftProvider,
     GroupDraftingError,
     GroupDraftProvider,
-    GeminiGroupDraftProvider,
     create_group_draft,
 )
 

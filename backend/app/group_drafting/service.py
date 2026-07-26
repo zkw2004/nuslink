@@ -124,7 +124,9 @@ class GeminiGroupDraftProvider:
             with request.urlopen(api_request, timeout=25) as response:
                 payload = json.loads(response.read().decode("utf-8"))
         except error.HTTPError as exc:
-            raise GroupDraftingError("Gemini rejected the group draft request.") from exc
+            raise GroupDraftingError(
+                "Gemini rejected the group draft request."
+            ) from exc
         except (error.URLError, TimeoutError) as exc:
             raise GroupDraftingError(
                 "Gemini is temporarily unavailable."
