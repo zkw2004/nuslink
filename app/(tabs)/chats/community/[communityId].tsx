@@ -44,9 +44,8 @@ import {
 } from "@services/communityMessagesService";
 import { fetchMeetupSuggestions } from "@services/meetupSuggestionsService";
 import {
-  checkContent,
-  confirmFlaggedContent,
-  confirmModerationUnavailable,
+  classifyFastChatModeration,
+  moderateMessageInBackground,
 } from "@services/moderationService";
 import {
   useAuthStore,
@@ -637,34 +636,10 @@ export default function CommunityChatThreadScreen() {
     setIsUploadingAttachment(true);
 
     try {
-      const moderationResult = await checkContent({
-        subjectType: "community_chat_message",
-        content: trimmedDraft,
-        sourceTable: "community_messages",
-        sourceColumn: "body",
-      });
-
-      if (moderationResult.verdict === "blocked") {
+      const fastModeration = classifyFastChatModeration(trimmedDraft);
+      if (fastModeration.outcome === "blocked") {
         setIsModerationAlertVisible(true);
         return;
-      }
-
-      if (moderationResult.verdict === "flagged") {
-        const confirmed = await confirmFlaggedContent(
-          "This message will appear behind a warning. Do you still want to send it?",
-        );
-        if (!confirmed) {
-          return;
-        }
-      }
-
-      if (moderationResult.verdict === "error") {
-        const confirmed = await confirmModerationUnavailable(
-          moderationResult.reason,
-        );
-        if (!confirmed) {
-          return;
-        }
       }
 
       const uploadedAttachment = pendingAttachment
@@ -678,15 +653,23 @@ export default function CommunityChatThreadScreen() {
           })
         : null;
 
-      await sendMessage(
+      const messageId = await sendMessage(
         communityId,
         trimmedDraft,
         session.user.id,
         uploadedAttachment,
-        moderationResult.verdict,
+        "pending",
       );
       setMessageDraft("");
       setPendingAttachment(null);
+      if (trimmedDraft) {
+        moderateMessageInBackground(
+          { kind: "community", messageId, content: trimmedDraft },
+          () => {
+            void loadCommunityMessages(communityId, session.user.id);
+          },
+        );
+      }
     } catch (sendError) {
       Alert.alert(
         "Could not send message",

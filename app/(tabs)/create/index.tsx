@@ -18,18 +18,13 @@ import {
   SectionCard,
   SectionHeader,
 } from "@components/shared";
-import { ModerationAlert } from "@components/moderation";
 import { getCurrentSemester, searchNusmodsModules } from "@lib/nusmods";
 import { useAuthStore, useCommunitiesStore, useGroupsStore } from "@store/index";
 import { toSelectedModule, type SelectedModule } from "@features/onboarding/types";
 import { AiGroupDraftPanel } from "@features/groups/AiGroupDraftPanel";
 import type { GroupDraft } from "@services/groupDraftingService";
 import {
-  checkContentBatch,
-  confirmFlaggedContent,
-  getAggregateModerationVerdict,
-  hasBlockedModeration,
-  hasFlaggedModeration,
+  moderateContainerInBackground,
 } from "@services/moderationService";
 import type { Database } from "@appTypes/database";
 
@@ -117,7 +112,11 @@ function normalizeTag(tag: string) {
 export default function CreateScreen() {
   const session = useAuthStore((state) => state.session);
   const createGroup = useGroupsStore((state) => state.createGroup);
+  const refreshGroups = useGroupsStore((state) => state.refreshGroups);
   const createCommunity = useCommunitiesStore((state) => state.createCommunity);
+  const refreshCommunities = useCommunitiesStore(
+    (state) => state.refreshCommunities,
+  );
   const [createMode, setCreateMode] = useState<CreateMode>("group");
   const [groupEntryMode, setGroupEntryMode] = useState<GroupEntryMode>("manual");
 
@@ -144,7 +143,6 @@ export default function CreateScreen() {
   const [communityPrivacy, setCommunityPrivacy] =
     useState<CommunityJoinPolicy>("open");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isModerationAlertVisible, setIsModerationAlertVisible] = useState(false);
   const currentSemester = useMemo(() => getCurrentSemester(), []);
 
   useEffect(() => {
@@ -332,37 +330,6 @@ export default function CreateScreen() {
     setIsSubmitting(true);
 
     try {
-      const moderationResults = await checkContentBatch([
-        {
-          key: "name",
-          subjectType: "group_name",
-          content: groupName,
-          sourceTable: "groups",
-          sourceColumn: "name",
-        },
-        {
-          key: "description",
-          subjectType: "group_description",
-          content: description,
-          sourceTable: "groups",
-          sourceColumn: "description",
-        },
-      ]);
-
-      if (hasBlockedModeration(moderationResults)) {
-        setIsModerationAlertVisible(true);
-        return;
-      }
-
-      if (hasFlaggedModeration(moderationResults)) {
-        const confirmed = await confirmFlaggedContent(
-          "This group may be hidden behind a warning. Do you still want to create it?",
-        );
-        if (!confirmed) {
-          return;
-        }
-      }
-
       const result = await createGroup({
         creatorId: session.user.id,
         module: {
@@ -381,8 +348,20 @@ export default function CreateScreen() {
         minSize: parsedMinSize,
         maxSize: parsedMaxSize,
         venue,
-        moderationOutcome: getAggregateModerationVerdict(moderationResults),
+        moderationOutcome: "pending",
       });
+
+      moderateContainerInBackground(
+        {
+          kind: "group",
+          id: result.groupId,
+          name: groupName,
+          description,
+        },
+        () => {
+          void refreshGroups(session.user.id);
+        },
+      );
 
       setGroupName("");
       setDescription("");
@@ -429,52 +408,27 @@ export default function CreateScreen() {
     setIsSubmitting(true);
 
     try {
-      const moderationResults = await checkContentBatch([
-        {
-          key: "name",
-          subjectType: "community_name",
-          content: communityName,
-          sourceTable: "communities",
-          sourceColumn: "name",
-        },
-        {
-          key: "description",
-          subjectType: "community_description",
-          content: communityDescription,
-          sourceTable: "communities",
-          sourceColumn: "description",
-        },
-        ...communityTags.map((tag, index) => ({
-          key: `tag-${index}`,
-          subjectType: "community_tag" as const,
-          content: tag,
-          sourceTable: "communities",
-          sourceColumn: "tags",
-        })),
-      ]);
-
-      if (hasBlockedModeration(moderationResults)) {
-        setIsModerationAlertVisible(true);
-        return;
-      }
-
-      if (hasFlaggedModeration(moderationResults)) {
-        const confirmed = await confirmFlaggedContent(
-          "This community may be hidden behind a warning. Do you still want to create it?",
-        );
-        if (!confirmed) {
-          return;
-        }
-      }
-
-      await createCommunity({
+      const communityId = await createCommunity({
         userId: session.user.id,
         name: communityName.trim(),
         description: communityDescription.trim(),
         tags: communityTags,
         privacy: communityPrivacy,
-        moderationOutcome: getAggregateModerationVerdict(moderationResults),
+        moderationOutcome: "pending",
       });
+
+      moderateContainerInBackground(
+        {
+          kind: "community",
+          id: communityId,
+          name: communityName,
+          description: communityDescription,
+          tags: communityTags,
+        },
+        () => {
+          void refreshCommunities(session.user.id);
+        },
+      );
 
       setCommunityName("");
       setCommunityDescription("");
@@ -900,10 +854,6 @@ export default function CreateScreen() {
           </>
         )}
       </ScrollView>
-      <ModerationAlert
-        visible={isModerationAlertVisible}
-        onClose={() => setIsModerationAlertVisible(false)}
-      />
     </SafeAreaView>
   );
 }

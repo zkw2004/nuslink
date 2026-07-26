@@ -44,9 +44,8 @@ import {
 } from "@services/directMessagesService";
 import { fetchMeetupSuggestions } from "@services/meetupSuggestionsService";
 import {
-  checkContent,
-  confirmFlaggedContent,
-  confirmModerationUnavailable,
+  classifyFastChatModeration,
+  moderateMessageInBackground,
 } from "@services/moderationService";
 import {
   useAuthStore,
@@ -617,34 +616,10 @@ export default function ConversationThreadScreen() {
     setIsUploadingAttachment(true);
 
     try {
-      const moderationResult = await checkContent({
-        subjectType: "direct_chat_message",
-        content: trimmedMessage,
-        sourceTable: "direct_messages",
-        sourceColumn: "body",
-      });
-
-      if (moderationResult.verdict === "blocked") {
+      const fastModeration = classifyFastChatModeration(trimmedMessage);
+      if (fastModeration.outcome === "blocked") {
         setIsModerationAlertVisible(true);
         return;
-      }
-
-      if (moderationResult.verdict === "flagged") {
-        const confirmed = await confirmFlaggedContent(
-          "This message will appear behind a warning. Do you still want to send it?",
-        );
-        if (!confirmed) {
-          return;
-        }
-      }
-
-      if (moderationResult.verdict === "error") {
-        const confirmed = await confirmModerationUnavailable(
-          moderationResult.reason,
-        );
-        if (!confirmed) {
-          return;
-        }
       }
 
       const uploadedAttachment = pendingAttachment
@@ -658,15 +633,23 @@ export default function ConversationThreadScreen() {
           })
         : null;
 
-      await sendMessage(
+      const messageId = await sendMessage(
         conversationId,
         trimmedMessage,
         session.user.id,
         uploadedAttachment,
-        moderationResult.verdict,
+        "pending",
       );
       setMessageDraft("");
       setPendingAttachment(null);
+      if (messageId && trimmedMessage) {
+        moderateMessageInBackground(
+          { kind: "direct", messageId, content: trimmedMessage },
+          () => {
+            void loadConversationMessages(conversationId, session.user.id);
+          },
+        );
+      }
     } catch (sendError) {
       Alert.alert(
         "Could not send message",

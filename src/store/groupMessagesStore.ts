@@ -45,7 +45,7 @@ interface GroupMessagesState {
     body: string,
     userId: string,
     moderationOutcome?: ModerationOutcome,
-  ) => Promise<void>;
+  ) => Promise<string>;
   subscribeToGroup: (groupId: string, userId: string) => () => void;
   reset: () => void;
 }
@@ -141,7 +141,12 @@ export const useGroupMessagesStore = create<GroupMessagesState>((set, get) => ({
     set({ isSending: true, error: null });
 
     try {
-      await sendGroupMessage(groupId, body, userId, moderationOutcome);
+      const messageId = await sendGroupMessage(
+        groupId,
+        body,
+        userId,
+        moderationOutcome,
+      );
       const [messages] = await Promise.all([
         fetchGroupMessages(groupId),
         get().refreshGroupChats(userId),
@@ -155,6 +160,7 @@ export const useGroupMessagesStore = create<GroupMessagesState>((set, get) => ({
         isSending: false,
         error: null,
       }));
+      return messageId;
     } catch (error) {
       set({
         isSending: false,

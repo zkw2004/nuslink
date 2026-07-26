@@ -39,9 +39,8 @@ import {
 } from "@services/groupMessagesService";
 import { fetchMeetupSuggestions } from "@services/meetupSuggestionsService";
 import {
-  checkContent,
-  confirmFlaggedContent,
-  confirmModerationUnavailable,
+  classifyFastChatModeration,
+  moderateMessageInBackground,
 } from "@services/moderationService";
 import {
   useAuthStore,
@@ -236,42 +235,24 @@ export default function GroupChatThreadScreen() {
     }
 
     try {
-      const moderationResult = await checkContent({
-        subjectType: "group_chat_message",
-        content: trimmedDraft,
-        sourceTable: "group_messages",
-        sourceColumn: "body",
-      });
-
-      if (moderationResult.verdict === "blocked") {
+      const fastModeration = classifyFastChatModeration(trimmedDraft);
+      if (fastModeration.outcome === "blocked") {
         setIsModerationAlertVisible(true);
         return;
       }
 
-      if (moderationResult.verdict === "flagged") {
-        const confirmed = await confirmFlaggedContent(
-          "This message will appear behind a warning. Do you still want to send it?",
-        );
-        if (!confirmed) {
-          return;
-        }
-      }
-
-      if (moderationResult.verdict === "error") {
-        const confirmed = await confirmModerationUnavailable(
-          moderationResult.reason,
-        );
-        if (!confirmed) {
-          return;
-        }
-      }
-
       setMessageDraft("");
-      await sendMessage(
+      const messageId = await sendMessage(
         groupId,
         trimmedDraft,
         session.user.id,
-        moderationResult.verdict,
+        "pending",
+      );
+      moderateMessageInBackground(
+        { kind: "group", messageId, content: trimmedDraft },
+        () => {
+          void loadGroupMessages(groupId, session.user.id);
+        },
       );
     } catch (sendError) {
       setMessageDraft(trimmedDraft);

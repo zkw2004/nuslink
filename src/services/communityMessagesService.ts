@@ -533,21 +533,27 @@ export async function sendCommunityMessage(
     throw new Error("Message cannot be empty.");
   }
 
-  const { error } = await supabase.from("community_messages").insert({
-    community_id: communityId,
-    sender_id: senderId,
-    body: trimmedBody,
-    attachment_url: attachment?.url ?? null,
-    attachment_name: attachment?.name ?? null,
-    attachment_mime_type: attachment?.mime_type ?? null,
-    attachment_size: attachment?.size ?? null,
-    attachment_kind: attachment?.kind ?? null,
-    moderation_outcome: moderationOutcome,
-  });
+  const { data, error } = await supabase
+    .from("community_messages")
+    .insert({
+      community_id: communityId,
+      sender_id: senderId,
+      body: trimmedBody,
+      attachment_url: attachment?.url ?? null,
+      attachment_name: attachment?.name ?? null,
+      attachment_mime_type: attachment?.mime_type ?? null,
+      attachment_size: attachment?.size ?? null,
+      attachment_kind: attachment?.kind ?? null,
+      moderation_outcome: moderationOutcome,
+    })
+    .select("id")
+    .single();
 
   if (error) {
     throw new Error(error.message);
   }
+
+  return data.id;
 }
 
 export async function uploadCommunityChatAttachment(

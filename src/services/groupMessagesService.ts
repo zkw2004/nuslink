@@ -303,16 +303,22 @@ export async function sendGroupMessage(
     throw new Error("Message cannot be empty.");
   }
 
-  const { error } = await supabase.from("group_messages").insert({
-    group_id: groupId,
-    sender_id: senderId,
-    body: trimmedBody,
-    moderation_outcome: moderationOutcome,
-  });
+  const { data, error } = await supabase
+    .from("group_messages")
+    .insert({
+      group_id: groupId,
+      sender_id: senderId,
+      body: trimmedBody,
+      moderation_outcome: moderationOutcome,
+    })
+    .select("id")
+    .single();
 
   if (error) {
     throw new Error(error.message);
   }
+
+  return data.id;
 }
 
 export async function markGroupChatRead(groupId: string, userId: string) {
