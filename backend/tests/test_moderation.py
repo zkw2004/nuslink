@@ -61,11 +61,11 @@ class FakeModerationRepository:
         self.events.append(kwargs)
 
 
-class FakeOpenAIResponse:
+class FakeGeminiResponse:
     def __init__(self, payload: dict[str, object]) -> None:
         self.payload = payload
 
-    def __enter__(self) -> "FakeOpenAIResponse":
+    def __enter__(self) -> "FakeGeminiResponse":
         return self
 
     def __exit__(self, *args: object) -> None:
@@ -377,10 +377,10 @@ def test_gemini_provider_sends_structured_generate_content_request(monkeypatch):
     monkeypatch.setattr(settings, "gemini_moderation_model", "test-model")
     captured_request: dict[str, object] = {}
 
-    def fake_urlopen(api_request: object, timeout: int) -> FakeOpenAIResponse:
+    def fake_urlopen(api_request: object, timeout: int) -> FakeGeminiResponse:
         captured_request["request"] = api_request
         captured_request["timeout"] = timeout
-        return FakeOpenAIResponse(
+        return FakeGeminiResponse(
             {
                 "candidates": [
                     {

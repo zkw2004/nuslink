@@ -3,9 +3,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from app.auth import AuthenticatedUser, get_current_user
 from app.group_drafting.schemas import GroupDraftRequest, GroupDraftResponse
 from app.group_drafting.service import (
+    GeminiGroupDraftProvider,
     GroupDraftingError,
     GroupDraftProvider,
-    OpenAIGroupDraftProvider,
     create_group_draft,
 )
 
@@ -13,7 +13,7 @@ router = APIRouter(prefix="/v1/groups", tags=["groups"])
 
 
 def get_group_draft_provider() -> GroupDraftProvider:
-    return OpenAIGroupDraftProvider()
+    return GeminiGroupDraftProvider()
 
 
 @router.post("/draft", response_model=GroupDraftResponse)

@@ -159,7 +159,7 @@ Classify employment and internships as work, portfolio work as project, and
 hackathons, case competitions, and contests as competition."""
 
 
-class OpenAIProfileExtractionProvider:
+class GeminiProfileExtractionProvider:
     def generate(
         self,
         *,
@@ -167,61 +167,47 @@ class OpenAIProfileExtractionProvider:
         mime_type: str,
         file_base64: str,
     ) -> dict[str, object]:
-        if not settings.openai_api_key:
+        if not settings.gemini_api_key:
             raise ProfileExtractionError("AI profile extraction is not configured.")
-
-        if mime_type.startswith("image/"):
-            file_part = {
-                "type": "input_image",
-                "image_url": f"data:{mime_type};base64,{file_base64}",
-                "detail": "high",
-            }
-        else:
-            file_part = {
-                "type": "input_file",
-                "filename": filename,
-                "file_data": f"data:{mime_type};base64,{file_base64}",
-            }
-            if mime_type == "application/pdf":
-                file_part["detail"] = "low"
 
         body = json.dumps(
             {
-                "model": settings.openai_profile_extraction_model,
-                "input": [
-                    {
-                        "role": "system",
-                        "content": [{"type": "input_text", "text": SYSTEM_PROMPT}],
-                    },
+                "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]},
+                "contents": [
                     {
                         "role": "user",
-                        "content": [
-                            file_part,
+                        "parts": [
                             {
-                                "type": "input_text",
-                                "text": "Extract the profile draft from this resume.",
+                                "inlineData": {
+                                    "mimeType": mime_type,
+                                    "data": file_base64,
+                                }
+                            },
+                            {
+                                "text": (
+                                    "Extract the profile draft from this resume "
+                                    f"named {filename}."
+                                )
                             },
                         ],
                     },
                 ],
-                "text": {
-                    "format": {
-                        "type": "json_schema",
-                        "name": "nuslink_profile_extraction",
-                        "strict": True,
-                        "schema": PROFILE_EXTRACTION_SCHEMA,
-                    }
+                "generationConfig": {
+                    "responseMimeType": "application/json",
+                    "responseJsonSchema": PROFILE_EXTRACTION_SCHEMA,
+                    "maxOutputTokens": 4000,
                 },
-                "store": False,
-                "max_output_tokens": 4000,
             }
         ).encode("utf-8")
         api_request = request.Request(
-            "https://api.openai.com/v1/responses",
+            (
+                "https://generativelanguage.googleapis.com/v1beta/models/"
+                f"{settings.gemini_profile_extraction_model}:generateContent"
+            ),
             data=body,
             headers={
-                "Authorization": f"Bearer {settings.openai_api_key}",
                 "Content-Type": "application/json",
+                "x-goog-api-key": settings.gemini_api_key,
             },
             method="POST",
         )
@@ -262,27 +248,24 @@ def _find_output_text(payload: object) -> str:
     if not isinstance(payload, dict):
         raise ProfileExtractionError("The AI provider returned an invalid response.")
 
-    direct_output = payload.get("output_text")
-    if isinstance(direct_output, str) and direct_output:
-        return direct_output
-
-    output = payload.get("output")
-    if isinstance(output, list):
-        for item in output:
-            if not isinstance(item, dict) or item.get("type") != "message":
+    candidates = payload.get("candidates")
+    if isinstance(candidates, list):
+        for candidate in candidates:
+            if not isinstance(candidate, dict):
                 continue
-            content = item.get("content")
-            if not isinstance(content, list):
+            if candidate.get("finishReason") in {"SAFETY", "RECITATION"}:
+                raise ProfileExtractionError("The AI provider declined this resume.")
+            content = candidate.get("content")
+            if not isinstance(content, dict):
                 continue
-            for part in content:
+            parts = content.get("parts")
+            if not isinstance(parts, list):
+                continue
+            for part in parts:
                 if not isinstance(part, dict):
                     continue
-                if part.get("type") == "refusal":
-                    raise ProfileExtractionError(
-                        "The AI provider declined this resume."
-                    )
                 text = part.get("text")
-                if part.get("type") == "output_text" and isinstance(text, str):
+                if isinstance(text, str) and text:
                     return text
 
     raise ProfileExtractionError("The AI provider returned no profile draft.")
@@ -302,9 +285,7 @@ def _validate_file(payload: ProfileExtractionRequest) -> str:
 
     valid_signature = {
         "application/pdf": file_bytes.startswith(b"%PDF"),
-        "application/msword": file_bytes.startswith(
-            bytes.fromhex("D0CF11E0A1B11AE1")
-        ),
+        "application/msword": file_bytes.startswith(bytes.fromhex("D0CF11E0A1B11AE1")),
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document": (
             file_bytes.startswith(b"PK")
         ),

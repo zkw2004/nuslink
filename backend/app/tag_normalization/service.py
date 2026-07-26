@@ -260,9 +260,9 @@ class SupabaseTagNormalizationMemoryStore:
             ) from exc
 
 
-class OpenAITagNormalizationProvider:
+class GeminiTagNormalizationProvider:
     def classify(self, *, tag_type: TagType, raw_tag: str) -> TagClassification:
-        if not settings.openai_api_key:
+        if not settings.gemini_api_key:
             raise TagNormalizationError("AI tag normalization is not configured.")
 
         allowed_tags = get_canonical_tags(tag_type)
@@ -282,37 +282,38 @@ class OpenAITagNormalizationProvider:
 
         body = json.dumps(
             {
-                "model": settings.openai_model,
-                "input": [
-                    {"role": "system", "content": SYSTEM_PROMPT},
+                "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]},
+                "contents": [
                     {
                         "role": "user",
-                        "content": json.dumps(
+                        "parts": [
                             {
-                                "tag_type": tag_type,
-                                "raw_tag": raw_tag,
-                                "allowed_canonical_tags": list(allowed_tags),
+                                "text": json.dumps(
+                                    {
+                                        "tag_type": tag_type,
+                                        "raw_tag": raw_tag,
+                                        "allowed_canonical_tags": list(allowed_tags),
+                                    }
+                                )
                             }
-                        ),
+                        ],
                     },
                 ],
-                "text": {
-                    "format": {
-                        "type": "json_schema",
-                        "name": "nuslink_tag_normalization",
-                        "strict": True,
-                        "schema": schema,
-                    }
+                "generationConfig": {
+                    "responseMimeType": "application/json",
+                    "responseJsonSchema": schema,
                 },
-                "store": False,
             }
         ).encode("utf-8")
         api_request = request.Request(
-            "https://api.openai.com/v1/responses",
+            (
+                "https://generativelanguage.googleapis.com/v1beta/models/"
+                f"{settings.gemini_model}:generateContent"
+            ),
             data=body,
             headers={
-                "Authorization": f"Bearer {settings.openai_api_key}",
                 "Content-Type": "application/json",
+                "x-goog-api-key": settings.gemini_api_key,
             },
             method="POST",
         )
@@ -561,27 +562,26 @@ def _find_output_text(payload: object) -> str:
             "The AI provider returned an invalid normalization response."
         )
 
-    direct_output = payload.get("output_text")
-    if isinstance(direct_output, str) and direct_output:
-        return direct_output
-
-    output = payload.get("output")
-    if isinstance(output, list):
-        for item in output:
-            if not isinstance(item, dict) or item.get("type") != "message":
+    candidates = payload.get("candidates")
+    if isinstance(candidates, list):
+        for candidate in candidates:
+            if not isinstance(candidate, dict):
                 continue
-            content = item.get("content")
-            if not isinstance(content, list):
+            if candidate.get("finishReason") in {"SAFETY", "RECITATION"}:
+                raise TagNormalizationError(
+                    "The AI provider declined the normalization request."
+                )
+            content = candidate.get("content")
+            if not isinstance(content, dict):
                 continue
-            for part in content:
+            parts = content.get("parts")
+            if not isinstance(parts, list):
+                continue
+            for part in parts:
                 if not isinstance(part, dict):
                     continue
-                if part.get("type") == "refusal":
-                    raise TagNormalizationError(
-                        "The AI provider declined the normalization request."
-                    )
                 text = part.get("text")
-                if part.get("type") == "output_text" and isinstance(text, str):
+                if isinstance(text, str) and text:
                     return text
 
     raise TagNormalizationError("The AI provider returned no normalization output.")
