@@ -8,8 +8,8 @@ from app.moderation.schemas import (
     ModerationCheckResponse,
 )
 from app.moderation.service import (
+    GeminiModerationProvider,
     ModerationProvider,
-    OpenAIModerationProvider,
     moderate_batch,
     moderate_content,
 )
@@ -19,7 +19,7 @@ router = APIRouter(prefix="/v1/moderation", tags=["moderation"])
 
 
 def get_moderation_provider() -> ModerationProvider:
-    return OpenAIModerationProvider()
+    return GeminiModerationProvider()
 
 
 def get_moderation_repository() -> SupabaseModerationRepository:

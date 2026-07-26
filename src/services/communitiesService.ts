@@ -1,4 +1,6 @@
 import { api } from "@lib/api";
+import { supabase } from "@lib/supabase";
+import type { ModerationOutcome } from "@appTypes/index";
 
 type CreateCommunityPayload = {
   name: string;
@@ -18,4 +20,22 @@ type CreateCommunityResponse = {
 
 export async function createCommunity(payload: CreateCommunityPayload) {
   return api.post<CreateCommunityResponse>("/v1/communities", payload);
+}
+
+export async function updateCommunityModerationOutcome(
+  communityId: string,
+  moderationOutcome: ModerationOutcome,
+) {
+  if (!supabase) {
+    throw new Error("Supabase is not configured.");
+  }
+
+  const { error } = await supabase
+    .from("communities")
+    .update({ moderation_outcome: moderationOutcome })
+    .eq("id", communityId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
 }

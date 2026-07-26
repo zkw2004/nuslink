@@ -10,6 +10,8 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 
 import { GlassButton, GlassSurface } from "@components/shared";
+import { PeopleCardBio } from "@components/moderation";
+import type { ModerationOutcome } from "@appTypes/index";
 
 export interface MatchSignal {
   icon: string;
@@ -27,6 +29,7 @@ export interface ProfileCardData {
   matchPct: number;
   intentText: string;
   bio: string;
+  bioModerationOutcome?: ModerationOutcome;
   modules: string[];
   skills: string[];
   metaSignals: MatchSignal[];
@@ -94,9 +97,7 @@ function InnerProfileCard({
         <Text style={styles.intentText}>{data.intentText}</Text>
       </View>
 
-      <Text style={styles.bio} numberOfLines={2}>
-        {data.bio}
-      </Text>
+      <PeopleCardBio bio={data.bio} verdict={data.bioModerationOutcome} />
 
       <View style={styles.chipRow}>
         {visibleChips.map((chip, index) => (
@@ -196,6 +197,7 @@ export const SAMPLE_PROFILE: ProfileCardData = {
   matchPct: 82,
   intentText: "Looking for a hackathon teammate",
   bio: "Enjoys sprint-style building and clean UI. Happy to iterate fast before deadlines.",
+  bioModerationOutcome: "allowed",
   modules: ["CS2040S", "CS2100"],
   skills: ["React Native", "Python"],
   metaSignals: [

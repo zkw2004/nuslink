@@ -5,6 +5,7 @@ import type {
   DirectConversationSummary,
   DirectMessageAttachmentInput,
   DirectMessage,
+  ModerationOutcome,
 } from "@appTypes/index";
 import type { Database } from "@appTypes/database";
 
@@ -103,6 +104,7 @@ function mapDirectMessage(message: DirectMessageRow): DirectMessage {
     created_at: message.created_at,
     deleted_at: message.deleted_at,
     edited_at: message.edited_at,
+    moderation_outcome: message.moderation_outcome,
   };
 }
 
@@ -691,6 +693,7 @@ export async function sendDirectMessage(
   conversationId: string,
   body: string,
   attachment?: DirectMessageAttachmentInput | null,
+  moderationOutcome: ModerationOutcome = "allowed",
 ) {
   if (!supabase) {
     throw new Error("Supabase is not configured.");
@@ -708,6 +711,18 @@ export async function sendDirectMessage(
 
   if (error) {
     throw new Error(error.message);
+  }
+
+  const messageId = typeof data === "string" ? data : null;
+  if (messageId) {
+    const { error: updateError } = await supabase
+      .from("direct_messages")
+      .update({ moderation_outcome: moderationOutcome })
+      .eq("id", messageId);
+
+    if (updateError) {
+      throw new Error(updateError.message);
+    }
   }
 
   return data;

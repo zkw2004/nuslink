@@ -1,6 +1,6 @@
 import { StyleSheet, Text, type StyleProp, type TextStyle } from "react-native";
 
-import type { ModerationVerdict } from "@appTypes/index";
+import type { ModerationOutcome } from "@appTypes/index";
 
 import { COPY } from "./moderationTheme";
 import { FlaggedVeil } from "./FlaggedVeil";
@@ -8,7 +8,7 @@ import { RemovedTombstone } from "./RemovedTombstone";
 
 type ModeratedMessageTextProps = {
   text: string;
-  verdict?: ModerationVerdict | null;
+  verdict?: ModerationOutcome | null;
   mine?: boolean;
   textStyle?: StyleProp<TextStyle>;
 };

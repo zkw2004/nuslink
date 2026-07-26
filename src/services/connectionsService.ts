@@ -151,6 +151,20 @@ export async function createConnectionRequest(recipientId: string) {
   }
 }
 
+export async function cancelConnectionRequest(recipientId: string) {
+  if (!supabase) {
+    throw new Error("Supabase is not configured.");
+  }
+
+  const { error } = await supabase.rpc("cancel_connection_request", {
+    recipient_id_input: recipientId,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
 export async function respondToConnectionRequest(
   requestId: string,
   decision: "accepted" | "declined",

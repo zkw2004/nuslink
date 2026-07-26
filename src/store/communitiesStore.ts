@@ -2,7 +2,11 @@ import { create } from "zustand";
 
 import { supabase } from "@lib/supabase";
 import type { Database } from "@appTypes/database";
-import { createCommunity as createCommunityRequest } from "@services/communitiesService";
+import type { ModerationOutcome } from "@appTypes/index";
+import {
+  createCommunity as createCommunityRequest,
+  updateCommunityModerationOutcome,
+} from "@services/communitiesService";
 
 type CommunityRow = Database["public"]["Tables"]["communities"]["Row"];
 
@@ -23,6 +27,7 @@ type CreateCommunityInput = {
   description: string;
   tags: string[];
   privacy: "open" | "request_approval";
+  moderationOutcome?: ModerationOutcome;
 };
 
 interface CommunitiesState {
@@ -134,6 +139,13 @@ export const useCommunitiesStore = create<CommunitiesState>((set, get) => ({
       tags: input.tags,
       privacy: input.privacy,
     });
+
+    if (input.moderationOutcome) {
+      await updateCommunityModerationOutcome(
+        createdCommunity.id,
+        input.moderationOutcome,
+      );
+    }
 
     await get().refreshCommunities(input.userId);
     return createdCommunity.id;

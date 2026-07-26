@@ -1,6 +1,10 @@
 import { create } from "zustand";
 
-import type { GroupChatMessage, GroupChatSummary } from "@appTypes/index";
+import type {
+  GroupChatMessage,
+  GroupChatSummary,
+  ModerationOutcome,
+} from "@appTypes/index";
 import {
   archiveGroupChats as archiveGroupChatsService,
   deleteGroupChats as deleteGroupChatsService,
@@ -36,7 +40,12 @@ interface GroupMessagesState {
     muted: boolean,
   ) => Promise<void>;
   restoreGroupChat: (groupId: string, userId: string) => Promise<void>;
-  sendMessage: (groupId: string, body: string, userId: string) => Promise<void>;
+  sendMessage: (
+    groupId: string,
+    body: string,
+    userId: string,
+    moderationOutcome?: ModerationOutcome,
+  ) => Promise<void>;
   subscribeToGroup: (groupId: string, userId: string) => () => void;
   reset: () => void;
 }
@@ -128,11 +137,11 @@ export const useGroupMessagesStore = create<GroupMessagesState>((set, get) => ({
     }
   },
 
-  async sendMessage(groupId, body, userId) {
+  async sendMessage(groupId, body, userId, moderationOutcome) {
     set({ isSending: true, error: null });
 
     try {
-      await sendGroupMessage(groupId, body, userId);
+      await sendGroupMessage(groupId, body, userId, moderationOutcome);
       const [messages] = await Promise.all([
         fetchGroupMessages(groupId),
         get().refreshGroupChats(userId),

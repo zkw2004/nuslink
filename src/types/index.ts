@@ -112,7 +112,7 @@ export interface ModerationResult {
   subject_id: string | null;
   source_table: string | null;
   source_column: string | null;
-  verdict: ModerationVerdict;
+  verdict: ModerationOutcome;
   categories: string[];
   confidence: number | null;
   reason: string | null;
@@ -393,6 +393,7 @@ export interface DirectMessage {
   created_at: string;
   deleted_at: string | null;
   edited_at: string | null;
+  moderation_outcome: ModerationOutcome;
 }
 
 export interface DirectMessageAttachmentInput {
@@ -506,6 +507,7 @@ export interface CommunityChatMessage {
   created_at: string;
   deleted_at: string | null;
   edited_at: string | null;
+  moderation_outcome: ModerationOutcome;
   sender_profile: ConnectedProfilePreview;
 }
 
@@ -538,6 +540,7 @@ export interface GroupChatMessage {
   created_at: string;
   deleted_at: string | null;
   edited_at: string | null;
+  moderation_outcome: ModerationOutcome;
   sender_profile: ConnectedProfilePreview;
 }
 
