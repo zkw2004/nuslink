@@ -6,7 +6,7 @@ from app.tag_normalization.schemas import (
     TagNormalizationResponse,
 )
 from app.tag_normalization.service import (
-    OpenAITagNormalizationProvider,
+    GeminiTagNormalizationProvider,
     SupabaseTagNormalizationMemoryStore,
     TagNormalizationError,
     TagNormalizationMemoryStore,
@@ -18,7 +18,7 @@ router = APIRouter(prefix="/v1/tags", tags=["tags"])
 
 
 def get_tag_normalization_provider() -> TagNormalizationProvider:
-    return OpenAITagNormalizationProvider()
+    return GeminiTagNormalizationProvider()
 
 
 def get_tag_normalization_memory_store() -> TagNormalizationMemoryStore:

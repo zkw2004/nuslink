@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from app.auth import AuthenticatedUser, get_current_user
 from app.group_drafting.schemas import GroupDraftRequest, GroupDraftResponse
 from app.group_drafting.service import (
+    GeminiGroupDraftProvider,
     GroupDraftingError,
     GroupDraftProvider,
     GeminiGroupDraftProvider,

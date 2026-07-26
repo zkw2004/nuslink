@@ -233,10 +233,7 @@ export default function PeopleProfileScreen() {
     );
   }
 
-  const headline =
-    candidate.headline?.trim() ||
-    candidate.bio.trim() ||
-    "No headline added yet.";
+  const headline = candidate.headline?.trim() ?? "";
   const about = candidate.bio.trim() || "No bio added yet.";
   const canConnect = relationshipStatus === "none";
   const canMessage = relationshipStatus === "connected";
@@ -280,13 +277,15 @@ export default function PeopleProfileScreen() {
             </View>
           </View>
 
-          <ModeratedProfileText
-            verdict={candidate.headline_moderation_outcome}
-            what="Headline"
-            textStyle={styles.headline}
-          >
-            {headline}
-          </ModeratedProfileText>
+          {headline ? (
+            <ModeratedProfileText
+              verdict={candidate.headline_moderation_outcome}
+              what="Headline"
+              textStyle={styles.headline}
+            >
+              {headline}
+            </ModeratedProfileText>
+          ) : null}
 
           <View style={styles.actions}>
             <GlassButton

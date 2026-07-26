@@ -67,9 +67,7 @@ def test_draft_group_returns_normalized_reviewable_fields():
     try:
         response = client.post(
             "/v1/groups/draft",
-            json={
-                "prompt": "  CS2040S midterm group, 3 to 5 people at COM3.  "
-            },
+            json={"prompt": "  CS2040S midterm group, 3 to 5 people at COM3.  "},
         )
     finally:
         app.dependency_overrides.pop(get_group_drafts_current_user, None)

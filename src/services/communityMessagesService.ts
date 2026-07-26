@@ -38,6 +38,38 @@ function mapProfileToPreview(profile: ProfileRow): ConnectedProfilePreview {
   };
 }
 
+function getMessagePreview(message: CommunityMessageRow) {
+  if (message.moderation_outcome === "blocked") {
+    return "Message removed";
+  }
+
+  if (message.moderation_outcome === "flagged") {
+    return "Message hidden for review";
+  }
+
+  if (message.body?.trim()) {
+    return message.body;
+  }
+
+  if (message.attachment_kind === "image") {
+    return "Photo attachment";
+  }
+
+  if (message.attachment_kind === "video") {
+    return "Video attachment";
+  }
+
+  if (message.attachment_kind === "audio") {
+    return "Audio attachment";
+  }
+
+  if (message.attachment_url) {
+    return `File: ${message.attachment_name ?? "Attachment"}`;
+  }
+
+  return null;
+}
+
 async function fetchProfilesByIds(userIds: string[]) {
   if (!supabase) {
     throw new Error("Supabase is not configured.");
@@ -228,17 +260,7 @@ export async function fetchJoinedCommunityChats(
         tags: community.tags ?? [],
         creator_id: community.creator_id,
         created_at: community.created_at,
-        last_message_preview:
-          lastMessage?.body ??
-          (lastMessage?.attachment_kind === "image"
-            ? "Photo attachment"
-            : lastMessage?.attachment_kind === "video"
-              ? "Video attachment"
-              : lastMessage?.attachment_kind === "audio"
-                ? "Audio attachment"
-                : lastMessage?.attachment_url
-                  ? `File: ${lastMessage.attachment_name ?? "Attachment"}`
-                  : null),
+        last_message_preview: lastMessage ? getMessagePreview(lastMessage) : null,
         last_message_at: lastMessage?.created_at ?? null,
         unread_count: unreadCountByCommunity.get(community.id) ?? 0,
         archived_at: membershipByCommunity.get(community.id)?.archived_at ?? null,

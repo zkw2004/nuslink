@@ -15,7 +15,7 @@ from app.routers.tags import (
 from app.tag_normalization import service
 from app.tag_normalization.schemas import TagClassification
 from app.tag_normalization.service import (
-    OpenAITagNormalizationProvider,
+    GeminiTagNormalizationProvider,
     TagNormalizationError,
     normalize_interest_tags_for_matching,
     normalize_tags,
@@ -73,11 +73,11 @@ class FakeTagNormalizationMemoryStore:
         }
 
 
-class FakeOpenAIResponse:
+class FakeGeminiResponse:
     def __init__(self, payload: dict[str, object]) -> None:
         self.payload = payload
 
-    def __enter__(self) -> "FakeOpenAIResponse":
+    def __enter__(self) -> "FakeGeminiResponse":
         return self
 
     def __exit__(self, *args: object) -> None:
@@ -251,9 +251,7 @@ def test_normalize_tags_endpoint_returns_structured_results():
     memory_store = FakeTagNormalizationMemoryStore()
     app.dependency_overrides[get_tags_current_user] = override_current_user
     app.dependency_overrides[get_tag_normalization_provider] = lambda: provider
-    app.dependency_overrides[get_tag_normalization_memory_store] = (
-        lambda: memory_store
-    )
+    app.dependency_overrides[get_tag_normalization_memory_store] = lambda: memory_store
 
     try:
         response = client.post(
@@ -279,30 +277,30 @@ def test_normalize_tags_endpoint_returns_structured_results():
     }
 
 
-def test_openai_provider_sends_supported_canonical_schema(monkeypatch):
-    monkeypatch.setattr(settings, "openai_api_key", "test-key")
-    monkeypatch.setattr(settings, "openai_model", "test-model")
+def test_gemini_provider_sends_supported_canonical_schema(monkeypatch):
+    monkeypatch.setattr(settings, "gemini_api_key", "test-key")
+    monkeypatch.setattr(settings, "gemini_model", "test-model")
     captured_request: dict[str, object] = {}
 
-    def fake_urlopen(api_request: object, timeout: int) -> FakeOpenAIResponse:
+    def fake_urlopen(api_request: object, timeout: int) -> FakeGeminiResponse:
         captured_request["request"] = api_request
         captured_request["timeout"] = timeout
-        return FakeOpenAIResponse(
+        return FakeGeminiResponse(
             {
-                "output": [
+                "candidates": [
                     {
-                        "type": "message",
-                        "content": [
-                            {
-                                "type": "output_text",
-                                "text": json.dumps(
-                                    {
-                                        "canonical_tags": ["Case Competitions"],
-                                        "no_match": False,
-                                    }
-                                ),
-                            }
-                        ],
+                        "content": {
+                            "parts": [
+                                {
+                                    "text": json.dumps(
+                                        {
+                                            "canonical_tags": ["Case Competitions"],
+                                            "no_match": False,
+                                        }
+                                    ),
+                                }
+                            ],
+                        },
                     }
                 ]
             }
@@ -310,7 +308,7 @@ def test_openai_provider_sends_supported_canonical_schema(monkeypatch):
 
     monkeypatch.setattr(service.request, "urlopen", fake_urlopen)
 
-    result = OpenAITagNormalizationProvider().classify(
+    result = GeminiTagNormalizationProvider().classify(
         tag_type="cca",
         raw_tag="biz case comps",
     )
@@ -318,13 +316,16 @@ def test_openai_provider_sends_supported_canonical_schema(monkeypatch):
     assert isinstance(api_request, service.request.Request)
     request_body = json.loads(api_request.data.decode("utf-8"))
 
-    assert api_request.full_url == "https://api.openai.com/v1/responses"
-    assert api_request.get_header("Authorization") == "Bearer test-key"
+    assert api_request.full_url == (
+        "https://generativelanguage.googleapis.com/v1beta/models/"
+        "test-model:generateContent"
+    )
+    assert api_request.get_header("X-goog-api-key") == "test-key"
     assert captured_request["timeout"] == 25
-    assert request_body["model"] == "test-model"
-    assert request_body["store"] is False
-    assert request_body["text"]["format"]["type"] == "json_schema"
-    assert "Case Competitions" in json.dumps(request_body["text"]["format"]["schema"])
+    assert request_body["generationConfig"]["responseMimeType"] == "application/json"
+    assert "Case Competitions" in json.dumps(
+        request_body["generationConfig"]["responseJsonSchema"]
+    )
     assert result == TagClassification(
         canonical_tags=["Case Competitions"],
         no_match=False,

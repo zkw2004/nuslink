@@ -105,10 +105,7 @@ export function ProfileReadOnlyScreen({
   reviewSummary,
   unreadCount,
 }: Props) {
-  const headline =
-    profile.headline?.trim() ||
-    profile.bio?.trim() ||
-    "Add a short headline in Settings to introduce yourself.";
+  const headline = profile.headline?.trim() ?? "";
   const about =
     profile.bio?.trim() ||
     "Add a little more about yourself in Settings so your profile feels complete.";
@@ -178,7 +175,7 @@ export function ProfileReadOnlyScreen({
                 />
               </View>
             </View>
-            <Text style={styles.headline}>{headline}</Text>
+            {headline ? <Text style={styles.headline}>{headline}</Text> : null}
           </View>
 
           <Section title="HERE FOR">

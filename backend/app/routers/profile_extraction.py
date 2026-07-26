@@ -6,8 +6,8 @@ from app.profile_extraction.schemas import (
     ProfileExtractionResponse,
 )
 from app.profile_extraction.service import (
+    GeminiProfileExtractionProvider,
     InvalidProfileFileError,
-    OpenAIProfileExtractionProvider,
     ProfileExtractionError,
     ProfileExtractionProvider,
     create_profile_extraction,
@@ -17,7 +17,7 @@ router = APIRouter(prefix="/v1/profiles", tags=["profiles"])
 
 
 def get_profile_extraction_provider() -> ProfileExtractionProvider:
-    return OpenAIProfileExtractionProvider()
+    return GeminiProfileExtractionProvider()
 
 
 @router.post("/extract", response_model=ProfileExtractionResponse)
