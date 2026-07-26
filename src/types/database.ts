@@ -6,12 +6,14 @@ export type Database = {
           avatar_url: string | null;
           badge_tier: "bronze" | "silver" | "gold" | null;
           bio: string;
+          bio_moderation_outcome: "allowed" | "flagged" | "blocked" | "error";
           created_at: string;
           display_name: string;
           faculty: string | null;
           graduation_date: string | null;
           hall_residence: string | null;
           headline: string | null;
+          headline_moderation_outcome: "allowed" | "flagged" | "blocked" | "error";
           id: string;
           intents: ("study_group" | "hackathon" | "tutoring" | "internship_networking")[];
           interests: string[];
@@ -31,12 +33,14 @@ export type Database = {
           avatar_url?: string | null;
           badge_tier?: "bronze" | "silver" | "gold" | null;
           bio?: string;
+          bio_moderation_outcome?: "allowed" | "flagged" | "blocked" | "error";
           created_at?: string;
           display_name?: string;
           faculty?: string | null;
           graduation_date?: string | null;
           hall_residence?: string | null;
           headline?: string | null;
+          headline_moderation_outcome?: "allowed" | "flagged" | "blocked" | "error";
           id: string;
           intents?: ("study_group" | "hackathon" | "tutoring" | "internship_networking")[];
           interests?: string[];
@@ -56,12 +60,14 @@ export type Database = {
           avatar_url?: string | null;
           badge_tier?: "bronze" | "silver" | "gold" | null;
           bio?: string;
+          bio_moderation_outcome?: "allowed" | "flagged" | "blocked" | "error";
           created_at?: string;
           display_name?: string;
           faculty?: string | null;
           graduation_date?: string | null;
           hall_residence?: string | null;
           headline?: string | null;
+          headline_moderation_outcome?: "allowed" | "flagged" | "blocked" | "error";
           id?: string;
           intents?: ("study_group" | "hackathon" | "tutoring" | "internship_networking")[];
           interests?: string[];
@@ -341,6 +347,7 @@ export type Database = {
           deleted_at: string | null;
           edited_at: string | null;
           id: string;
+          moderation_outcome: "allowed" | "flagged" | "blocked" | "error";
           sender_id: string;
         };
         Insert: {
@@ -355,6 +362,7 @@ export type Database = {
           deleted_at?: string | null;
           edited_at?: string | null;
           id?: string;
+          moderation_outcome?: "allowed" | "flagged" | "blocked" | "error";
           sender_id: string;
         };
         Update: {
@@ -369,6 +377,7 @@ export type Database = {
           deleted_at?: string | null;
           edited_at?: string | null;
           id?: string;
+          moderation_outcome?: "allowed" | "flagged" | "blocked" | "error";
           sender_id?: string;
         };
         Relationships: [];
@@ -610,6 +619,7 @@ export type Database = {
           is_active: boolean;
           max_size: number | null;
           min_size: number | null;
+          moderation_outcome: "allowed" | "flagged" | "blocked" | "error";
           module_code: string | null;
           name: string;
           privacy: "public" | "semi_private" | "private";
@@ -631,6 +641,7 @@ export type Database = {
           is_active?: boolean;
           max_size?: number | null;
           min_size?: number | null;
+          moderation_outcome?: "allowed" | "flagged" | "blocked" | "error";
           module_code?: string | null;
           name: string;
           privacy?: "public" | "semi_private" | "private";
@@ -652,6 +663,7 @@ export type Database = {
           is_active?: boolean;
           max_size?: number | null;
           min_size?: number | null;
+          moderation_outcome?: "allowed" | "flagged" | "blocked" | "error";
           module_code?: string | null;
           name?: string;
           privacy?: "public" | "semi_private" | "private";
@@ -845,6 +857,7 @@ export type Database = {
           edited_at: string | null;
           group_id: string;
           id: string;
+          moderation_outcome: "allowed" | "flagged" | "blocked" | "error";
           sender_id: string;
         };
         Insert: {
@@ -859,6 +872,7 @@ export type Database = {
           edited_at?: string | null;
           group_id: string;
           id?: string;
+          moderation_outcome?: "allowed" | "flagged" | "blocked" | "error";
           sender_id: string;
         };
         Update: {
@@ -873,6 +887,7 @@ export type Database = {
           edited_at?: string | null;
           group_id?: string;
           id?: string;
+          moderation_outcome?: "allowed" | "flagged" | "blocked" | "error";
           sender_id?: string;
         };
         Relationships: [];
@@ -885,6 +900,7 @@ export type Database = {
           id: string;
           is_active: boolean;
           join_policy: "open" | "request_approval";
+          moderation_outcome: "allowed" | "flagged" | "blocked" | "error";
           name: string;
           tags: string[];
           type: "official" | "user_created";
@@ -897,6 +913,7 @@ export type Database = {
           id?: string;
           is_active?: boolean;
           join_policy?: "open" | "request_approval";
+          moderation_outcome?: "allowed" | "flagged" | "blocked" | "error";
           name: string;
           tags?: string[];
           type?: "official" | "user_created";
@@ -909,6 +926,7 @@ export type Database = {
           id?: string;
           is_active?: boolean;
           join_policy?: "open" | "request_approval";
+          moderation_outcome?: "allowed" | "flagged" | "blocked" | "error";
           name?: string;
           tags?: string[];
           type?: "official" | "user_created";
@@ -965,6 +983,7 @@ export type Database = {
           deleted_at: string | null;
           edited_at: string | null;
           id: string;
+          moderation_outcome: "allowed" | "flagged" | "blocked" | "error";
           sender_id: string;
         };
         Insert: {
@@ -979,6 +998,7 @@ export type Database = {
           deleted_at?: string | null;
           edited_at?: string | null;
           id?: string;
+          moderation_outcome?: "allowed" | "flagged" | "blocked" | "error";
           sender_id: string;
         };
         Update: {
@@ -993,6 +1013,7 @@ export type Database = {
           deleted_at?: string | null;
           edited_at?: string | null;
           id?: string;
+          moderation_outcome?: "allowed" | "flagged" | "blocked" | "error";
           sender_id?: string;
         };
         Relationships: [];
