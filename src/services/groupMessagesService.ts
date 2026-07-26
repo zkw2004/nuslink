@@ -27,6 +27,14 @@ function mapProfileToPreview(profile: ProfileRow): ConnectedProfilePreview {
 }
 
 function getMessagePreview(message: GroupMessageRow) {
+  if (message.moderation_outcome === "blocked") {
+    return "Message removed";
+  }
+
+  if (message.moderation_outcome === "flagged") {
+    return "Message hidden for review";
+  }
+
   if (message.body?.trim()) {
     return message.body;
   }

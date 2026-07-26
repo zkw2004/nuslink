@@ -13,7 +13,7 @@ export function RemovedTombstone({ what, dark = false }: RemovedTombstoneProps) 
   const boxed = Boolean(what);
 
   return (
-    <View style={[styles.row, boxed ? styles.box : null]}>
+    <View style={[styles.row, boxed ? styles.box : styles.messageRow]}>
       <Ionicons name="ban-outline" size={boxed ? 16 : 15} color={ink} />
       <Text style={[styles.text, { color: ink }]}>
         {what ? COPY.removedField(what) : COPY.removedMessage}
@@ -27,6 +27,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     gap: 9,
+  },
+  messageRow: {
+    minWidth: 145,
   },
   box: {
     backgroundColor: BLOCK.soft,
