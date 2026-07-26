@@ -9,7 +9,7 @@ from app.core.config import settings
 from app.main import app
 from app.profile_extraction import service
 from app.profile_extraction.service import (
-    OpenAIProfileExtractionProvider,
+    GeminiProfileExtractionProvider,
     ProfileExtractionError,
     _find_output_text,
 )
@@ -41,11 +41,11 @@ class FakeProfileExtractionProvider:
         return self.output
 
 
-class FakeOpenAIResponse:
+class FakeGeminiResponse:
     def __init__(self, payload: dict[str, object]) -> None:
         self.payload = payload
 
-    def __enter__(self) -> "FakeOpenAIResponse":
+    def __enter__(self) -> "FakeGeminiResponse":
         return self
 
     def __exit__(self, *args: object) -> None:
@@ -116,9 +116,7 @@ def test_extract_profile_returns_normalized_reviewable_draft():
     assert response.status_code == 200
     body = response.json()
     assert body["suggested_bio"] == "Computing student building useful products."
-    assert body["skills"] == [
-        {"value": "Python", "evidence": "Built APIs with Python"}
-    ]
+    assert body["skills"] == [{"value": "Python", "evidence": "Built APIs with Python"}]
     assert body["entries"][0]["title"] == "NUSLink"
     assert body["entries"][0]["description"] == "Built a student matching app."
     assert provider.calls[0]["filename"] == "resume.pdf"
@@ -163,9 +161,7 @@ def test_extract_profile_rejects_invalid_provider_output():
         app.dependency_overrides.pop(get_profile_extraction_provider, None)
 
     assert response.status_code == 502
-    assert response.json() == {
-        "detail": "The extracted profile failed validation."
-    }
+    assert response.json() == {"detail": "The extracted profile failed validation."}
 
 
 def test_extract_profile_requires_authentication():
@@ -178,43 +174,30 @@ def test_find_output_text_rejects_provider_refusal():
         ProfileExtractionError,
         match="The AI provider declined this resume.",
     ):
-        _find_output_text(
-            {
-                "output": [
-                    {
-                        "type": "message",
-                        "content": [{"type": "refusal", "refusal": "No"}],
-                    }
-                ]
-            }
-        )
+        _find_output_text({"candidates": [{"finishReason": "SAFETY"}]})
 
 
-def test_openai_provider_sends_private_structured_file_request(
+def test_gemini_provider_sends_private_structured_file_request(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    monkeypatch.setattr(settings, "openai_api_key", "test-key")
+    monkeypatch.setattr(settings, "gemini_api_key", "test-key")
     monkeypatch.setattr(
         settings,
-        "openai_profile_extraction_model",
+        "gemini_profile_extraction_model",
         "test-profile-model",
     )
     captured_request: dict[str, object] = {}
 
-    def fake_urlopen(api_request: object, timeout: int) -> FakeOpenAIResponse:
+    def fake_urlopen(api_request: object, timeout: int) -> FakeGeminiResponse:
         captured_request["request"] = api_request
         captured_request["timeout"] = timeout
-        return FakeOpenAIResponse(
+        return FakeGeminiResponse(
             {
-                "output": [
+                "candidates": [
                     {
-                        "type": "message",
-                        "content": [
-                            {
-                                "type": "output_text",
-                                "text": json.dumps(valid_output()),
-                            }
-                        ],
+                        "content": {
+                            "parts": [{"text": json.dumps(valid_output())}],
+                        },
                     }
                 ]
             }
@@ -222,7 +205,7 @@ def test_openai_provider_sends_private_structured_file_request(
 
     monkeypatch.setattr(service.request, "urlopen", fake_urlopen)
 
-    result = OpenAIProfileExtractionProvider().generate(
+    result = GeminiProfileExtractionProvider().generate(
         filename="resume.pdf",
         mime_type="application/pdf",
         file_base64=pdf_payload()["file_base64"],
@@ -231,11 +214,17 @@ def test_openai_provider_sends_private_structured_file_request(
     assert isinstance(api_request, service.request.Request)
     request_body = json.loads(api_request.data.decode("utf-8"))
 
-    assert api_request.full_url == "https://api.openai.com/v1/responses"
-    assert request_body["model"] == "test-profile-model"
-    assert request_body["store"] is False
-    assert request_body["input"][1]["content"][0]["type"] == "input_file"
-    assert request_body["text"]["format"]["type"] == "json_schema"
-    assert request_body["text"]["format"]["strict"] is True
+    assert api_request.full_url == (
+        "https://generativelanguage.googleapis.com/v1beta/models/"
+        "test-profile-model:generateContent"
+    )
+    assert api_request.get_header("X-goog-api-key") == "test-key"
+    assert request_body["contents"][0]["parts"][0]["inlineData"] == {
+        "mimeType": "application/pdf",
+        "data": pdf_payload()["file_base64"],
+    }
+    assert request_body["generationConfig"]["responseMimeType"] == "application/json"
+    assert request_body["generationConfig"]["responseJsonSchema"]["type"] == "object"
+    assert request_body["generationConfig"]["maxOutputTokens"] == 4000
     assert captured_request["timeout"] == 45
     assert result["skills"][0]["value"] == " Python "

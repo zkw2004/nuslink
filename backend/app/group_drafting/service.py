@@ -66,35 +66,32 @@ Only set a restriction for semi_private privacy; semi_private must have a restri
 Do not invent dates, venues, modules, or group sizes."""
 
 
-class OpenAIGroupDraftProvider:
+class GeminiGroupDraftProvider:
     def generate(self, prompt: str) -> dict[str, object]:
-        if not settings.openai_api_key:
+        if not settings.gemini_api_key:
             raise GroupDraftingError("AI group drafting is not configured.")
 
         body = json.dumps(
             {
-                "model": settings.openai_model,
-                "input": [
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": prompt},
+                "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]},
+                "contents": [
+                    {"role": "user", "parts": [{"text": prompt}]},
                 ],
-                "text": {
-                    "format": {
-                        "type": "json_schema",
-                        "name": "nuslink_group_draft",
-                        "strict": True,
-                        "schema": GROUP_DRAFT_SCHEMA,
-                    }
+                "generationConfig": {
+                    "responseMimeType": "application/json",
+                    "responseJsonSchema": GROUP_DRAFT_SCHEMA,
                 },
-                "store": False,
             }
         ).encode("utf-8")
         api_request = request.Request(
-            "https://api.openai.com/v1/responses",
+            (
+                "https://generativelanguage.googleapis.com/v1beta/models/"
+                f"{settings.gemini_model}:generateContent"
+            ),
             data=body,
             headers={
-                "Authorization": f"Bearer {settings.openai_api_key}",
                 "Content-Type": "application/json",
+                "x-goog-api-key": settings.gemini_api_key,
             },
             method="POST",
         )
@@ -129,25 +126,24 @@ def _find_output_text(payload: object) -> str:
     if not isinstance(payload, dict):
         raise GroupDraftingError("The AI provider returned an invalid response.")
 
-    direct_output = payload.get("output_text")
-    if isinstance(direct_output, str) and direct_output:
-        return direct_output
-
-    output = payload.get("output")
-    if isinstance(output, list):
-        for item in output:
-            if not isinstance(item, dict) or item.get("type") != "message":
+    candidates = payload.get("candidates")
+    if isinstance(candidates, list):
+        for candidate in candidates:
+            if not isinstance(candidate, dict):
                 continue
-            content = item.get("content")
-            if not isinstance(content, list):
+            if candidate.get("finishReason") in {"SAFETY", "RECITATION"}:
+                raise GroupDraftingError("The AI provider declined this request.")
+            content = candidate.get("content")
+            if not isinstance(content, dict):
                 continue
-            for part in content:
+            parts = content.get("parts")
+            if not isinstance(parts, list):
+                continue
+            for part in parts:
                 if not isinstance(part, dict):
                     continue
-                if part.get("type") == "refusal":
-                    raise GroupDraftingError("The AI provider declined this request.")
                 text = part.get("text")
-                if part.get("type") == "output_text" and isinstance(text, str):
+                if isinstance(text, str) and text:
                     return text
 
     raise GroupDraftingError("The AI provider returned no draft.")
