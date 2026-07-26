@@ -30,6 +30,7 @@ export type TimetableSource = "manual" | "nusmods";
 export type ConnectionRequestStatus = "pending" | "accepted" | "declined";
 export type MatchFeedbackEventType = "view" | "skip" | "accept" | "chat_start";
 export type ModerationVerdict = "allowed" | "flagged" | "blocked";
+export type ModerationOutcome = ModerationVerdict | "error";
 export type ModerationSubjectType =
   | "profile_bio"
   | "profile_headline"
@@ -83,9 +84,9 @@ export interface UserProfile {
   id: string;
   display_name: string;
   headline: string | null;
-  headline_moderation_outcome?: ModerationVerdict;
+  headline_moderation_outcome?: ModerationOutcome;
   bio: string;
-  bio_moderation_outcome?: ModerationVerdict;
+  bio_moderation_outcome?: ModerationOutcome;
   avatar_url: string | null;
   faculty: string | null;
   major: string | null;
@@ -157,7 +158,7 @@ export interface Group {
   tags: string[];
   max_size: number | null;
   review_min_membership_days?: number;
-  moderation_outcome?: ModerationVerdict;
+  moderation_outcome?: ModerationOutcome;
   scheduled_time: string | null;
   venue: string | null;
   creator_id: string;
@@ -302,9 +303,9 @@ export interface PeopleMatch {
   user_id: string;
   display_name: string;
   headline: string | null;
-  headline_moderation_outcome?: ModerationVerdict;
+  headline_moderation_outcome?: ModerationOutcome;
   bio: string;
-  bio_moderation_outcome?: ModerationVerdict;
+  bio_moderation_outcome?: ModerationOutcome;
   avatar_url: string | null;
   faculty: string | null;
   major: string | null;
