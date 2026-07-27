@@ -4,6 +4,7 @@ import {
   Alert,
   Pressable,
   ScrollView,
+  StyleSheet,
   Text,
   View,
 } from "react-native";
@@ -143,9 +144,11 @@ export function ProfileImportScreen() {
 
   return (
     <LinearGradient
-      className="flex-1"
       colors={["#F6F8FD", "#E7EBF7", "#D3DBEE", "#C6D0E8"]}
+      end={{ x: 1, y: 1 }}
       locations={[0, 0.44, 0.8, 1]}
+      start={{ x: 0, y: 0 }}
+      style={styles.root}
     >
       <SafeAreaView style={{ flex: 1, backgroundColor: "transparent" }}>
         <View className="flex-row items-center gap-3 px-5 pb-3 pt-2">
@@ -233,3 +236,9 @@ export function ProfileImportScreen() {
     </LinearGradient>
   );
 }
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
+});

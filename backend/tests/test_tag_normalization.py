@@ -324,7 +324,7 @@ def test_gemini_provider_sends_supported_canonical_schema(monkeypatch):
     assert captured_request["timeout"] == 25
     assert request_body["generationConfig"]["responseMimeType"] == "application/json"
     assert "Case Competitions" in json.dumps(
-        request_body["generationConfig"]["responseJsonSchema"]
+        request_body["generationConfig"]["responseSchema"]
     )
     assert result == TagClassification(
         canonical_tags=["Case Competitions"],

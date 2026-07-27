@@ -148,7 +148,7 @@ class GeminiModerationProvider:
                     ],
                     "generationConfig": {
                         "responseMimeType": "application/json",
-                        "responseJsonSchema": schema,
+                        "responseSchema": schema,
                     },
                 },
                 timeout=25,
