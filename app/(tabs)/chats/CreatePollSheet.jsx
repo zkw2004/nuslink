@@ -17,7 +17,6 @@
 import React, { useState } from "react";
 import { View, Text, TextInput, Modal, Pressable, ScrollView, StyleSheet, SafeAreaView } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { BlurView } from "expo-blur";
 import { Ionicons } from "@expo/vector-icons";
 
 const ACCENT = "rgba(91,79,224,0.92)";

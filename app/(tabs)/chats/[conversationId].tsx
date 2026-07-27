@@ -98,30 +98,6 @@ type DocumentPickerModule = {
   >;
 };
 
-function toBadgeTierLabel(tier: "bronze" | "silver" | "gold" | null) {
-  switch (tier) {
-    case "gold":
-      return "Standout" as const;
-    case "silver":
-      return "Trusted" as const;
-    case "bronze":
-      return "Reliable" as const;
-    default:
-      return "New" as const;
-  }
-}
-
-function formatMessageTime(value: string) {
-  const date = new Date(value);
-
-  return date.toLocaleString("en-SG", {
-    day: "numeric",
-    month: "short",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
-
 function formatThreadTime(value: string) {
   return new Date(value).toLocaleTimeString("en-SG", {
     hour: "numeric",

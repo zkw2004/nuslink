@@ -305,9 +305,6 @@ export default function ChatsScreen() {
   const archiveConversations = useDirectMessagesStore(
     (state) => state.archiveConversations,
   );
-  const unarchiveConversations = useDirectMessagesStore(
-    (state) => state.unarchiveConversations,
-  );
   const deleteConversations = useDirectMessagesStore(
     (state) => state.deleteConversations,
   );
@@ -476,7 +473,6 @@ export default function ChatsScreen() {
       );
     });
   }, [
-    archivedConversations,
     archivedGroupChats,
     connectedProfiles,
     existingConversationUserIds,
