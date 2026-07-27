@@ -15,11 +15,11 @@ class Settings(BaseSettings):
     expo_push_access_token: str = ""
     push_worker_enabled: bool = True
     push_worker_interval_seconds: float = 10.0
-    gemini_api_key: str = ""
-    gemini_group_drafting_model: str = "gemini-3.5-flash"
-    gemini_model: str = "gemini-3.5-flash"
-    gemini_moderation_model: str = "gemini-3.5-flash"
-    gemini_profile_extraction_model: str = "gemini-3.5-flash"
+    anthropic_api_key: str = ""
+    anthropic_group_drafting_model: str = "claude-haiku-4-5-20251001"
+    anthropic_model: str = "claude-haiku-4-5-20251001"
+    anthropic_moderation_model: str = "claude-haiku-4-5-20251001"
+    anthropic_profile_extraction_model: str = "claude-haiku-4-5-20251001"
 
 
 settings = Settings()

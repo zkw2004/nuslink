@@ -1,17 +1,11 @@
 import base64
 import binascii
-import json
 from typing import Protocol
 
 from pydantic import ValidationError
 
+from app.anthropic import AnthropicRequestError, create_message_payload, find_tool_input
 from app.core.config import settings
-from app.gemini import (
-    GeminiRequestError,
-    find_output_text,
-    generate_content_payload,
-    to_gemini_response_schema,
-)
 from app.profile_extraction.schemas import (
     ExtractedProfileEntry,
     ExtractedProfileItem,
@@ -169,12 +163,12 @@ Classify employment and internships as work, portfolio work as project, and
 hackathons, case competitions, and contests as competition."""
 
 
-class GeminiProfileExtractionProvider:
-    provider_name = "gemini"
+class ClaudeProfileExtractionProvider:
+    provider_name = "claude"
 
     @property
     def model_name(self) -> str:
-        return settings.gemini_profile_extraction_model
+        return settings.anthropic_profile_extraction_model
 
     def generate(
         self,
@@ -183,27 +177,25 @@ class GeminiProfileExtractionProvider:
         mime_type: str,
         file_base64: str,
     ) -> dict[str, object]:
-        if not settings.gemini_api_key:
+        if not settings.anthropic_api_key:
             raise ProfileExtractionError("AI profile extraction is not configured.")
 
         try:
-            payload = generate_content_payload(
+            payload = create_message_payload(
                 request_type="profile extraction",
-                model=settings.gemini_profile_extraction_model,
-                api_key=settings.gemini_api_key,
+                model=settings.anthropic_profile_extraction_model,
+                api_key=settings.anthropic_api_key,
                 body={
-                    "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]},
-                    "contents": [
+                    "model": settings.anthropic_profile_extraction_model,
+                    "max_tokens": 4000,
+                    "system": SYSTEM_PROMPT,
+                    "messages": [
                         {
                             "role": "user",
-                            "parts": [
+                            "content": [
+                                _create_resume_content_block(mime_type, file_base64),
                                 {
-                                    "inlineData": {
-                                        "mimeType": mime_type,
-                                        "data": file_base64,
-                                    }
-                                },
-                                {
+                                    "type": "text",
                                     "text": (
                                         "Extract the profile draft from this resume "
                                         f"named {filename}."
@@ -212,36 +204,36 @@ class GeminiProfileExtractionProvider:
                             ],
                         },
                     ],
-                    "generationConfig": {
-                        "responseMimeType": "application/json",
-                        "responseSchema": to_gemini_response_schema(
-                            PROFILE_EXTRACTION_SCHEMA
-                        ),
-                        "maxOutputTokens": 4000,
+                    "tools": [
+                        {
+                            "name": "emit_profile_extraction",
+                            "description": "Return the reviewable profile draft.",
+                            "input_schema": PROFILE_EXTRACTION_SCHEMA,
+                        }
+                    ],
+                    "tool_choice": {
+                        "type": "tool",
+                        "name": "emit_profile_extraction",
                     },
                 },
                 timeout=45,
             )
-        except GeminiRequestError as exc:
+        except AnthropicRequestError as exc:
             raise ProfileExtractionError(str(exc)) from exc
 
-        output_text = _find_output_text(payload)
         try:
-            parsed_output = json.loads(output_text)
-        except json.JSONDecodeError as exc:
-            raise ProfileExtractionError(
-                "The extracted profile was not valid JSON."
-            ) from exc
-
-        if not isinstance(parsed_output, dict):
-            raise ProfileExtractionError(
-                "The extracted profile had an unexpected shape."
+            return find_tool_input(
+                payload,
+                request_type="profile extraction",
+                tool_name="emit_profile_extraction",
+                declined_message="The AI provider declined this resume.",
+                no_output_message="The AI provider returned no profile draft.",
             )
-
-        return parsed_output
+        except AnthropicRequestError as exc:
+            raise ProfileExtractionError(str(exc)) from exc
 
     def check_health(self) -> None:
-        if not settings.gemini_api_key:
+        if not settings.anthropic_api_key:
             raise ProfileExtractionError("AI profile extraction is not configured.")
 
         try:
@@ -260,16 +252,35 @@ class GeminiProfileExtractionProvider:
             ) from exc
 
 
-def _find_output_text(payload: object) -> str:
-    try:
-        return find_output_text(
-            payload,
-            request_type="profile extraction",
-            declined_message="The AI provider declined this resume.",
-            no_output_message="The AI provider returned no profile draft.",
-        )
-    except GeminiRequestError as exc:
-        raise ProfileExtractionError(str(exc)) from exc
+def _create_resume_content_block(
+    mime_type: str,
+    file_base64: str,
+) -> dict[str, object]:
+    if mime_type == "application/pdf":
+        return {
+            "type": "document",
+            "source": {
+                "type": "base64",
+                "media_type": mime_type,
+                "data": file_base64,
+            },
+        }
+
+    if mime_type in {"image/jpeg", "image/png"}:
+        return {
+            "type": "image",
+            "source": {
+                "type": "base64",
+                "media_type": mime_type,
+                "data": file_base64,
+            },
+        }
+
+    raise ProfileExtractionError(
+        "Claude resume extraction supports PDF, JPEG, and PNG files."
+    )
+
+
 
 
 def _validate_file(payload: ProfileExtractionRequest) -> str:
@@ -286,10 +297,6 @@ def _validate_file(payload: ProfileExtractionRequest) -> str:
 
     valid_signature = {
         "application/pdf": file_bytes.startswith(b"%PDF"),
-        "application/msword": file_bytes.startswith(bytes.fromhex("D0CF11E0A1B11AE1")),
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document": (
-            file_bytes.startswith(b"PK")
-        ),
         "image/jpeg": file_bytes.startswith(b"\xff\xd8\xff"),
         "image/png": file_bytes.startswith(b"\x89PNG\r\n\x1a\n"),
     }[payload.mime_type]

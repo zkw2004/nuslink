@@ -5,8 +5,8 @@ from difflib import SequenceMatcher
 from typing import Protocol
 from urllib import error, parse, request
 
+from app.anthropic import AnthropicRequestError, create_message_payload, find_tool_input
 from app.core.config import settings
-from app.gemini import to_gemini_response_schema
 from app.tag_normalization.schemas import (
     TagClassification,
     TagNormalizationResult,
@@ -261,9 +261,15 @@ class SupabaseTagNormalizationMemoryStore:
             ) from exc
 
 
-class GeminiTagNormalizationProvider:
+class ClaudeTagNormalizationProvider:
+    provider_name = "claude"
+
+    @property
+    def model_name(self) -> str:
+        return settings.anthropic_model
+
     def classify(self, *, tag_type: TagType, raw_tag: str) -> TagClassification:
-        if not settings.gemini_api_key:
+        if not settings.anthropic_api_key:
             raise TagNormalizationError("AI tag normalization is not configured.")
 
         allowed_tags = get_canonical_tags(tag_type)
@@ -281,65 +287,60 @@ class GeminiTagNormalizationProvider:
             "additionalProperties": False,
         }
 
-        body = json.dumps(
-            {
-                "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]},
-                "contents": [
-                    {
-                        "role": "user",
-                        "parts": [
-                            {
-                                "text": json.dumps(
-                                    {
-                                        "tag_type": tag_type,
-                                        "raw_tag": raw_tag,
-                                        "allowed_canonical_tags": list(allowed_tags),
-                                    }
-                                )
-                            }
-                        ],
+        try:
+            payload = create_message_payload(
+                request_type="tag normalization",
+                model=settings.anthropic_model,
+                api_key=settings.anthropic_api_key,
+                body={
+                    "model": settings.anthropic_model,
+                    "max_tokens": 900,
+                    "system": SYSTEM_PROMPT,
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": json.dumps(
+                                        {
+                                            "tag_type": tag_type,
+                                            "raw_tag": raw_tag,
+                                            "allowed_canonical_tags": list(allowed_tags),
+                                        }
+                                    ),
+                                }
+                            ],
+                        },
+                    ],
+                    "tools": [
+                        {
+                            "name": "emit_tag_classification",
+                            "description": "Return matching canonical tags.",
+                            "input_schema": schema,
+                        }
+                    ],
+                    "tool_choice": {
+                        "type": "tool",
+                        "name": "emit_tag_classification",
                     },
-                ],
-                "generationConfig": {
-                    "responseMimeType": "application/json",
-                    "responseSchema": to_gemini_response_schema(schema),
                 },
-            }
-        ).encode("utf-8")
-        api_request = request.Request(
-            (
-                "https://generativelanguage.googleapis.com/v1beta/models/"
-                f"{settings.gemini_model}:generateContent"
-            ),
-            data=body,
-            headers={
-                "Content-Type": "application/json",
-                "x-goog-api-key": settings.gemini_api_key,
-            },
-            method="POST",
-        )
+                timeout=25,
+            )
+        except AnthropicRequestError as exc:
+            raise TagNormalizationError(str(exc)) from exc
 
         try:
-            with request.urlopen(api_request, timeout=25) as response:
-                payload = json.loads(response.read().decode("utf-8"))
-        except error.HTTPError as exc:
-            raise TagNormalizationError(
-                "The AI provider rejected the normalization request."
-            ) from exc
-        except (error.URLError, TimeoutError) as exc:
-            raise TagNormalizationError(
-                "The AI provider is temporarily unavailable."
-            ) from exc
-        except json.JSONDecodeError as exc:
-            raise TagNormalizationError(
-                "The AI provider returned an invalid normalization response."
-            ) from exc
-
-        output_text = _find_output_text(payload)
-
-        try:
-            classification = TagClassification.model_validate_json(output_text)
-        except Exception as exc:  # pragma: no cover - defensive
+            classification = TagClassification.model_validate(
+                find_tool_input(
+                    payload,
+                    request_type="tag normalization",
+                    tool_name="emit_tag_classification",
+                    declined_message="Claude declined the normalization request.",
+                    no_output_message="Claude returned no normalization output.",
+                )
+            )
+        except Exception as exc:
             raise TagNormalizationError(
                 "The AI normalization output failed validation."
             ) from exc
@@ -357,6 +358,7 @@ class GeminiTagNormalizationProvider:
             return TagClassification(canonical_tags=[], no_match=True)
 
         return classification
+
 
 
 def get_canonical_tags(tag_type: TagType) -> tuple[str, ...]:

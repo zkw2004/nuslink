@@ -6,12 +6,7 @@ from typing import Any, Protocol, cast
 from pydantic import BaseModel, Field
 
 from app.core.config import settings
-from app.gemini import (
-    GeminiRequestError,
-    find_output_text,
-    generate_content_payload,
-    to_gemini_response_schema,
-)
+from app.anthropic import AnthropicRequestError, create_message_payload, find_tool_input
 from app.moderation.repository import ModerationRepository
 from app.moderation.schemas import (
     ModerationCategory,
@@ -82,16 +77,16 @@ class ModerationProvider(Protocol):
         ...
 
 
-class GeminiModerationProvider:
-    provider_name = "gemini"
+class ClaudeModerationProvider:
+    provider_name = "claude"
 
     @property
     def model_name(self) -> str:
-        return settings.gemini_moderation_model
+        return settings.anthropic_moderation_model
 
     def moderate(self, *, subject_type: str, content: str) -> ProviderModerationResult:
-        if not settings.gemini_api_key:
-            raise ModerationProviderError("Gemini moderation is not configured.")
+        if not settings.anthropic_api_key:
+            raise ModerationProviderError("Claude moderation is not configured.")
 
         schema = {
             "type": "object",
@@ -121,54 +116,57 @@ class GeminiModerationProvider:
         }
 
         try:
-            payload = generate_content_payload(
+            payload = create_message_payload(
                 request_type="moderation",
-                model=settings.gemini_moderation_model,
-                api_key=settings.gemini_api_key,
+                model=settings.anthropic_moderation_model,
+                api_key=settings.anthropic_api_key,
                 body={
-                    "systemInstruction": {
-                        "parts": [
-                            {
-                                "text": (
-                                    f"{SYSTEM_PROMPT}\n"
-                                    "Return only JSON matching the response schema."
-                                )
-                            }
-                        ]
-                    },
-                    "contents": [
+                    "model": settings.anthropic_moderation_model,
+                    "max_tokens": 512,
+                    "system": SYSTEM_PROMPT,
+                    "messages": [
                         {
                             "role": "user",
-                            "parts": [
+                            "content": [
                                 {
+                                    "type": "text",
                                     "text": json.dumps(
                                         {
                                             "subject_type": subject_type,
                                             "content": content,
                                         }
-                                    )
+                                    ),
                                 }
                             ],
                         }
                     ],
-                    "generationConfig": {
-                        "responseMimeType": "application/json",
-                        "responseSchema": to_gemini_response_schema(schema),
+                    "tools": [
+                        {
+                            "name": "emit_moderation_result",
+                            "description": "Return the moderation decision.",
+                            "input_schema": schema,
+                        }
+                    ],
+                    "tool_choice": {
+                        "type": "tool",
+                        "name": "emit_moderation_result",
                     },
                 },
                 timeout=25,
             )
-        except GeminiRequestError as exc:
+        except AnthropicRequestError as exc:
             raise ModerationProviderError(str(exc)) from exc
 
-        output_text = _find_gemini_output_text(payload)
-
         try:
-            parsed = json.loads(output_text)
-        except json.JSONDecodeError as exc:
-            raise ModerationProviderError(
-                "Gemini moderation output was not valid JSON."
-            ) from exc
+            parsed = find_tool_input(
+                payload,
+                request_type="moderation",
+                tool_name="emit_moderation_result",
+                declined_message="Claude declined this moderation request.",
+                no_output_message="Claude did not return a moderation result.",
+            )
+        except AnthropicRequestError as exc:
+            raise ModerationProviderError(str(exc)) from exc
 
         return _parse_provider_result(parsed, payload)
 
@@ -335,16 +333,6 @@ def _rule_based_chat_result(
     )
 
 
-def _find_gemini_output_text(payload: dict[str, Any]) -> str:
-    try:
-        return find_output_text(
-            payload,
-            request_type="moderation",
-            declined_message="Gemini declined this moderation request.",
-            no_output_message="Gemini did not return moderation text.",
-        )
-    except GeminiRequestError as exc:
-        raise ModerationProviderError(str(exc)) from exc
 
 
 def _parse_provider_result(

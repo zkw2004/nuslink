@@ -8,7 +8,7 @@ from app.profile_extraction.schemas import (
     ProfileExtractionResponse,
 )
 from app.profile_extraction.service import (
-    GeminiProfileExtractionProvider,
+    ClaudeProfileExtractionProvider,
     InvalidProfileFileError,
     ProfileExtractionError,
     ProfileExtractionProvider,
@@ -19,7 +19,7 @@ router = APIRouter(prefix="/v1/profiles", tags=["profiles"])
 
 
 def get_profile_extraction_provider() -> ProfileExtractionProvider:
-    return GeminiProfileExtractionProvider()
+    return ClaudeProfileExtractionProvider()
 
 
 @router.get(
@@ -31,7 +31,7 @@ def provider_health(
     provider: ProfileExtractionProvider = Depends(get_profile_extraction_provider),
 ) -> ProfileExtractionProviderHealthResponse:
     del current_user
-    configured = bool(settings.gemini_api_key)
+    configured = bool(settings.anthropic_api_key)
 
     try:
         provider.check_health()

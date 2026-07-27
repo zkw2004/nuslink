@@ -8,7 +8,7 @@ from app.group_drafting.schemas import (
     GroupDraftResponse,
 )
 from app.group_drafting.service import (
-    GeminiGroupDraftProvider,
+    ClaudeGroupDraftProvider,
     GroupDraftingError,
     GroupDraftProvider,
     create_group_draft,
@@ -18,7 +18,7 @@ router = APIRouter(prefix="/v1/groups", tags=["groups"])
 
 
 def get_group_draft_provider() -> GroupDraftProvider:
-    return GeminiGroupDraftProvider()
+    return ClaudeGroupDraftProvider()
 
 
 @router.get("/draft/provider-health", response_model=GroupDraftProviderHealthResponse)
@@ -27,7 +27,7 @@ def provider_health(
     provider: GroupDraftProvider = Depends(get_group_draft_provider),
 ) -> GroupDraftProviderHealthResponse:
     del current_user
-    configured = bool(settings.gemini_api_key)
+    configured = bool(settings.anthropic_api_key)
 
     try:
         provider.check_health()
@@ -61,7 +61,7 @@ def draft_group(
         detail = str(exc)
         response_status = (
             status.HTTP_503_SERVICE_UNAVAILABLE
-            if detail == "Gemini group drafting is not configured."
+            if detail == "Claude group drafting is not configured."
             else status.HTTP_502_BAD_GATEWAY
         )
         raise HTTPException(status_code=response_status, detail=detail) from exc

@@ -3,6 +3,7 @@ import json
 from fastapi.testclient import TestClient
 
 from app.auth import AuthenticatedUser
+from app import anthropic
 from app.core.config import settings
 from app.main import app
 from app.routers.tags import (
@@ -15,7 +16,7 @@ from app.routers.tags import (
 from app.tag_normalization import service
 from app.tag_normalization.schemas import TagClassification
 from app.tag_normalization.service import (
-    GeminiTagNormalizationProvider,
+    ClaudeTagNormalizationProvider,
     TagNormalizationError,
     normalize_interest_tags_for_matching,
     normalize_tags,
@@ -73,11 +74,11 @@ class FakeTagNormalizationMemoryStore:
         }
 
 
-class FakeGeminiResponse:
+class FakeAnthropicResponse:
     def __init__(self, payload: dict[str, object]) -> None:
         self.payload = payload
 
-    def __enter__(self) -> "FakeGeminiResponse":
+    def __enter__(self) -> "FakeAnthropicResponse":
         return self
 
     def __exit__(self, *args: object) -> None:
@@ -277,55 +278,49 @@ def test_normalize_tags_endpoint_returns_structured_results():
     }
 
 
-def test_gemini_provider_sends_supported_canonical_schema(monkeypatch):
-    monkeypatch.setattr(settings, "gemini_api_key", "test-key")
-    monkeypatch.setattr(settings, "gemini_model", "test-model")
+def test_claude_provider_sends_supported_canonical_schema(monkeypatch):
+    monkeypatch.setattr(settings, "anthropic_api_key", "test-key")
+    monkeypatch.setattr(settings, "anthropic_model", "test-model")
     captured_request: dict[str, object] = {}
 
-    def fake_urlopen(api_request: object, timeout: int) -> FakeGeminiResponse:
+    def fake_urlopen(api_request: object, timeout: int) -> FakeAnthropicResponse:
         captured_request["request"] = api_request
         captured_request["timeout"] = timeout
-        return FakeGeminiResponse(
+        return FakeAnthropicResponse(
             {
-                "candidates": [
+                "content": [
                     {
-                        "content": {
-                            "parts": [
-                                {
-                                    "text": json.dumps(
-                                        {
-                                            "canonical_tags": ["Case Competitions"],
-                                            "no_match": False,
-                                        }
-                                    ),
-                                }
-                            ],
+                        "type": "tool_use",
+                        "name": "emit_tag_classification",
+                        "input": {
+                            "canonical_tags": ["Case Competitions"],
+                            "no_match": False,
                         },
                     }
                 ]
             }
         )
 
-    monkeypatch.setattr(service.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(anthropic.request, "urlopen", fake_urlopen)
 
-    result = GeminiTagNormalizationProvider().classify(
+    result = ClaudeTagNormalizationProvider().classify(
         tag_type="cca",
         raw_tag="biz case comps",
     )
     api_request = captured_request["request"]
-    assert isinstance(api_request, service.request.Request)
+    assert isinstance(api_request, anthropic.request.Request)
     request_body = json.loads(api_request.data.decode("utf-8"))
 
-    assert api_request.full_url == (
-        "https://generativelanguage.googleapis.com/v1beta/models/"
-        "test-model:generateContent"
-    )
-    assert api_request.get_header("X-goog-api-key") == "test-key"
+    assert api_request.full_url == "https://api.anthropic.com/v1/messages"
+    assert api_request.get_header("X-api-key") == "test-key"
     assert captured_request["timeout"] == 25
-    assert request_body["generationConfig"]["responseMimeType"] == "application/json"
-    response_schema = request_body["generationConfig"]["responseSchema"]
+    assert request_body["tool_choice"] == {
+        "type": "tool",
+        "name": "emit_tag_classification",
+    }
+    response_schema = request_body["tools"][0]["input_schema"]
     assert "Case Competitions" in json.dumps(response_schema)
-    assert "additionalProperties" not in json.dumps(response_schema)
+    assert response_schema["additionalProperties"] is False
     assert result == TagClassification(
         canonical_tags=["Case Competitions"],
         no_match=False,

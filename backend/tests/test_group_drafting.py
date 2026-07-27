@@ -4,14 +4,13 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
-from app import gemini
+from app import anthropic
 from app.auth import AuthenticatedUser
 from app.core.config import settings
 from app.group_drafting import service
 from app.group_drafting.service import (
-    GeminiGroupDraftProvider,
+    ClaudeGroupDraftProvider,
     GroupDraftingError,
-    _find_gemini_output_text,
 )
 from app.main import app
 from app.routers.group_drafts import get_current_user as get_group_drafts_current_user
@@ -35,11 +34,11 @@ class FakeGroupDraftProvider:
         self.health_calls += 1
 
 
-class FakeGeminiResponse:
+class FakeAnthropicResponse:
     def __init__(self, payload: dict[str, object]) -> None:
         self.payload = payload
 
-    def __enter__(self) -> "FakeGeminiResponse":
+    def __enter__(self) -> "FakeAnthropicResponse":
         return self
 
     def __exit__(self, *args: object) -> None:
@@ -154,96 +153,54 @@ def test_draft_group_rejects_whitespace_only_prompt_before_provider_call():
     assert provider.prompts == []
 
 
-def test_find_gemini_output_text_reads_candidate_content():
-    output_text = _find_gemini_output_text(
-        {
-            "candidates": [
-                {
-                    "content": {
-                        "parts": [{"text": '{"name":"Draft"}'}],
-                    },
-                }
-            ]
-        }
-    )
-
-    assert output_text == '{"name":"Draft"}'
-
-
-def test_find_gemini_output_text_rejects_safety_block():
-    try:
-        _find_gemini_output_text(
-            {
-                "candidates": [{"finishReason": "SAFETY"}],
-            }
-        )
-    except GroupDraftingError as exc:
-        assert str(exc) == "Gemini declined this group draft request."
-    else:
-        raise AssertionError("Expected a provider refusal to raise an error.")
-
-
-def test_gemini_provider_sends_structured_generate_content_request(
+def test_claude_provider_sends_structured_messages_request(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    monkeypatch.setattr(settings, "gemini_api_key", "test-key")
-    monkeypatch.setattr(settings, "gemini_group_drafting_model", "test-model")
+    monkeypatch.setattr(settings, "anthropic_api_key", "test-key")
+    monkeypatch.setattr(settings, "anthropic_group_drafting_model", "test-model")
     captured_request: dict[str, object] = {}
 
-    def fake_urlopen(api_request: object, timeout: int) -> FakeGeminiResponse:
+    def fake_urlopen(api_request: object, timeout: int) -> FakeAnthropicResponse:
         captured_request["request"] = api_request
         captured_request["timeout"] = timeout
-        return FakeGeminiResponse(
+        return FakeAnthropicResponse(
             {
-                "candidates": [
+                "content": [
                     {
-                        "content": {
-                            "parts": [
-                                {
-                                    "text": json.dumps(
-                                        {
-                                            "name": "CS2040S Prep",
-                                            "type": "study_group",
-                                            "module_code": "CS2040S",
-                                            "privacy": "public",
-                                            "restriction": None,
-                                            "description": None,
-                                            "venue": None,
-                                            "min_size": 3,
-                                            "max_size": 5,
-                                        }
-                                    ),
-                                }
-                            ],
+                        "type": "tool_use",
+                        "name": "emit_group_draft",
+                        "input": {
+                            "name": "CS2040S Prep",
+                            "type": "study_group",
+                            "module_code": "CS2040S",
+                            "privacy": "public",
+                            "restriction": None,
+                            "description": None,
+                            "venue": None,
+                            "min_size": 3,
+                            "max_size": 5,
                         },
                     }
                 ]
             }
         )
 
-    monkeypatch.setattr(gemini.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(anthropic.request, "urlopen", fake_urlopen)
 
-    result = GeminiGroupDraftProvider().generate("Create a CS2040S study group.")
+    result = ClaudeGroupDraftProvider().generate("Create a CS2040S study group.")
     api_request = captured_request["request"]
-    assert isinstance(api_request, gemini.request.Request)
+    assert isinstance(api_request, anthropic.request.Request)
     request_body = json.loads(api_request.data.decode("utf-8"))
 
-    assert api_request.full_url == (
-        "https://generativelanguage.googleapis.com/v1beta/models/"
-        "test-model:generateContent"
-    )
-    assert api_request.get_header("X-goog-api-key") == "test-key"
+    assert api_request.full_url == "https://api.anthropic.com/v1/messages"
+    assert api_request.get_header("X-api-key") == "test-key"
+    assert api_request.get_header("Anthropic-version") == "2023-06-01"
     assert captured_request["timeout"] == 25
-    assert request_body["generationConfig"]["responseMimeType"] == (
-        "application/json"
-    )
-    response_schema = request_body["generationConfig"]["responseSchema"]
+    assert request_body["model"] == "test-model"
+    assert request_body["tool_choice"] == {"type": "tool", "name": "emit_group_draft"}
+    response_schema = request_body["tools"][0]["input_schema"]
     assert response_schema["type"] == "object"
-    assert response_schema["properties"]["module_code"]["type"] == "string"
-    assert response_schema["properties"]["module_code"]["nullable"] is True
-    assert response_schema["properties"]["min_size"]["type"] == "integer"
-    assert response_schema["properties"]["min_size"]["nullable"] is True
-    assert "maxLength" not in json.dumps(response_schema)
+    assert response_schema["properties"]["module_code"]["type"] == ["string", "null"]
     assert result["module_code"] == "CS2040S"
 
 
@@ -274,7 +231,7 @@ def test_group_draft_provider_health_endpoint_returns_status():
     assert response.json() == {
         "provider": "fake",
         "model": "fake-model",
-        "configured": bool(settings.gemini_api_key),
+        "configured": bool(settings.anthropic_api_key),
         "ok": True,
         "error": None,
     }
@@ -282,12 +239,12 @@ def test_group_draft_provider_health_endpoint_returns_status():
 
 
 def test_group_draft_provider_surfaces_http_error_detail(monkeypatch):
-    monkeypatch.setattr(settings, "gemini_api_key", "test-key")
-    monkeypatch.setattr(settings, "gemini_group_drafting_model", "test-model")
+    monkeypatch.setattr(settings, "anthropic_api_key", "test-key")
+    monkeypatch.setattr(settings, "anthropic_group_drafting_model", "test-model")
 
-    def fake_urlopen(api_request: object, timeout: int) -> FakeGeminiResponse:
+    def fake_urlopen(api_request: object, timeout: int) -> FakeAnthropicResponse:
         del api_request, timeout
-        raise gemini.error.HTTPError(
+        raise anthropic.error.HTTPError(
             url="https://example.test",
             code=429,
             msg="Too Many Requests",
@@ -295,10 +252,10 @@ def test_group_draft_provider_surfaces_http_error_detail(monkeypatch):
             fp=io.BytesIO(b'{"error":{"message":"quota exceeded"}}'),
         )
 
-    monkeypatch.setattr(gemini.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(anthropic.request, "urlopen", fake_urlopen)
 
     try:
-        GeminiGroupDraftProvider().generate("Create a CS2040S study group.")
+        ClaudeGroupDraftProvider().generate("Create a CS2040S study group.")
     except GroupDraftingError as exc:
         assert "HTTP 429" in str(exc)
         assert "quota exceeded" in str(exc)
