@@ -323,9 +323,9 @@ def test_gemini_provider_sends_supported_canonical_schema(monkeypatch):
     assert api_request.get_header("X-goog-api-key") == "test-key"
     assert captured_request["timeout"] == 25
     assert request_body["generationConfig"]["responseMimeType"] == "application/json"
-    assert "Case Competitions" in json.dumps(
-        request_body["generationConfig"]["responseSchema"]
-    )
+    response_schema = request_body["generationConfig"]["responseSchema"]
+    assert "Case Competitions" in json.dumps(response_schema)
+    assert "additionalProperties" not in json.dumps(response_schema)
     assert result == TagClassification(
         canonical_tags=["Case Competitions"],
         no_match=False,

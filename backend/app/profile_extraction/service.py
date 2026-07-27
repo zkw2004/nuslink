@@ -6,7 +6,12 @@ from typing import Protocol
 from pydantic import ValidationError
 
 from app.core.config import settings
-from app.gemini import GeminiRequestError, find_output_text, generate_content_payload
+from app.gemini import (
+    GeminiRequestError,
+    find_output_text,
+    generate_content_payload,
+    to_gemini_response_schema,
+)
 from app.profile_extraction.schemas import (
     ExtractedProfileEntry,
     ExtractedProfileItem,
@@ -209,7 +214,9 @@ class GeminiProfileExtractionProvider:
                     ],
                     "generationConfig": {
                         "responseMimeType": "application/json",
-                        "responseSchema": PROFILE_EXTRACTION_SCHEMA,
+                        "responseSchema": to_gemini_response_schema(
+                            PROFILE_EXTRACTION_SCHEMA
+                        ),
                         "maxOutputTokens": 4000,
                     },
                 },

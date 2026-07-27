@@ -9,6 +9,76 @@ class GeminiRequestError(Exception):
     pass
 
 
+def to_gemini_response_schema(schema: dict[str, object]) -> dict[str, object]:
+    """Convert JSON-schema conveniences into Gemini responseSchema format."""
+
+    return _convert_schema_node(schema)
+
+
+def _convert_schema_node(schema: object) -> dict[str, object]:
+    if not isinstance(schema, dict):
+        return {}
+
+    converted: dict[str, object] = {}
+    nullable = False
+
+    schema_type = schema.get("type")
+    if isinstance(schema_type, list):
+        non_null_types = [item for item in schema_type if item != "null"]
+        nullable = len(non_null_types) != len(schema_type)
+        if len(non_null_types) == 1 and isinstance(non_null_types[0], str):
+            converted["type"] = non_null_types[0]
+    elif schema_type == "null":
+        converted["type"] = "string"
+        nullable = True
+    elif isinstance(schema_type, str):
+        converted["type"] = schema_type
+
+    any_of = schema.get("anyOf")
+    if isinstance(any_of, list):
+        non_null_options = [
+            option
+            for option in any_of
+            if not (isinstance(option, dict) and option.get("type") == "null")
+        ]
+        nullable = nullable or len(non_null_options) != len(any_of)
+        if len(non_null_options) == 1:
+            converted.update(_convert_schema_node(non_null_options[0]))
+        else:
+            converted["anyOf"] = [
+                _convert_schema_node(option) for option in non_null_options
+            ]
+
+    for key in (
+        "title",
+        "description",
+        "format",
+        "enum",
+        "minimum",
+        "maximum",
+        "minItems",
+        "maxItems",
+        "required",
+    ):
+        if key in schema:
+            converted[key] = schema[key]
+
+    properties = schema.get("properties")
+    if isinstance(properties, dict):
+        converted["properties"] = {
+            key: _convert_schema_node(value) for key, value in properties.items()
+        }
+
+    items = schema.get("items")
+    if isinstance(items, dict):
+        converted["items"] = _convert_schema_node(items)
+
+    if nullable:
+        converted["nullable"] = True
+
+    return converted
+
+
 def generate_content_payload(
     *,
     request_type: str,
