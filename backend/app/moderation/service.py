@@ -1,12 +1,12 @@
 import hashlib
 import json
 import re
-from typing import Any, Protocol, cast
+from typing import Protocol, cast
 
 from pydantic import BaseModel, Field
 
-from app.core.config import settings
 from app.anthropic import AnthropicRequestError, create_message_payload, find_tool_input
+from app.core.config import settings
 from app.moderation.repository import ModerationRepository
 from app.moderation.schemas import (
     ModerationCategory,

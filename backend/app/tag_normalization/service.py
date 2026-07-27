@@ -306,7 +306,9 @@ class ClaudeTagNormalizationProvider:
                                         {
                                             "tag_type": tag_type,
                                             "raw_tag": raw_tag,
-                                            "allowed_canonical_tags": list(allowed_tags),
+                                            "allowed_canonical_tags": list(
+                                                allowed_tags
+                                            ),
                                         }
                                     ),
                                 }

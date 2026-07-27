@@ -88,7 +88,9 @@ def find_tool_input(
     no_output_message: str,
 ) -> dict[str, object]:
     if not isinstance(payload, dict):
-        raise AnthropicRequestError(f"Claude {request_type} returned an invalid response.")
+        raise AnthropicRequestError(
+            f"Claude {request_type} returned an invalid response."
+        )
 
     if payload.get("stop_reason") == "refusal":
         raise AnthropicRequestError(declined_message)

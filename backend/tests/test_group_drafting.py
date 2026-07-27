@@ -7,7 +7,6 @@ from fastapi.testclient import TestClient
 from app import anthropic
 from app.auth import AuthenticatedUser
 from app.core.config import settings
-from app.group_drafting import service
 from app.group_drafting.service import (
     ClaudeGroupDraftProvider,
     GroupDraftingError,

@@ -7,7 +7,6 @@ from app import anthropic
 from app.auth import AuthenticatedUser
 from app.core.config import settings
 from app.main import app
-from app.moderation import service
 from app.moderation.schemas import ModerationItem
 from app.moderation.service import (
     ClaudeModerationProvider,

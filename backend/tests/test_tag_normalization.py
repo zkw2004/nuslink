@@ -2,8 +2,8 @@ import json
 
 from fastapi.testclient import TestClient
 
-from app.auth import AuthenticatedUser
 from app import anthropic
+from app.auth import AuthenticatedUser
 from app.core.config import settings
 from app.main import app
 from app.routers.tags import (

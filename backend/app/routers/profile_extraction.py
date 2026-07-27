@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.core.config import settings
 from app.auth import AuthenticatedUser, get_current_user
+from app.core.config import settings
 from app.profile_extraction.schemas import (
     ProfileExtractionProviderHealthResponse,
     ProfileExtractionRequest,
