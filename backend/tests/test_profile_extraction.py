@@ -266,7 +266,7 @@ def test_gemini_provider_sends_private_structured_file_request(
         "data": pdf_payload()["file_base64"],
     }
     assert request_body["generationConfig"]["responseMimeType"] == "application/json"
-    response_schema = request_body["generationConfig"]["responseJsonSchema"]
+    response_schema = request_body["generationConfig"]["responseSchema"]
     assert response_schema["type"] == "object"
     assert "maxLength" not in json.dumps(response_schema)
     assert "minLength" not in json.dumps(response_schema)

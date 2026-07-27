@@ -467,7 +467,7 @@ def test_gemini_provider_sends_structured_generate_content_request(monkeypatch):
     assert request_body["generationConfig"]["responseMimeType"] == (
         "application/json"
     )
-    response_schema = request_body["generationConfig"]["responseJsonSchema"]
+    response_schema = request_body["generationConfig"]["responseSchema"]
     assert response_schema["type"] == "object"
     assert response_schema["properties"]["confidence"]["type"] == [
         "number",

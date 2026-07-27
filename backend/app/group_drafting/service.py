@@ -124,7 +124,7 @@ class GeminiGroupDraftProvider:
                     ],
                     "generationConfig": {
                         "responseMimeType": "application/json",
-                        "responseJsonSchema": GROUP_DRAFT_SCHEMA,
+                        "responseSchema": GROUP_DRAFT_SCHEMA,
                     },
                 },
                 timeout=25,

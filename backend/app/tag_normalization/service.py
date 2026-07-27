@@ -301,7 +301,7 @@ class GeminiTagNormalizationProvider:
                 ],
                 "generationConfig": {
                     "responseMimeType": "application/json",
-                    "responseJsonSchema": schema,
+                    "responseSchema": schema,
                 },
             }
         ).encode("utf-8")

@@ -209,7 +209,7 @@ class GeminiProfileExtractionProvider:
                     ],
                     "generationConfig": {
                         "responseMimeType": "application/json",
-                        "responseJsonSchema": PROFILE_EXTRACTION_SCHEMA,
+                        "responseSchema": PROFILE_EXTRACTION_SCHEMA,
                         "maxOutputTokens": 4000,
                     },
                 },
