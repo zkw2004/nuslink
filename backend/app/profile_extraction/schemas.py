@@ -68,3 +68,11 @@ class ProfileExtractionResponse(BaseModel):
         max_length=30,
     )
     warnings: list[str] = Field(default_factory=list, max_length=10)
+
+
+class ProfileExtractionProviderHealthResponse(BaseModel):
+    provider: str
+    model: str | None
+    configured: bool
+    ok: bool
+    error: str | None = None

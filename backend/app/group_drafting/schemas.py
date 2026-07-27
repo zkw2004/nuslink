@@ -45,3 +45,11 @@ class GroupDraftResponse(BaseModel):
             raise ValueError("Minimum size cannot exceed maximum size.")
 
         return self
+
+
+class GroupDraftProviderHealthResponse(BaseModel):
+    provider: str
+    model: str | None
+    configured: bool
+    ok: bool
+    error: str | None = None

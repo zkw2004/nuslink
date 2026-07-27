@@ -1,10 +1,10 @@
 import json
 from typing import Protocol
-from urllib import error, request
 
 from pydantic import ValidationError
 
 from app.core.config import settings
+from app.gemini import GeminiRequestError, find_output_text, generate_content_payload
 from app.group_drafting.schemas import GroupDraftResponse
 
 
@@ -13,7 +13,12 @@ class GroupDraftingError(Exception):
 
 
 class GroupDraftProvider(Protocol):
+    provider_name: str
+    model_name: str | None
+
     def generate(self, prompt: str) -> dict[str, object]: ...
+
+    def check_health(self) -> None: ...
 
 
 GROUP_DRAFT_SCHEMA = {
@@ -88,59 +93,44 @@ Do not invent dates, venues, modules, or group sizes."""
 
 
 class GeminiGroupDraftProvider:
+    provider_name = "gemini"
+
+    @property
+    def model_name(self) -> str:
+        return settings.gemini_group_drafting_model
+
     def generate(self, prompt: str) -> dict[str, object]:
         if not settings.gemini_api_key:
             raise GroupDraftingError("Gemini group drafting is not configured.")
 
-        body = json.dumps(
-            {
-                "systemInstruction": {
-                    "parts": [
-                        {
-                            "text": (
-                                f"{SYSTEM_PROMPT}\n"
-                                "Return only JSON matching the response schema."
-                            )
-                        }
-                    ]
-                },
-                "contents": [
-                    {"role": "user", "parts": [{"text": prompt}]},
-                ],
-                "generationConfig": {
-                    "responseMimeType": "application/json",
-                    "responseJsonSchema": GROUP_DRAFT_SCHEMA,
-                },
-            }
-        ).encode("utf-8")
-        api_request = request.Request(
-            (
-                "https://generativelanguage.googleapis.com/v1beta/models/"
-                f"{settings.gemini_group_drafting_model}:generateContent"
-            ),
-            data=body,
-            headers={
-                "Content-Type": "application/json",
-                "x-goog-api-key": settings.gemini_api_key,
-            },
-            method="POST",
-        )
-
         try:
-            with request.urlopen(api_request, timeout=25) as response:
-                payload = json.loads(response.read().decode("utf-8"))
-        except error.HTTPError as exc:
-            raise GroupDraftingError(
-                "Gemini rejected the group draft request."
-            ) from exc
-        except (error.URLError, TimeoutError) as exc:
-            raise GroupDraftingError(
-                "Gemini is temporarily unavailable."
-            ) from exc
-        except json.JSONDecodeError as exc:
-            raise GroupDraftingError(
-                "Gemini returned an invalid group draft response."
-            ) from exc
+            payload = generate_content_payload(
+                request_type="group drafting",
+                model=settings.gemini_group_drafting_model,
+                api_key=settings.gemini_api_key,
+                body={
+                    "systemInstruction": {
+                        "parts": [
+                            {
+                                "text": (
+                                    f"{SYSTEM_PROMPT}\n"
+                                    "Return only JSON matching the response schema."
+                                )
+                            }
+                        ]
+                    },
+                    "contents": [
+                        {"role": "user", "parts": [{"text": prompt}]},
+                    ],
+                    "generationConfig": {
+                        "responseMimeType": "application/json",
+                        "responseJsonSchema": GROUP_DRAFT_SCHEMA,
+                    },
+                },
+                timeout=25,
+            )
+        except GeminiRequestError as exc:
+            raise GroupDraftingError(str(exc)) from exc
 
         output_text = _find_gemini_output_text(payload)
         try:
@@ -153,34 +143,20 @@ class GeminiGroupDraftProvider:
 
         return parsed_output
 
+    def check_health(self) -> None:
+        self.generate("CS2040S study group before midterms, 3 to 5 people at COM3.")
+
 
 def _find_gemini_output_text(payload: object) -> str:
-    if not isinstance(payload, dict):
-        raise GroupDraftingError("Gemini returned an invalid group draft response.")
-
-    candidates = payload.get("candidates")
-    if isinstance(candidates, list):
-        for candidate in candidates:
-            if not isinstance(candidate, dict):
-                continue
-
-            if candidate.get("finishReason") in {"SAFETY", "RECITATION"}:
-                raise GroupDraftingError("Gemini declined this group draft request.")
-
-            content = candidate.get("content")
-            if not isinstance(content, dict):
-                continue
-            parts = content.get("parts")
-            if not isinstance(parts, list):
-                continue
-            for part in parts:
-                if not isinstance(part, dict):
-                    continue
-                text = part.get("text")
-                if isinstance(text, str) and text:
-                    return text
-
-    raise GroupDraftingError("Gemini returned no group draft.")
+    try:
+        return find_output_text(
+            payload,
+            request_type="group drafting",
+            declined_message="Gemini declined this group draft request.",
+            no_output_message="Gemini returned no group draft.",
+        )
+    except GeminiRequestError as exc:
+        raise GroupDraftingError(str(exc)) from exc
 
 
 def create_group_draft(

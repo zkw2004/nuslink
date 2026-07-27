@@ -1,9 +1,11 @@
 import base64
+import io
 import json
 
 import pytest
 from fastapi.testclient import TestClient
 
+from app import gemini
 from app.auth import AuthenticatedUser
 from app.core.config import settings
 from app.main import app
@@ -12,7 +14,6 @@ from app.profile_extraction.service import (
     GeminiProfileExtractionProvider,
     ProfileExtractionError,
     _find_output_text,
-    _provider_http_error_message,
 )
 from app.routers.profile_extraction import (
     get_current_user as get_profile_extraction_current_user,
@@ -21,9 +22,13 @@ from app.routers.profile_extraction import get_profile_extraction_provider
 
 
 class FakeProfileExtractionProvider:
+    provider_name = "fake"
+    model_name = "fake-model"
+
     def __init__(self, output: dict[str, object]) -> None:
         self.output = output
         self.calls: list[dict[str, str]] = []
+        self.health_calls = 0
 
     def generate(
         self,
@@ -40,6 +45,9 @@ class FakeProfileExtractionProvider:
             }
         )
         return self.output
+
+    def check_health(self) -> None:
+        self.health_calls += 1
 
 
 class FakeGeminiResponse:
@@ -178,22 +186,6 @@ def test_find_output_text_rejects_provider_refusal():
         _find_output_text({"candidates": [{"finishReason": "SAFETY"}]})
 
 
-@pytest.mark.parametrize(
-    ("status_code", "expected_message"),
-    [
-        (400, "The AI provider could not process this resume. Try a PDF or image."),
-        (403, "AI profile extraction is not configured correctly."),
-        (429, "AI profile extraction is busy. Please try again shortly."),
-        (500, "The AI provider is temporarily unavailable."),
-    ],
-)
-def test_provider_http_errors_are_actionable(
-    status_code: int,
-    expected_message: str,
-):
-    assert _provider_http_error_message(status_code) == expected_message
-
-
 def test_gemini_provider_sends_private_structured_file_request(
     monkeypatch: pytest.MonkeyPatch,
 ):
@@ -220,7 +212,7 @@ def test_gemini_provider_sends_private_structured_file_request(
             }
         )
 
-    monkeypatch.setattr(service.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(gemini.request, "urlopen", fake_urlopen)
 
     result = GeminiProfileExtractionProvider().generate(
         filename="resume.pdf",
@@ -228,7 +220,7 @@ def test_gemini_provider_sends_private_structured_file_request(
         file_base64=pdf_payload()["file_base64"],
     )
     api_request = captured_request["request"]
-    assert isinstance(api_request, service.request.Request)
+    assert isinstance(api_request, gemini.request.Request)
     request_body = json.loads(api_request.data.decode("utf-8"))
 
     assert api_request.full_url == (
@@ -248,3 +240,60 @@ def test_gemini_provider_sends_private_structured_file_request(
     assert request_body["generationConfig"]["maxOutputTokens"] == 4000
     assert captured_request["timeout"] == 45
     assert result["skills"][0]["value"] == " Python "
+
+
+def test_profile_extraction_provider_health_endpoint_returns_status():
+    provider = FakeProfileExtractionProvider(valid_output())
+    app.dependency_overrides[get_profile_extraction_current_user] = (
+        override_current_user
+    )
+    app.dependency_overrides[get_profile_extraction_provider] = lambda: provider
+
+    try:
+        response = client.get("/v1/profiles/extract/provider-health")
+    finally:
+        app.dependency_overrides.pop(get_profile_extraction_current_user, None)
+        app.dependency_overrides.pop(get_profile_extraction_provider, None)
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "provider": "fake",
+        "model": "fake-model",
+        "configured": bool(settings.gemini_api_key),
+        "ok": True,
+        "error": None,
+    }
+    assert provider.health_calls == 1
+
+
+def test_profile_extraction_provider_surfaces_http_error_detail(monkeypatch):
+    monkeypatch.setattr(settings, "gemini_api_key", "test-key")
+    monkeypatch.setattr(
+        settings,
+        "gemini_profile_extraction_model",
+        "test-profile-model",
+    )
+
+    def fake_urlopen(api_request: object, timeout: int) -> FakeGeminiResponse:
+        del api_request, timeout
+        raise gemini.error.HTTPError(
+            url="https://example.test",
+            code=403,
+            msg="Forbidden",
+            hdrs={},
+            fp=io.BytesIO(b'{"error":{"message":"API key not valid"}}'),
+        )
+
+    monkeypatch.setattr(gemini.request, "urlopen", fake_urlopen)
+
+    try:
+        GeminiProfileExtractionProvider().generate(
+            filename="resume.pdf",
+            mime_type="application/pdf",
+            file_base64=pdf_payload()["file_base64"],
+        )
+    except ProfileExtractionError as exc:
+        assert "HTTP 403" in str(exc)
+        assert "API key not valid" in str(exc)
+    else:
+        raise AssertionError("Expected profile extraction HTTP errors to surface.")

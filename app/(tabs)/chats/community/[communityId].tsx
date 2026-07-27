@@ -99,17 +99,6 @@ function getHeaderMetrics(width: number) {
   };
 }
 
-function formatMessageTime(value: string) {
-  const date = new Date(value);
-
-  return date.toLocaleString("en-SG", {
-    day: "numeric",
-    month: "short",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
-
 function formatThreadTime(value: string) {
   return new Date(value).toLocaleTimeString("en-SG", {
     hour: "numeric",
@@ -264,21 +253,8 @@ export default function CommunityChatThreadScreen() {
     (state) => state.subscribeToCommunity,
   );
 
-  const communityResourcesById = useSharedResourcesStore(
-    (state) => state.communityResources,
-  );
-  const isResourcesLoading = useSharedResourcesStore(
-    (state) => state.isLoading,
-  );
-  const isUploadingResource = useSharedResourcesStore(
-    (state) => state.isUploading,
-  );
-  const resourcesError = useSharedResourcesStore((state) => state.error);
   const loadCommunityResources = useSharedResourcesStore(
     (state) => state.loadCommunityResources,
-  );
-  const uploadCommunityResource = useSharedResourcesStore(
-    (state) => state.uploadCommunityResource,
   );
 
   const pollsByMessageId = useChatFeaturesStore(
@@ -349,11 +325,6 @@ export default function CommunityChatThreadScreen() {
   );
   const chatKey = `community:${communityId}`;
   const pinnedMessages = pinnedMessagesByChatKey[chatKey] ?? [];
-  const communityResources = useMemo(
-    () => communityResourcesById[communityId] ?? [],
-    [communityId, communityResourcesById],
-  );
-
   useEffect(() => {
     if (!session?.user.id || !communityId) {
       return;
@@ -677,71 +648,6 @@ export default function CommunityChatThreadScreen() {
       );
     } finally {
       setIsUploadingAttachment(false);
-    }
-  }
-
-  async function handleUploadResource() {
-    if (!session?.user.id) {
-      Alert.alert(
-        "Sign in required",
-        "Please sign in again before uploading files.",
-      );
-      return;
-    }
-
-    let documentPicker: DocumentPickerModule;
-
-    try {
-      documentPicker =
-        (await import("expo-document-picker")) as DocumentPickerModule;
-    } catch {
-      Alert.alert(
-        "File picker unavailable",
-        "Install project dependencies again on this machine before uploading files.",
-      );
-      return;
-    }
-
-    const result = await documentPicker.getDocumentAsync({
-      copyToCacheDirectory: true,
-      multiple: false,
-      type: [
-        "application/pdf",
-        "text/plain",
-        "application/msword",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "application/vnd.ms-excel",
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "application/vnd.ms-powerpoint",
-        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        "image/jpeg",
-        "image/png",
-        "image/webp",
-      ],
-    });
-
-    if (result.canceled) {
-      return;
-    }
-
-    const asset = result.assets[0];
-    const bytes = await new ExpoFile(asset.uri).arrayBuffer();
-
-    try {
-      await uploadCommunityResource(communityId, {
-        bytes,
-        uri: asset.uri,
-        name: asset.name,
-        mimeType: asset.mimeType ?? getMimeTypeFromName(asset.name),
-        size: asset.size ?? bytes.byteLength,
-      });
-    } catch (uploadError) {
-      Alert.alert(
-        "Could not upload resource",
-        uploadError instanceof Error
-          ? uploadError.message
-          : "Please try again.",
-      );
     }
   }
 

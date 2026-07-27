@@ -65,17 +65,6 @@ function getHeaderMetrics(width: number) {
   };
 }
 
-function formatMessageTime(value: string) {
-  const date = new Date(value);
-
-  return date.toLocaleString("en-SG", {
-    day: "numeric",
-    month: "short",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
-
 function formatThreadTime(value: string) {
   return new Date(value).toLocaleTimeString("en-SG", {
     hour: "numeric",

@@ -1,7 +1,9 @@
+import io
 import json
 
 from fastapi.testclient import TestClient
 
+from app import gemini
 from app.auth import AuthenticatedUser
 from app.core.config import settings
 from app.main import app
@@ -153,6 +155,27 @@ def test_moderate_content_blocks_directed_chat_profanity_without_provider():
 
     assert result.outcome == "blocked"
     assert result.categories == ["harassment"]
+    assert result.visible is False
+    assert provider.calls == []
+    assert repository.events[0]["provider"] == "rule_based"
+
+
+def test_moderate_content_blocks_clear_chat_vulgarity_without_provider():
+    provider = FakeModerationProvider()
+    repository = FakeModerationRepository()
+
+    result = moderate_content(
+        actor_id="user-kaiwen",
+        item=moderation_item(
+            "what the fuck",
+            subject_type="group_chat_message",
+        ),
+        provider=provider,
+        repository=repository,
+    )
+
+    assert result.outcome == "blocked"
+    assert result.categories == ["explicit_content"]
     assert result.visible is False
     assert provider.calls == []
     assert repository.events[0]["provider"] == "rule_based"
@@ -372,6 +395,27 @@ def test_moderation_endpoint_requires_authentication():
     assert response.status_code == 401
 
 
+def test_moderation_provider_health_endpoint_returns_status():
+    provider = FakeModerationProvider()
+    app.dependency_overrides[get_moderation_current_user] = override_current_user
+    app.dependency_overrides[get_moderation_provider] = lambda: provider
+
+    try:
+        response = client.get("/v1/moderation/provider-health")
+    finally:
+        app.dependency_overrides.pop(get_moderation_current_user, None)
+        app.dependency_overrides.pop(get_moderation_provider, None)
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "provider": "fake",
+        "model": "fake-model",
+        "configured": bool(settings.gemini_api_key),
+        "ok": True,
+        "error": None,
+    }
+
+
 def test_gemini_provider_sends_structured_generate_content_request(monkeypatch):
     monkeypatch.setattr(settings, "gemini_api_key", "test-key")
     monkeypatch.setattr(settings, "gemini_moderation_model", "test-model")
@@ -403,14 +447,14 @@ def test_gemini_provider_sends_structured_generate_content_request(monkeypatch):
             }
         )
 
-    monkeypatch.setattr(service.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(gemini.request, "urlopen", fake_urlopen)
 
     result = GeminiModerationProvider().moderate(
         subject_type="group_description",
         content="Study dynamic programming together.",
     )
     api_request = captured_request["request"]
-    assert isinstance(api_request, service.request.Request)
+    assert isinstance(api_request, gemini.request.Request)
     request_body = json.loads(api_request.data.decode("utf-8"))
 
     assert (
@@ -436,3 +480,33 @@ def test_gemini_provider_sends_structured_generate_content_request(monkeypatch):
     assert "nullable" not in json.dumps(response_schema)
     assert "temperature" not in request_body["generationConfig"]
     assert result.outcome == "allowed"
+
+
+def test_gemini_provider_surfaces_http_error_detail(monkeypatch):
+    monkeypatch.setattr(settings, "gemini_api_key", "test-key")
+    monkeypatch.setattr(settings, "gemini_moderation_model", "test-model")
+
+    def fake_urlopen(api_request: object, timeout: int) -> FakeGeminiResponse:
+        del api_request, timeout
+        raise gemini.error.HTTPError(
+            url="https://example.test",
+            code=404,
+            msg="Not Found",
+            hdrs={},
+            fp=io.BytesIO(
+                b'{"error":{"message":"models/test-model is not found"}}'
+            ),
+        )
+
+    monkeypatch.setattr(gemini.request, "urlopen", fake_urlopen)
+
+    try:
+        GeminiModerationProvider().moderate(
+            subject_type="group_description",
+            content="Study algorithms together.",
+        )
+    except ModerationProviderError as exc:
+        assert "HTTP 404" in str(exc)
+        assert "models/test-model is not found" in str(exc)
+    else:
+        raise AssertionError("Expected Gemini HTTP errors to surface details.")

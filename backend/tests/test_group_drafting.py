@@ -1,8 +1,10 @@
+import io
 import json
 
 import pytest
 from fastapi.testclient import TestClient
 
+from app import gemini
 from app.auth import AuthenticatedUser
 from app.core.config import settings
 from app.group_drafting import service
@@ -17,13 +19,20 @@ from app.routers.group_drafts import get_group_draft_provider
 
 
 class FakeGroupDraftProvider:
+    provider_name = "fake"
+    model_name = "fake-model"
+
     def __init__(self, output: dict[str, object]) -> None:
         self.output = output
         self.prompts: list[str] = []
+        self.health_calls = 0
 
     def generate(self, prompt: str) -> dict[str, object]:
         self.prompts.append(prompt)
         return self.output
+
+    def check_health(self) -> None:
+        self.health_calls += 1
 
 
 class FakeGeminiResponse:
@@ -212,11 +221,11 @@ def test_gemini_provider_sends_structured_generate_content_request(
             }
         )
 
-    monkeypatch.setattr(service.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(gemini.request, "urlopen", fake_urlopen)
 
     result = GeminiGroupDraftProvider().generate("Create a CS2040S study group.")
     api_request = captured_request["request"]
-    assert isinstance(api_request, service.request.Request)
+    assert isinstance(api_request, gemini.request.Request)
     request_body = json.loads(api_request.data.decode("utf-8"))
 
     assert api_request.full_url == (
@@ -233,3 +242,62 @@ def test_gemini_provider_sends_structured_generate_content_request(
     assert "nullable" not in json.dumps(response_schema)
     assert "maxLength" not in json.dumps(response_schema)
     assert result["module_code"] == "CS2040S"
+
+
+def test_group_draft_provider_health_endpoint_returns_status():
+    provider = FakeGroupDraftProvider(
+        {
+            "name": "CS2040S Prep",
+            "type": "study_group",
+            "module_code": "CS2040S",
+            "privacy": "public",
+            "restriction": None,
+            "description": None,
+            "venue": None,
+            "min_size": 3,
+            "max_size": 5,
+        }
+    )
+    app.dependency_overrides[get_group_drafts_current_user] = override_current_user
+    app.dependency_overrides[get_group_draft_provider] = lambda: provider
+
+    try:
+        response = client.get("/v1/groups/draft/provider-health")
+    finally:
+        app.dependency_overrides.pop(get_group_drafts_current_user, None)
+        app.dependency_overrides.pop(get_group_draft_provider, None)
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "provider": "fake",
+        "model": "fake-model",
+        "configured": bool(settings.gemini_api_key),
+        "ok": True,
+        "error": None,
+    }
+    assert provider.health_calls == 1
+
+
+def test_group_draft_provider_surfaces_http_error_detail(monkeypatch):
+    monkeypatch.setattr(settings, "gemini_api_key", "test-key")
+    monkeypatch.setattr(settings, "gemini_group_drafting_model", "test-model")
+
+    def fake_urlopen(api_request: object, timeout: int) -> FakeGeminiResponse:
+        del api_request, timeout
+        raise gemini.error.HTTPError(
+            url="https://example.test",
+            code=429,
+            msg="Too Many Requests",
+            hdrs={},
+            fp=io.BytesIO(b'{"error":{"message":"quota exceeded"}}'),
+        )
+
+    monkeypatch.setattr(gemini.request, "urlopen", fake_urlopen)
+
+    try:
+        GeminiGroupDraftProvider().generate("Create a CS2040S study group.")
+    except GroupDraftingError as exc:
+        assert "HTTP 429" in str(exc)
+        assert "quota exceeded" in str(exc)
+    else:
+        raise AssertionError("Expected group draft HTTP errors to surface.")

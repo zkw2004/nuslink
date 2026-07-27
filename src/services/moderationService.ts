@@ -2,6 +2,7 @@ import { Alert } from "react-native";
 
 import { api } from "@lib/api";
 import { supabase } from "@lib/supabase";
+import { classifyFastChatModeration } from "@utils/moderation";
 import type {
   ModerationOutcome,
   ModerationResult,
@@ -59,15 +60,6 @@ type ContainerModerationTarget =
       tags: string[];
     };
 
-type FastModerationDecision =
-  | { outcome: "blocked"; reason: string }
-  | { outcome: "pending" };
-
-const ABUSIVE_PROFANITY_PATTERN =
-  /\b(f+u+c+k+(?:ing|er|ed)?|f+ck(?:ing|er|ed)?|shit+|bitch+|cunt+)\b/i;
-const DIRECTED_ATTACK_PATTERN =
-  /\b(u|you|ur|your|idiot|moron|stupid|dumb|loser)\b/i;
-
 function normalizeVerdict(outcome: string | null | undefined): ModerationOutcome {
   if (
     outcome === "blocked" ||
@@ -80,20 +72,7 @@ function normalizeVerdict(outcome: string | null | undefined): ModerationOutcome
   return "allowed";
 }
 
-export function classifyFastChatModeration(content: string): FastModerationDecision {
-  const trimmed = content.trim();
-  if (
-    ABUSIVE_PROFANITY_PATTERN.test(trimmed) &&
-    DIRECTED_ATTACK_PATTERN.test(trimmed)
-  ) {
-    return {
-      outcome: "blocked",
-      reason: "Targets another user with abusive profanity.",
-    };
-  }
-
-  return { outcome: "pending" };
-}
+export { classifyFastChatModeration };
 
 function mapResult(response: ModerationCheckResponse): ModerationResult {
   return {

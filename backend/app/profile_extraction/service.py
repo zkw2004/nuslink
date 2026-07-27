@@ -2,11 +2,11 @@ import base64
 import binascii
 import json
 from typing import Protocol
-from urllib import error, request
 
 from pydantic import ValidationError
 
 from app.core.config import settings
+from app.gemini import GeminiRequestError, find_output_text, generate_content_payload
 from app.profile_extraction.schemas import (
     ExtractedProfileEntry,
     ExtractedProfileItem,
@@ -27,6 +27,9 @@ class InvalidProfileFileError(ProfileExtractionError):
 
 
 class ProfileExtractionProvider(Protocol):
+    provider_name: str
+    model_name: str | None
+
     def generate(
         self,
         *,
@@ -34,6 +37,8 @@ class ProfileExtractionProvider(Protocol):
         mime_type: str,
         file_base64: str,
     ) -> dict[str, object]: ...
+
+    def check_health(self) -> None: ...
 
 
 PROFILE_EXTRACTION_SCHEMA = {
@@ -154,6 +159,12 @@ hackathons, case competitions, and contests as competition."""
 
 
 class GeminiProfileExtractionProvider:
+    provider_name = "gemini"
+
+    @property
+    def model_name(self) -> str:
+        return settings.gemini_profile_extraction_model
+
     def generate(
         self,
         *,
@@ -164,62 +175,42 @@ class GeminiProfileExtractionProvider:
         if not settings.gemini_api_key:
             raise ProfileExtractionError("AI profile extraction is not configured.")
 
-        body = json.dumps(
-            {
-                "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]},
-                "contents": [
-                    {
-                        "role": "user",
-                        "parts": [
-                            {
-                                "inlineData": {
-                                    "mimeType": mime_type,
-                                    "data": file_base64,
-                                }
-                            },
-                            {
-                                "text": (
-                                    "Extract the profile draft from this resume "
-                                    f"named {filename}."
-                                )
-                            },
-                        ],
-                    },
-                ],
-                "generationConfig": {
-                    "responseMimeType": "application/json",
-                    "responseJsonSchema": PROFILE_EXTRACTION_SCHEMA,
-                    "maxOutputTokens": 4000,
-                },
-            }
-        ).encode("utf-8")
-        api_request = request.Request(
-            (
-                "https://generativelanguage.googleapis.com/v1beta/models/"
-                f"{settings.gemini_profile_extraction_model}:generateContent"
-            ),
-            data=body,
-            headers={
-                "Content-Type": "application/json",
-                "x-goog-api-key": settings.gemini_api_key,
-            },
-            method="POST",
-        )
-
         try:
-            with request.urlopen(api_request, timeout=45) as response:
-                payload = json.loads(response.read().decode("utf-8"))
-        except error.HTTPError as exc:
-            message = _provider_http_error_message(exc.code)
-            raise ProfileExtractionError(message) from exc
-        except (error.URLError, TimeoutError) as exc:
-            raise ProfileExtractionError(
-                "The AI provider is temporarily unavailable."
-            ) from exc
-        except json.JSONDecodeError as exc:
-            raise ProfileExtractionError(
-                "The AI provider returned an invalid response."
-            ) from exc
+            payload = generate_content_payload(
+                request_type="profile extraction",
+                model=settings.gemini_profile_extraction_model,
+                api_key=settings.gemini_api_key,
+                body={
+                    "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]},
+                    "contents": [
+                        {
+                            "role": "user",
+                            "parts": [
+                                {
+                                    "inlineData": {
+                                        "mimeType": mime_type,
+                                        "data": file_base64,
+                                    }
+                                },
+                                {
+                                    "text": (
+                                        "Extract the profile draft from this resume "
+                                        f"named {filename}."
+                                    )
+                                },
+                            ],
+                        },
+                    ],
+                    "generationConfig": {
+                        "responseMimeType": "application/json",
+                        "responseJsonSchema": PROFILE_EXTRACTION_SCHEMA,
+                        "maxOutputTokens": 4000,
+                    },
+                },
+                timeout=45,
+            )
+        except GeminiRequestError as exc:
+            raise ProfileExtractionError(str(exc)) from exc
 
         output_text = _find_output_text(payload)
         try:
@@ -236,42 +227,61 @@ class GeminiProfileExtractionProvider:
 
         return parsed_output
 
+    def check_health(self) -> None:
+        if not settings.gemini_api_key:
+            raise ProfileExtractionError("AI profile extraction is not configured.")
 
-def _provider_http_error_message(status_code: int) -> str:
-    if status_code in {401, 403}:
-        return "AI profile extraction is not configured correctly."
-    if status_code == 429:
-        return "AI profile extraction is busy. Please try again shortly."
-    if status_code == 400:
-        return "The AI provider could not process this resume. Try a PDF or image."
-    return "The AI provider is temporarily unavailable."
+        try:
+            payload = generate_content_payload(
+                request_type="profile extraction health",
+                model=settings.gemini_profile_extraction_model,
+                api_key=settings.gemini_api_key,
+                body={
+                    "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]},
+                    "contents": [
+                        {
+                            "role": "user",
+                            "parts": [
+                                {
+                                    "text": (
+                                        "Return an empty NUSLink profile extraction "
+                                        "draft for a provider health check."
+                                    )
+                                }
+                            ],
+                        }
+                    ],
+                    "generationConfig": {
+                        "responseMimeType": "application/json",
+                        "responseJsonSchema": PROFILE_EXTRACTION_SCHEMA,
+                        "maxOutputTokens": 800,
+                    },
+                },
+                timeout=25,
+            )
+        except GeminiRequestError as exc:
+            raise ProfileExtractionError(str(exc)) from exc
+
+        output_text = _find_output_text(payload)
+        try:
+            parsed_output = json.loads(output_text)
+            ProfileExtractionResponse.model_validate(parsed_output)
+        except (json.JSONDecodeError, ValidationError) as exc:
+            raise ProfileExtractionError(
+                "AI profile extraction health check returned invalid output."
+            ) from exc
 
 
 def _find_output_text(payload: object) -> str:
-    if not isinstance(payload, dict):
-        raise ProfileExtractionError("The AI provider returned an invalid response.")
-
-    candidates = payload.get("candidates")
-    if isinstance(candidates, list):
-        for candidate in candidates:
-            if not isinstance(candidate, dict):
-                continue
-            if candidate.get("finishReason") in {"SAFETY", "RECITATION"}:
-                raise ProfileExtractionError("The AI provider declined this resume.")
-            content = candidate.get("content")
-            if not isinstance(content, dict):
-                continue
-            parts = content.get("parts")
-            if not isinstance(parts, list):
-                continue
-            for part in parts:
-                if not isinstance(part, dict):
-                    continue
-                text = part.get("text")
-                if isinstance(text, str) and text:
-                    return text
-
-    raise ProfileExtractionError("The AI provider returned no profile draft.")
+    try:
+        return find_output_text(
+            payload,
+            request_type="profile extraction",
+            declined_message="The AI provider declined this resume.",
+            no_output_message="The AI provider returned no profile draft.",
+        )
+    except GeminiRequestError as exc:
+        raise ProfileExtractionError(str(exc)) from exc
 
 
 def _validate_file(payload: ProfileExtractionRequest) -> str:

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   ScrollView,
@@ -302,10 +302,10 @@ export default function PeopleScreen() {
     [incomingRequests],
   );
 
-  function logFeedbackEvent(
+  const logFeedbackEvent = useCallback((
     candidate: PeopleMatch,
     eventType: "view" | "skip" | "accept",
-  ) {
+  ) => {
     void logMatchFeedbackEvent({
       target_user_id: candidate.user_id,
       event_type: eventType,
@@ -321,7 +321,7 @@ export default function PeopleScreen() {
     }).catch(() => {
       // Feedback logging should never block the main People flow.
     });
-  }
+  }, [activeModule, semester]);
 
   useEffect(() => {
     for (const candidate of filteredMatches) {
@@ -334,7 +334,7 @@ export default function PeopleScreen() {
       loggedViewKeys.current.add(viewKey);
       logFeedbackEvent(candidate, "view");
     }
-  }, [activeModule, filteredMatches, semester]);
+  }, [activeModule, filteredMatches, logFeedbackEvent, semester]);
 
   async function handleSendRequest(candidate: PeopleMatch) {
     if (!session?.user.id) {
