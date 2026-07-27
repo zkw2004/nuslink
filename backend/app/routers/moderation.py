@@ -1,15 +1,18 @@
 from fastapi import APIRouter, Depends
 
 from app.auth import AuthenticatedUser, get_current_user
+from app.core.config import settings
 from app.moderation.schemas import (
     ModerationBatchRequest,
     ModerationBatchResponse,
     ModerationCheckRequest,
     ModerationCheckResponse,
+    ModerationProviderHealthResponse,
 )
 from app.moderation.service import (
     GeminiModerationProvider,
     ModerationProvider,
+    ModerationProviderError,
     moderate_batch,
     moderate_content,
 )
@@ -24,6 +27,37 @@ def get_moderation_provider() -> ModerationProvider:
 
 def get_moderation_repository() -> SupabaseModerationRepository:
     return SupabaseModerationRepository()
+
+
+@router.get("/provider-health", response_model=ModerationProviderHealthResponse)
+def provider_health(
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    provider: ModerationProvider = Depends(get_moderation_provider),
+) -> ModerationProviderHealthResponse:
+    del current_user
+    configured = bool(settings.gemini_api_key)
+
+    try:
+        provider.moderate(
+            subject_type="group_description",
+            content="Study algorithms together.",
+        )
+    except ModerationProviderError as exc:
+        return ModerationProviderHealthResponse(
+            provider=provider.provider_name,
+            model=provider.model_name,
+            configured=configured,
+            ok=False,
+            error=str(exc),
+        )
+
+    return ModerationProviderHealthResponse(
+        provider=provider.provider_name,
+        model=provider.model_name,
+        configured=configured,
+        ok=True,
+        error=None,
+    )
 
 
 @router.post("/check", response_model=ModerationCheckResponse)

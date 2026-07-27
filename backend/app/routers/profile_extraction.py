@@ -1,7 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
+from app.core.config import settings
 from app.auth import AuthenticatedUser, get_current_user
 from app.profile_extraction.schemas import (
+    ProfileExtractionProviderHealthResponse,
     ProfileExtractionRequest,
     ProfileExtractionResponse,
 )
@@ -18,6 +20,37 @@ router = APIRouter(prefix="/v1/profiles", tags=["profiles"])
 
 def get_profile_extraction_provider() -> ProfileExtractionProvider:
     return GeminiProfileExtractionProvider()
+
+
+@router.get(
+    "/extract/provider-health",
+    response_model=ProfileExtractionProviderHealthResponse,
+)
+def provider_health(
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    provider: ProfileExtractionProvider = Depends(get_profile_extraction_provider),
+) -> ProfileExtractionProviderHealthResponse:
+    del current_user
+    configured = bool(settings.gemini_api_key)
+
+    try:
+        provider.check_health()
+    except ProfileExtractionError as exc:
+        return ProfileExtractionProviderHealthResponse(
+            provider=provider.provider_name,
+            model=provider.model_name,
+            configured=configured,
+            ok=False,
+            error=str(exc),
+        )
+
+    return ProfileExtractionProviderHealthResponse(
+        provider=provider.provider_name,
+        model=provider.model_name,
+        configured=configured,
+        ok=True,
+        error=None,
+    )
 
 
 @router.post("/extract", response_model=ProfileExtractionResponse)

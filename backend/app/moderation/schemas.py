@@ -66,3 +66,11 @@ class ModerationBatchResponse(BaseModel):
     overall_outcome: ModerationOutcome
     visible: bool
     results: list[ModerationResult]
+
+
+class ModerationProviderHealthResponse(BaseModel):
+    provider: str
+    model: str | None
+    configured: bool
+    ok: bool
+    error: str | None = None

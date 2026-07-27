@@ -2,11 +2,11 @@ import hashlib
 import json
 import re
 from typing import Any, Protocol, cast
-from urllib import error, request
 
 from pydantic import BaseModel, Field
 
 from app.core.config import settings
+from app.gemini import GeminiRequestError, find_output_text, generate_content_payload
 from app.moderation.repository import ModerationRepository
 from app.moderation.schemas import (
     ModerationCategory,
@@ -42,7 +42,13 @@ CHAT_SUBJECT_TYPES = {
     "community_chat_message",
 }
 ABUSIVE_PROFANITY_PATTERN = re.compile(
-    r"\b(f+u+c+k+(?:ing|er|ed)?|f+ck(?:ing|er|ed)?|shit+|bitch+|cunt+)\b",
+    r"\b(f+u+c+k+(?:ing|er|ed)?|f+ck(?:ing|er|ed)?|shit+|bitch+|cunt+|"
+    r"motherf+u+c+k+(?:er|ing)?|asshole+)\b",
+    re.IGNORECASE,
+)
+CLEAR_VULGARITY_PATTERN = re.compile(
+    r"\b(f+u+c+k+(?:ing|er|ed)?|f+ck(?:ing|er|ed)?|motherf+u+c+k+(?:er|ing)?|"
+    r"cunt+)\b",
     re.IGNORECASE,
 )
 DIRECTED_ATTACK_PATTERN = re.compile(
@@ -109,68 +115,46 @@ class GeminiModerationProvider:
             "required": ["outcome", "categories", "confidence", "reason"],
         }
 
-        body = json.dumps(
-            {
-                "systemInstruction": {
-                    "parts": [
-                        {
-                            "text": (
-                                f"{SYSTEM_PROMPT}\n"
-                                "Return only JSON matching the response schema."
-                            )
-                        }
-                    ]
-                },
-                "contents": [
-                    {
-                        "role": "user",
+        try:
+            payload = generate_content_payload(
+                request_type="moderation",
+                model=settings.gemini_moderation_model,
+                api_key=settings.gemini_api_key,
+                body={
+                    "systemInstruction": {
                         "parts": [
                             {
-                                "text": json.dumps(
-                                    {
-                                        "subject_type": subject_type,
-                                        "content": content,
-                                    }
+                                "text": (
+                                    f"{SYSTEM_PROMPT}\n"
+                                    "Return only JSON matching the response schema."
                                 )
                             }
-                        ],
-                    }
-                ],
-                "generationConfig": {
-                    "responseMimeType": "application/json",
-                    "responseJsonSchema": schema,
+                        ]
+                    },
+                    "contents": [
+                        {
+                            "role": "user",
+                            "parts": [
+                                {
+                                    "text": json.dumps(
+                                        {
+                                            "subject_type": subject_type,
+                                            "content": content,
+                                        }
+                                    )
+                                }
+                            ],
+                        }
+                    ],
+                    "generationConfig": {
+                        "responseMimeType": "application/json",
+                        "responseJsonSchema": schema,
+                    },
                 },
-            }
-        ).encode("utf-8")
-        api_request = request.Request(
-            (
-                "https://generativelanguage.googleapis.com/v1beta/models/"
-                f"{settings.gemini_moderation_model}:generateContent"
-            ),
-            data=body,
-            headers={
-                "Content-Type": "application/json",
-                "x-goog-api-key": settings.gemini_api_key,
-            },
-            method="POST",
-        )
-
-        try:
-            with request.urlopen(api_request, timeout=25) as response:
-                payload = json.loads(response.read().decode("utf-8"))
-        except error.HTTPError as exc:
-            error_detail = _read_http_error_detail(exc)
-            raise ModerationProviderError(
-                f"Gemini rejected the moderation request: {error_detail}"
-            ) from exc
-        except (error.URLError, TimeoutError) as exc:
-            raise ModerationProviderError(
-                "Gemini is temporarily unavailable."
-            ) from exc
-        except json.JSONDecodeError as exc:
-            raise ModerationProviderError(
-                "Gemini returned an invalid moderation response."
-            ) from exc
+                timeout=25,
+            )
+        except GeminiRequestError as exc:
+            raise ModerationProviderError(str(exc)) from exc
 
         output_text = _find_gemini_output_text(payload)
 
@@ -314,9 +298,23 @@ def _rule_based_chat_result(
         return None
 
     has_abusive_profanity = ABUSIVE_PROFANITY_PATTERN.search(content) is not None
+    has_clear_vulgarity = CLEAR_VULGARITY_PATTERN.search(content) is not None
     is_directed_attack = DIRECTED_ATTACK_PATTERN.search(content) is not None
 
     if not has_abusive_profanity or not is_directed_attack:
+        if has_clear_vulgarity:
+            return ModerationResult(
+                subject_type=item.subject_type,
+                subject_id=item.subject_id,
+                source_table=item.source_table,
+                source_column=item.source_column,
+                outcome="blocked",
+                categories=["explicit_content"],
+                confidence=0.97,
+                reason="Contains clearly vulgar language.",
+                visible=False,
+            )
+
         return None
 
     return ModerationResult(
@@ -333,40 +331,15 @@ def _rule_based_chat_result(
 
 
 def _find_gemini_output_text(payload: dict[str, Any]) -> str:
-    for candidate in payload.get("candidates", []):
-        if not isinstance(candidate, dict):
-            continue
-
-        finish_reason = candidate.get("finishReason")
-        if finish_reason in {"SAFETY", "RECITATION"}:
-            raise ModerationProviderError(
-                "Gemini declined this moderation request."
-            )
-
-        content = candidate.get("content")
-        if not isinstance(content, dict):
-            continue
-
-        for part in content.get("parts", []):
-            if not isinstance(part, dict):
-                continue
-            text = part.get("text")
-            if isinstance(text, str):
-                return text
-
-    raise ModerationProviderError("Gemini did not return moderation text.")
-
-
-def _read_http_error_detail(exc: error.HTTPError) -> str:
     try:
-        body = exc.read().decode("utf-8")
-    except Exception:
-        body = ""
-
-    if not body:
-        return f"HTTP {exc.code}"
-
-    return body[:400]
+        return find_output_text(
+            payload,
+            request_type="moderation",
+            declined_message="Gemini declined this moderation request.",
+            no_output_message="Gemini did not return moderation text.",
+        )
+    except GeminiRequestError as exc:
+        raise ModerationProviderError(str(exc)) from exc
 
 
 def _parse_provider_result(
