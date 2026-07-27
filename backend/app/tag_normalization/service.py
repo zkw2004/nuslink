@@ -6,6 +6,7 @@ from typing import Protocol
 from urllib import error, parse, request
 
 from app.core.config import settings
+from app.gemini import to_gemini_response_schema
 from app.tag_normalization.schemas import (
     TagClassification,
     TagNormalizationResult,
@@ -301,7 +302,7 @@ class GeminiTagNormalizationProvider:
                 ],
                 "generationConfig": {
                     "responseMimeType": "application/json",
-                    "responseSchema": schema,
+                    "responseSchema": to_gemini_response_schema(schema),
                 },
             }
         ).encode("utf-8")

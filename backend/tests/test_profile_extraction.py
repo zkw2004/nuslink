@@ -268,6 +268,12 @@ def test_gemini_provider_sends_private_structured_file_request(
     assert request_body["generationConfig"]["responseMimeType"] == "application/json"
     response_schema = request_body["generationConfig"]["responseSchema"]
     assert response_schema["type"] == "object"
+    assert response_schema["properties"]["suggested_bio"]["type"] == "string"
+    assert response_schema["properties"]["suggested_bio"]["nullable"] is True
+    assert response_schema["properties"]["skills"]["items"]["properties"]["evidence"][
+        "nullable"
+    ] is True
+    assert "additionalProperties" not in json.dumps(response_schema)
     assert "maxLength" not in json.dumps(response_schema)
     assert "minLength" not in json.dumps(response_schema)
     assert request_body["generationConfig"]["maxOutputTokens"] == 4000

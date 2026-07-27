@@ -6,7 +6,12 @@ from typing import Any, Protocol, cast
 from pydantic import BaseModel, Field
 
 from app.core.config import settings
-from app.gemini import GeminiRequestError, find_output_text, generate_content_payload
+from app.gemini import (
+    GeminiRequestError,
+    find_output_text,
+    generate_content_payload,
+    to_gemini_response_schema,
+)
 from app.moderation.repository import ModerationRepository
 from app.moderation.schemas import (
     ModerationCategory,
@@ -148,7 +153,7 @@ class GeminiModerationProvider:
                     ],
                     "generationConfig": {
                         "responseMimeType": "application/json",
-                        "responseSchema": schema,
+                        "responseSchema": to_gemini_response_schema(schema),
                     },
                 },
                 timeout=25,

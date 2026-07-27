@@ -4,7 +4,12 @@ from typing import Protocol
 from pydantic import ValidationError
 
 from app.core.config import settings
-from app.gemini import GeminiRequestError, find_output_text, generate_content_payload
+from app.gemini import (
+    GeminiRequestError,
+    find_output_text,
+    generate_content_payload,
+    to_gemini_response_schema,
+)
 from app.group_drafting.schemas import GroupDraftResponse
 
 
@@ -124,7 +129,7 @@ class GeminiGroupDraftProvider:
                     ],
                     "generationConfig": {
                         "responseMimeType": "application/json",
-                        "responseSchema": GROUP_DRAFT_SCHEMA,
+                        "responseSchema": to_gemini_response_schema(GROUP_DRAFT_SCHEMA),
                     },
                 },
                 timeout=25,
