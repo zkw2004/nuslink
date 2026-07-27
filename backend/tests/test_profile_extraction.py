@@ -5,15 +5,14 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
-from app import gemini
+from app import anthropic
 from app.auth import AuthenticatedUser
 from app.core.config import settings
 from app.main import app
 from app.profile_extraction import service
 from app.profile_extraction.service import (
-    GeminiProfileExtractionProvider,
+    ClaudeProfileExtractionProvider,
     ProfileExtractionError,
-    _find_output_text,
 )
 from app.routers.profile_extraction import (
     get_current_user as get_profile_extraction_current_user,
@@ -50,11 +49,11 @@ class FakeProfileExtractionProvider:
         self.health_calls += 1
 
 
-class FakeGeminiResponse:
+class FakeAnthropicResponse:
     def __init__(self, payload: dict[str, object]) -> None:
         self.payload = payload
 
-    def __enter__(self) -> "FakeGeminiResponse":
+    def __enter__(self) -> "FakeAnthropicResponse":
         return self
 
     def __exit__(self, *args: object) -> None:
@@ -211,114 +210,165 @@ def test_extract_profile_requires_authentication():
     assert response.status_code == 401
 
 
-def test_find_output_text_rejects_provider_refusal():
-    with pytest.raises(
-        ProfileExtractionError,
-        match="The AI provider declined this resume.",
-    ):
-        _find_output_text({"candidates": [{"finishReason": "SAFETY"}]})
-
-
-def test_gemini_provider_sends_private_structured_file_request(
+def test_claude_provider_sends_private_structured_file_request(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    monkeypatch.setattr(settings, "gemini_api_key", "test-key")
+    monkeypatch.setattr(settings, "anthropic_api_key", "test-key")
     monkeypatch.setattr(
         settings,
-        "gemini_profile_extraction_model",
+        "anthropic_profile_extraction_model",
         "test-profile-model",
     )
     captured_request: dict[str, object] = {}
 
-    def fake_urlopen(api_request: object, timeout: int) -> FakeGeminiResponse:
+    def fake_urlopen(api_request: object, timeout: int) -> FakeAnthropicResponse:
         captured_request["request"] = api_request
         captured_request["timeout"] = timeout
-        return FakeGeminiResponse(
+        return FakeAnthropicResponse(
             {
-                "candidates": [
+                "content": [
                     {
-                        "content": {
-                            "parts": [{"text": json.dumps(valid_output())}],
-                        },
+                        "type": "tool_use",
+                        "name": "emit_profile_extraction",
+                        "input": valid_output(),
                     }
                 ]
             }
         )
 
-    monkeypatch.setattr(gemini.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(anthropic.request, "urlopen", fake_urlopen)
 
-    result = GeminiProfileExtractionProvider().generate(
+    result = ClaudeProfileExtractionProvider().generate(
         filename="resume.pdf",
         mime_type="application/pdf",
         file_base64=pdf_payload()["file_base64"],
     )
     api_request = captured_request["request"]
-    assert isinstance(api_request, gemini.request.Request)
+    assert isinstance(api_request, anthropic.request.Request)
     request_body = json.loads(api_request.data.decode("utf-8"))
 
-    assert api_request.full_url == (
-        "https://generativelanguage.googleapis.com/v1beta/models/"
-        "test-profile-model:generateContent"
-    )
-    assert api_request.get_header("X-goog-api-key") == "test-key"
-    assert request_body["contents"][0]["parts"][0]["inlineData"] == {
-        "mimeType": "application/pdf",
-        "data": pdf_payload()["file_base64"],
+    assert api_request.full_url == "https://api.anthropic.com/v1/messages"
+    assert api_request.get_header("X-api-key") == "test-key"
+    assert request_body["model"] == "test-profile-model"
+    assert request_body["messages"][0]["content"][0] == {
+        "type": "document",
+        "source": {
+            "type": "base64",
+            "media_type": "application/pdf",
+            "data": pdf_payload()["file_base64"],
+        },
     }
-    assert request_body["generationConfig"]["responseMimeType"] == "application/json"
-    response_schema = request_body["generationConfig"]["responseSchema"]
+    response_schema = request_body["tools"][0]["input_schema"]
     assert response_schema["type"] == "object"
-    assert response_schema["properties"]["suggested_bio"]["type"] == "string"
-    assert response_schema["properties"]["suggested_bio"]["nullable"] is True
-    assert response_schema["properties"]["skills"]["items"]["properties"]["evidence"][
-        "nullable"
-    ] is True
-    assert "additionalProperties" not in json.dumps(response_schema)
-    assert "maxLength" not in json.dumps(response_schema)
-    assert "minLength" not in json.dumps(response_schema)
-    assert request_body["generationConfig"]["maxOutputTokens"] == 4000
+    assert response_schema["properties"]["suggested_bio"]["type"] == [
+        "string",
+        "null",
+    ]
+    assert request_body["tool_choice"] == {
+        "type": "tool",
+        "name": "emit_profile_extraction",
+    }
     assert captured_request["timeout"] == 45
     assert result["skills"][0]["value"] == " Python "
 
 
-def test_gemini_profile_health_uses_inline_file_request(
+def test_claude_profile_health_uses_inline_image_request(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    monkeypatch.setattr(settings, "gemini_api_key", "test-key")
+    monkeypatch.setattr(settings, "anthropic_api_key", "test-key")
     monkeypatch.setattr(
         settings,
-        "gemini_profile_extraction_model",
+        "anthropic_profile_extraction_model",
         "test-profile-model",
     )
     captured_request: dict[str, object] = {}
 
-    def fake_urlopen(api_request: object, timeout: int) -> FakeGeminiResponse:
+    def fake_urlopen(api_request: object, timeout: int) -> FakeAnthropicResponse:
         captured_request["request"] = api_request
         captured_request["timeout"] = timeout
-        return FakeGeminiResponse(
+        return FakeAnthropicResponse(
             {
-                "candidates": [
+                "content": [
                     {
-                        "content": {
-                            "parts": [{"text": json.dumps(valid_output())}],
-                        },
+                        "type": "tool_use",
+                        "name": "emit_profile_extraction",
+                        "input": valid_output(),
                     }
                 ]
             }
         )
 
-    monkeypatch.setattr(gemini.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(anthropic.request, "urlopen", fake_urlopen)
 
-    GeminiProfileExtractionProvider().check_health()
+    ClaudeProfileExtractionProvider().check_health()
     api_request = captured_request["request"]
-    assert isinstance(api_request, gemini.request.Request)
+    assert isinstance(api_request, anthropic.request.Request)
     request_body = json.loads(api_request.data.decode("utf-8"))
 
-    assert request_body["contents"][0]["parts"][0]["inlineData"] == {
-        "mimeType": "image/png",
-        "data": service.PROFILE_HEALTH_IMAGE_BASE64,
+    assert request_body["messages"][0]["content"][0] == {
+        "type": "image",
+        "source": {
+            "type": "base64",
+            "media_type": "image/png",
+            "data": service.PROFILE_HEALTH_IMAGE_BASE64,
+        },
     }
     assert captured_request["timeout"] == 45
+
+
+def test_claude_provider_rejects_tool_refusal(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(settings, "anthropic_api_key", "test-key")
+    monkeypatch.setattr(
+        settings,
+        "anthropic_profile_extraction_model",
+        "test-profile-model",
+    )
+
+    def fake_urlopen(api_request: object, timeout: int) -> FakeAnthropicResponse:
+        del api_request, timeout
+        return FakeAnthropicResponse({"stop_reason": "refusal", "content": []})
+
+    monkeypatch.setattr(anthropic.request, "urlopen", fake_urlopen)
+
+    with pytest.raises(ProfileExtractionError, match="declined this resume"):
+        ClaudeProfileExtractionProvider().generate(
+            filename="resume.pdf",
+            mime_type="application/pdf",
+            file_base64=pdf_payload()["file_base64"],
+        )
+
+
+def test_profile_extraction_provider_surfaces_http_error_detail(monkeypatch):
+    monkeypatch.setattr(settings, "anthropic_api_key", "test-key")
+    monkeypatch.setattr(
+        settings,
+        "anthropic_profile_extraction_model",
+        "test-profile-model",
+    )
+
+    def fake_urlopen(api_request: object, timeout: int) -> FakeAnthropicResponse:
+        del api_request, timeout
+        raise anthropic.error.HTTPError(
+            url="https://example.test",
+            code=403,
+            msg="Forbidden",
+            hdrs={},
+            fp=io.BytesIO(b'{"error":{"message":"API key not valid"}}'),
+        )
+
+    monkeypatch.setattr(anthropic.request, "urlopen", fake_urlopen)
+
+    try:
+        ClaudeProfileExtractionProvider().generate(
+            filename="resume.pdf",
+            mime_type="application/pdf",
+            file_base64=pdf_payload()["file_base64"],
+        )
+    except ProfileExtractionError as exc:
+        assert "HTTP 403" in str(exc)
+        assert "API key not valid" in str(exc)
+    else:
+        raise AssertionError("Expected profile extraction HTTP errors to surface.")
 
 
 def test_profile_extraction_provider_health_endpoint_returns_status():
@@ -338,41 +388,8 @@ def test_profile_extraction_provider_health_endpoint_returns_status():
     assert response.json() == {
         "provider": "fake",
         "model": "fake-model",
-        "configured": bool(settings.gemini_api_key),
+        "configured": bool(settings.anthropic_api_key),
         "ok": True,
         "error": None,
     }
     assert provider.health_calls == 1
-
-
-def test_profile_extraction_provider_surfaces_http_error_detail(monkeypatch):
-    monkeypatch.setattr(settings, "gemini_api_key", "test-key")
-    monkeypatch.setattr(
-        settings,
-        "gemini_profile_extraction_model",
-        "test-profile-model",
-    )
-
-    def fake_urlopen(api_request: object, timeout: int) -> FakeGeminiResponse:
-        del api_request, timeout
-        raise gemini.error.HTTPError(
-            url="https://example.test",
-            code=403,
-            msg="Forbidden",
-            hdrs={},
-            fp=io.BytesIO(b'{"error":{"message":"API key not valid"}}'),
-        )
-
-    monkeypatch.setattr(gemini.request, "urlopen", fake_urlopen)
-
-    try:
-        GeminiProfileExtractionProvider().generate(
-            filename="resume.pdf",
-            mime_type="application/pdf",
-            file_base64=pdf_payload()["file_base64"],
-        )
-    except ProfileExtractionError as exc:
-        assert "HTTP 403" in str(exc)
-        assert "API key not valid" in str(exc)
-    else:
-        raise AssertionError("Expected profile extraction HTTP errors to surface.")

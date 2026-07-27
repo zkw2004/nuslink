@@ -1,15 +1,9 @@
-import json
 from typing import Protocol
 
 from pydantic import ValidationError
 
+from app.anthropic import AnthropicRequestError, create_message_payload, find_tool_input
 from app.core.config import settings
-from app.gemini import (
-    GeminiRequestError,
-    find_output_text,
-    generate_content_payload,
-    to_gemini_response_schema,
-)
 from app.group_drafting.schemas import GroupDraftResponse
 
 
@@ -97,71 +91,61 @@ Only set a restriction for semi_private privacy; semi_private must have a restri
 Do not invent dates, venues, modules, or group sizes."""
 
 
-class GeminiGroupDraftProvider:
-    provider_name = "gemini"
+class ClaudeGroupDraftProvider:
+    provider_name = "claude"
 
     @property
     def model_name(self) -> str:
-        return settings.gemini_group_drafting_model
+        return settings.anthropic_group_drafting_model
 
     def generate(self, prompt: str) -> dict[str, object]:
-        if not settings.gemini_api_key:
-            raise GroupDraftingError("Gemini group drafting is not configured.")
+        if not settings.anthropic_api_key:
+            raise GroupDraftingError("Claude group drafting is not configured.")
 
         try:
-            payload = generate_content_payload(
+            payload = create_message_payload(
                 request_type="group drafting",
-                model=settings.gemini_group_drafting_model,
-                api_key=settings.gemini_api_key,
+                model=settings.anthropic_group_drafting_model,
+                api_key=settings.anthropic_api_key,
                 body={
-                    "systemInstruction": {
-                        "parts": [
-                            {
-                                "text": (
-                                    f"{SYSTEM_PROMPT}\n"
-                                    "Return only JSON matching the response schema."
-                                )
-                            }
-                        ]
-                    },
-                    "contents": [
-                        {"role": "user", "parts": [{"text": prompt}]},
+                    "model": settings.anthropic_group_drafting_model,
+                    "max_tokens": 1200,
+                    "system": SYSTEM_PROMPT,
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": [{"type": "text", "text": prompt}],
+                        },
                     ],
-                    "generationConfig": {
-                        "responseMimeType": "application/json",
-                        "responseSchema": to_gemini_response_schema(GROUP_DRAFT_SCHEMA),
-                    },
+                    "tools": [
+                        {
+                            "name": "emit_group_draft",
+                            "description": "Return the group draft fields.",
+                            "input_schema": GROUP_DRAFT_SCHEMA,
+                        }
+                    ],
+                    "tool_choice": {"type": "tool", "name": "emit_group_draft"},
                 },
                 timeout=25,
             )
-        except GeminiRequestError as exc:
+        except AnthropicRequestError as exc:
             raise GroupDraftingError(str(exc)) from exc
 
-        output_text = _find_gemini_output_text(payload)
         try:
-            parsed_output = json.loads(output_text)
-        except json.JSONDecodeError as exc:
-            raise GroupDraftingError("Gemini group draft was not valid JSON.") from exc
-
-        if not isinstance(parsed_output, dict):
-            raise GroupDraftingError("The AI draft had an unexpected shape.")
-
-        return parsed_output
+            return find_tool_input(
+                payload,
+                request_type="group drafting",
+                tool_name="emit_group_draft",
+                declined_message="Claude declined this group draft request.",
+                no_output_message="Claude returned no group draft.",
+            )
+        except AnthropicRequestError as exc:
+            raise GroupDraftingError(str(exc)) from exc
 
     def check_health(self) -> None:
         self.generate("CS2040S study group before midterms, 3 to 5 people at COM3.")
 
 
-def _find_gemini_output_text(payload: object) -> str:
-    try:
-        return find_output_text(
-            payload,
-            request_type="group drafting",
-            declined_message="Gemini declined this group draft request.",
-            no_output_message="Gemini returned no group draft.",
-        )
-    except GeminiRequestError as exc:
-        raise GroupDraftingError(str(exc)) from exc
 
 
 def create_group_draft(

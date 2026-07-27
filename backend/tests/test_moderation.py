@@ -3,14 +3,13 @@ import json
 
 from fastapi.testclient import TestClient
 
-from app import gemini
+from app import anthropic
 from app.auth import AuthenticatedUser
 from app.core.config import settings
 from app.main import app
-from app.moderation import service
 from app.moderation.schemas import ModerationItem
 from app.moderation.service import (
-    GeminiModerationProvider,
+    ClaudeModerationProvider,
     ModerationProviderError,
     ProviderModerationResult,
     aggregate_outcome,
@@ -63,11 +62,11 @@ class FakeModerationRepository:
         self.events.append(kwargs)
 
 
-class FakeGeminiResponse:
+class FakeAnthropicResponse:
     def __init__(self, payload: dict[str, object]) -> None:
         self.payload = payload
 
-    def __enter__(self) -> "FakeGeminiResponse":
+    def __enter__(self) -> "FakeAnthropicResponse":
         return self
 
     def __exit__(self, *args: object) -> None:
@@ -410,81 +409,70 @@ def test_moderation_provider_health_endpoint_returns_status():
     assert response.json() == {
         "provider": "fake",
         "model": "fake-model",
-        "configured": bool(settings.gemini_api_key),
+        "configured": bool(settings.anthropic_api_key),
         "ok": True,
         "error": None,
     }
 
 
-def test_gemini_provider_sends_structured_generate_content_request(monkeypatch):
-    monkeypatch.setattr(settings, "gemini_api_key", "test-key")
-    monkeypatch.setattr(settings, "gemini_moderation_model", "test-model")
+def test_claude_provider_sends_structured_messages_request(monkeypatch):
+    monkeypatch.setattr(settings, "anthropic_api_key", "test-key")
+    monkeypatch.setattr(settings, "anthropic_moderation_model", "test-model")
     captured_request: dict[str, object] = {}
 
-    def fake_urlopen(api_request: object, timeout: int) -> FakeGeminiResponse:
+    def fake_urlopen(api_request: object, timeout: int) -> FakeAnthropicResponse:
         captured_request["request"] = api_request
         captured_request["timeout"] = timeout
-        return FakeGeminiResponse(
+        return FakeAnthropicResponse(
             {
-                "candidates": [
+                "content": [
                     {
-                        "content": {
-                            "parts": [
-                                {
-                                    "text": json.dumps(
-                                        {
-                                            "outcome": "allowed",
-                                            "categories": [],
-                                            "confidence": 0.01,
-                                            "reason": None,
-                                        }
-                                    )
-                                }
-                            ]
-                        }
+                        "type": "tool_use",
+                        "name": "emit_moderation_result",
+                        "input": {
+                            "outcome": "allowed",
+                            "categories": [],
+                            "confidence": 0.01,
+                            "reason": None,
+                        },
                     }
                 ]
             }
         )
 
-    monkeypatch.setattr(gemini.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(anthropic.request, "urlopen", fake_urlopen)
 
-    result = GeminiModerationProvider().moderate(
+    result = ClaudeModerationProvider().moderate(
         subject_type="group_description",
         content="Study dynamic programming together.",
     )
     api_request = captured_request["request"]
-    assert isinstance(api_request, gemini.request.Request)
+    assert isinstance(api_request, anthropic.request.Request)
     request_body = json.loads(api_request.data.decode("utf-8"))
 
-    assert (
-        api_request.full_url
-        == "https://generativelanguage.googleapis.com/v1beta/models/"
-        "test-model:generateContent"
-    )
-    assert api_request.get_header("X-goog-api-key") == "test-key"
+    assert api_request.full_url == "https://api.anthropic.com/v1/messages"
+    assert api_request.get_header("X-api-key") == "test-key"
+    assert api_request.get_header("Anthropic-version") == "2023-06-01"
     assert captured_request["timeout"] == 25
-    assert request_body["generationConfig"]["responseMimeType"] == (
-        "application/json"
-    )
-    response_schema = request_body["generationConfig"]["responseSchema"]
+    assert request_body["model"] == "test-model"
+    assert request_body["tool_choice"] == {
+        "type": "tool",
+        "name": "emit_moderation_result",
+    }
+    response_schema = request_body["tools"][0]["input_schema"]
     assert response_schema["type"] == "object"
-    assert response_schema["properties"]["confidence"]["type"] == "number"
-    assert response_schema["properties"]["confidence"]["nullable"] is True
-    assert response_schema["properties"]["reason"]["type"] == "string"
-    assert response_schema["properties"]["reason"]["nullable"] is True
-    assert '["number", "null"]' not in json.dumps(response_schema)
-    assert "temperature" not in request_body["generationConfig"]
+    assert response_schema["properties"]["confidence"]["type"] == ["number", "null"]
+    assert "temperature" not in request_body
     assert result.outcome == "allowed"
 
 
-def test_gemini_provider_surfaces_http_error_detail(monkeypatch):
-    monkeypatch.setattr(settings, "gemini_api_key", "test-key")
-    monkeypatch.setattr(settings, "gemini_moderation_model", "test-model")
+def test_claude_provider_surfaces_http_error_detail(monkeypatch):
+    monkeypatch.setattr(settings, "anthropic_api_key", "test-key")
+    monkeypatch.setattr(settings, "anthropic_moderation_model", "test-model")
 
-    def fake_urlopen(api_request: object, timeout: int) -> FakeGeminiResponse:
+    def fake_urlopen(api_request: object, timeout: int) -> FakeAnthropicResponse:
         del api_request, timeout
-        raise gemini.error.HTTPError(
+        raise anthropic.error.HTTPError(
             url="https://example.test",
             code=404,
             msg="Not Found",
@@ -494,10 +482,10 @@ def test_gemini_provider_surfaces_http_error_detail(monkeypatch):
             ),
         )
 
-    monkeypatch.setattr(gemini.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(anthropic.request, "urlopen", fake_urlopen)
 
     try:
-        GeminiModerationProvider().moderate(
+        ClaudeModerationProvider().moderate(
             subject_type="group_description",
             content="Study algorithms together.",
         )
@@ -505,4 +493,4 @@ def test_gemini_provider_surfaces_http_error_detail(monkeypatch):
         assert "HTTP 404" in str(exc)
         assert "models/test-model is not found" in str(exc)
     else:
-        raise AssertionError("Expected Gemini HTTP errors to surface details.")
+        raise AssertionError("Expected Claude HTTP errors to surface details.")

@@ -12,8 +12,6 @@ class ProfileExtractionRequest(BaseModel):
     filename: str = Field(min_length=1, max_length=160)
     mime_type: Literal[
         "application/pdf",
-        "application/msword",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         "image/jpeg",
         "image/png",
     ]

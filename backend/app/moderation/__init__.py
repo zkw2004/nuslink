@@ -17,7 +17,7 @@ from .schemas import (
     ModerationResult as ModerationResult,
 )
 from .service import (
-    GeminiModerationProvider as GeminiModerationProvider,
+    ClaudeModerationProvider as ClaudeModerationProvider,
 )
 from .service import (
     ModerationProvider as ModerationProvider,
@@ -41,7 +41,7 @@ __all__ = [
     "ModerationProvider",
     "ModerationRepository",
     "ModerationResult",
-    "GeminiModerationProvider",
+    "ClaudeModerationProvider",
     "moderate_batch",
     "moderate_content",
 ]

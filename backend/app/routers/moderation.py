@@ -10,7 +10,7 @@ from app.moderation.schemas import (
     ModerationProviderHealthResponse,
 )
 from app.moderation.service import (
-    GeminiModerationProvider,
+    ClaudeModerationProvider,
     ModerationProvider,
     ModerationProviderError,
     moderate_batch,
@@ -22,7 +22,7 @@ router = APIRouter(prefix="/v1/moderation", tags=["moderation"])
 
 
 def get_moderation_provider() -> ModerationProvider:
-    return GeminiModerationProvider()
+    return ClaudeModerationProvider()
 
 
 def get_moderation_repository() -> SupabaseModerationRepository:
@@ -35,7 +35,7 @@ def provider_health(
     provider: ModerationProvider = Depends(get_moderation_provider),
 ) -> ModerationProviderHealthResponse:
     del current_user
-    configured = bool(settings.gemini_api_key)
+    configured = bool(settings.anthropic_api_key)
 
     try:
         provider.moderate(

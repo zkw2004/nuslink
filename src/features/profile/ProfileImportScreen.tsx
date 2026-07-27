@@ -23,8 +23,6 @@ import {
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 const SUPPORTED_MIME_TYPES = [
   "application/pdf",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "image/jpeg",
   "image/png",
 ] as const;
@@ -63,8 +61,6 @@ function inferMimeType(asset: DocumentPickerAsset): SupportedMimeType | null {
   const extension = asset.name.split(".").pop()?.toLowerCase();
   const byExtension: Record<string, SupportedMimeType> = {
     pdf: "application/pdf",
-    doc: "application/msword",
-    docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     jpg: "image/jpeg",
     jpeg: "image/jpeg",
     png: "image/png",
@@ -108,7 +104,7 @@ export function ProfileImportScreen() {
     if (!mimeType) {
       Alert.alert(
         "Unsupported file",
-        "Choose a PDF, Word document, JPEG, or PNG resume.",
+        "Choose a PDF, JPEG, or PNG resume.",
       );
       return;
     }
@@ -194,7 +190,7 @@ export function ProfileImportScreen() {
                 Select your resume
               </Text>
               <Text className="text-[13px] leading-5 text-[#606A7B]">
-                PDF, Word, JPEG, or PNG · up to 10 MB. Contact details and
+                PDF, JPEG, or PNG · up to 10 MB. Contact details and
                 sensitive identifiers are excluded from extraction.
               </Text>
               <AppButton
