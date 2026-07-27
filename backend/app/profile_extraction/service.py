@@ -16,6 +16,12 @@ from app.profile_extraction.schemas import (
 )
 
 MAX_PROFILE_FILE_BYTES = 10 * 1024 * 1024
+PROFILE_HEALTH_IMAGE_BASE64 = (
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9s"
+    "AAAAASUVORK5CYII="
+)
+PROFILE_LINK_LABELS = {"linkedin", "github", "portfolio", "other"}
+PROFILE_ENTRY_CATEGORIES = {"work", "project", "competition"}
 
 
 class ProfileExtractionError(Exception):
@@ -232,41 +238,16 @@ class GeminiProfileExtractionProvider:
             raise ProfileExtractionError("AI profile extraction is not configured.")
 
         try:
-            payload = generate_content_payload(
-                request_type="profile extraction health",
-                model=settings.gemini_profile_extraction_model,
-                api_key=settings.gemini_api_key,
-                body={
-                    "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]},
-                    "contents": [
-                        {
-                            "role": "user",
-                            "parts": [
-                                {
-                                    "text": (
-                                        "Return an empty NUSLink profile extraction "
-                                        "draft for a provider health check."
-                                    )
-                                }
-                            ],
-                        }
-                    ],
-                    "generationConfig": {
-                        "responseMimeType": "application/json",
-                        "responseJsonSchema": PROFILE_EXTRACTION_SCHEMA,
-                        "maxOutputTokens": 800,
-                    },
-                },
-                timeout=25,
+            ProfileExtractionResponse.model_validate(
+                _normalize_provider_output(
+                    self.generate(
+                        filename="provider-health.png",
+                        mime_type="image/png",
+                        file_base64=PROFILE_HEALTH_IMAGE_BASE64,
+                    )
+                )
             )
-        except GeminiRequestError as exc:
-            raise ProfileExtractionError(str(exc)) from exc
-
-        output_text = _find_output_text(payload)
-        try:
-            parsed_output = json.loads(output_text)
-            ProfileExtractionResponse.model_validate(parsed_output)
-        except (json.JSONDecodeError, ValidationError) as exc:
+        except ValidationError as exc:
             raise ProfileExtractionError(
                 "AI profile extraction health check returned invalid output."
             ) from exc
@@ -321,6 +302,158 @@ def _normalize_text(value: str | None) -> str | None:
     return normalized or None
 
 
+def _normalize_provider_text(value: object, *, max_length: int) -> str | None:
+    if not isinstance(value, str):
+        return None
+    normalized = _normalize_text(value)
+    if normalized is None:
+        return None
+    return normalized[:max_length].rstrip() or None
+
+
+def _normalize_provider_list(value: object) -> list[object]:
+    return value if isinstance(value, list) else []
+
+
+def _normalize_provider_items(
+    value: object,
+    *,
+    max_items: int,
+) -> list[dict[str, object]]:
+    items: list[dict[str, object]] = []
+    for raw_item in _normalize_provider_list(value):
+        if not isinstance(raw_item, dict):
+            continue
+        item_value = _normalize_provider_text(raw_item.get("value"), max_length=100)
+        if not item_value:
+            continue
+        items.append(
+            {
+                "value": item_value,
+                "evidence": _normalize_provider_text(
+                    raw_item.get("evidence"),
+                    max_length=240,
+                ),
+            }
+        )
+        if len(items) >= max_items:
+            break
+    return items
+
+
+def _normalize_provider_url(value: object) -> str | None:
+    url = _normalize_provider_text(value, max_length=500)
+    if not url or any(character.isspace() for character in url):
+        return None
+    if url.startswith(("https://", "http://")):
+        return url
+    if "." not in url:
+        return None
+    return f"https://{url}"[:500].rstrip()
+
+
+def _normalize_provider_link_label(label: object, url: str) -> str:
+    normalized_label = _normalize_provider_text(label, max_length=40)
+    if normalized_label and normalized_label.casefold() in PROFILE_LINK_LABELS:
+        return normalized_label.casefold()
+
+    normalized_url = url.casefold()
+    if "linkedin.com" in normalized_url:
+        return "linkedin"
+    if "github.com" in normalized_url:
+        return "github"
+    if normalized_url.startswith(("http://", "https://")):
+        return "portfolio"
+    return "other"
+
+
+def _normalize_provider_links(value: object) -> list[dict[str, object]]:
+    links: list[dict[str, object]] = []
+    for raw_link in _normalize_provider_list(value):
+        if not isinstance(raw_link, dict):
+            continue
+        url = _normalize_provider_url(raw_link.get("url"))
+        if not url:
+            continue
+        links.append(
+            {
+                "label": _normalize_provider_link_label(raw_link.get("label"), url),
+                "url": url,
+                "evidence": _normalize_provider_text(
+                    raw_link.get("evidence"),
+                    max_length=240,
+                ),
+            }
+        )
+        if len(links) >= 10:
+            break
+    return links
+
+
+def _normalize_provider_entries(value: object) -> list[dict[str, object]]:
+    entries: list[dict[str, object]] = []
+    for raw_entry in _normalize_provider_list(value):
+        if not isinstance(raw_entry, dict):
+            continue
+        category = _normalize_provider_text(raw_entry.get("category"), max_length=40)
+        title = _normalize_provider_text(raw_entry.get("title"), max_length=140)
+        if category not in PROFILE_ENTRY_CATEGORIES or not title:
+            continue
+        entries.append(
+            {
+                "category": category,
+                "title": title,
+                "organization": _normalize_provider_text(
+                    raw_entry.get("organization"),
+                    max_length=140,
+                ),
+                "date_label": _normalize_provider_text(
+                    raw_entry.get("date_label"),
+                    max_length=80,
+                ),
+                "description": _normalize_provider_text(
+                    raw_entry.get("description"),
+                    max_length=500,
+                ),
+                "evidence": _normalize_provider_text(
+                    raw_entry.get("evidence"),
+                    max_length=240,
+                ),
+            }
+        )
+        if len(entries) >= 30:
+            break
+    return entries
+
+
+def _normalize_provider_warnings(value: object) -> list[str]:
+    warnings: list[str] = []
+    for warning in _normalize_provider_list(value):
+        normalized_warning = _normalize_provider_text(warning, max_length=240)
+        if normalized_warning:
+            warnings.append(normalized_warning)
+        if len(warnings) >= 10:
+            break
+    return warnings
+
+
+def _normalize_provider_output(value: dict[str, object]) -> dict[str, object]:
+    return {
+        "suggested_bio": _normalize_provider_text(
+            value.get("suggested_bio"),
+            max_length=200,
+        ),
+        "skills": _normalize_provider_items(value.get("skills"), max_items=30),
+        "interests": _normalize_provider_items(value.get("interests"), max_items=20),
+        "cca_tags": _normalize_provider_items(value.get("cca_tags"), max_items=20),
+        "professional_links": _normalize_provider_links(
+            value.get("professional_links")
+        ),
+        "entries": _normalize_provider_entries(value.get("entries")),
+        "warnings": _normalize_provider_warnings(value.get("warnings")),
+    }
+
+
 def _dedupe_items(
     items: list[ExtractedProfileItem],
 ) -> list[ExtractedProfileItem]:
@@ -350,10 +483,12 @@ def create_profile_extraction(
 
     try:
         draft = ProfileExtractionResponse.model_validate(
-            provider.generate(
-                filename=payload.filename,
-                mime_type=payload.mime_type,
-                file_base64=normalized_base64,
+            _normalize_provider_output(
+                provider.generate(
+                    filename=payload.filename,
+                    mime_type=payload.mime_type,
+                    file_base64=normalized_base64,
+                )
             )
         )
     except ValidationError as exc:

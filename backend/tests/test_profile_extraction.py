@@ -154,9 +154,32 @@ def test_extract_profile_rejects_mismatched_file_signature():
     assert provider.calls == []
 
 
-def test_extract_profile_rejects_invalid_provider_output():
+def test_extract_profile_normalizes_sloppy_provider_output():
     provider = FakeProfileExtractionProvider(
-        {**valid_output(), "professional_links": [{"label": "github", "url": "x"}]}
+        {
+            **valid_output(),
+            "interests": "not a list",
+            "professional_links": [
+                {
+                    "label": "Github",
+                    "url": "github.com/example",
+                    "evidence": "github.com/example",
+                },
+                {"label": "github", "url": "x"},
+            ],
+            "entries": [
+                {
+                    "category": "project",
+                    "title": "Useful tool",
+                    "organization": None,
+                    "date_label": None,
+                    "description": "Built from resume evidence.",
+                    "evidence": "Useful tool",
+                },
+                {"category": "unknown", "title": "Skipped item"},
+            ],
+            "warnings": ["  Review imported suggestions before saving.  ", None],
+        }
     )
     app.dependency_overrides[get_profile_extraction_current_user] = (
         override_current_user
@@ -169,8 +192,18 @@ def test_extract_profile_rejects_invalid_provider_output():
         app.dependency_overrides.pop(get_profile_extraction_current_user, None)
         app.dependency_overrides.pop(get_profile_extraction_provider, None)
 
-    assert response.status_code == 502
-    assert response.json() == {"detail": "The extracted profile failed validation."}
+    assert response.status_code == 200
+    body = response.json()
+    assert body["interests"] == []
+    assert body["professional_links"] == [
+        {
+            "label": "github",
+            "url": "https://github.com/example",
+            "evidence": "github.com/example",
+        }
+    ]
+    assert body["entries"][-1]["title"] == "Useful tool"
+    assert body["warnings"] == ["Review imported suggestions before saving."]
 
 
 def test_extract_profile_requires_authentication():
@@ -240,6 +273,46 @@ def test_gemini_provider_sends_private_structured_file_request(
     assert request_body["generationConfig"]["maxOutputTokens"] == 4000
     assert captured_request["timeout"] == 45
     assert result["skills"][0]["value"] == " Python "
+
+
+def test_gemini_profile_health_uses_inline_file_request(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setattr(settings, "gemini_api_key", "test-key")
+    monkeypatch.setattr(
+        settings,
+        "gemini_profile_extraction_model",
+        "test-profile-model",
+    )
+    captured_request: dict[str, object] = {}
+
+    def fake_urlopen(api_request: object, timeout: int) -> FakeGeminiResponse:
+        captured_request["request"] = api_request
+        captured_request["timeout"] = timeout
+        return FakeGeminiResponse(
+            {
+                "candidates": [
+                    {
+                        "content": {
+                            "parts": [{"text": json.dumps(valid_output())}],
+                        },
+                    }
+                ]
+            }
+        )
+
+    monkeypatch.setattr(gemini.request, "urlopen", fake_urlopen)
+
+    GeminiProfileExtractionProvider().check_health()
+    api_request = captured_request["request"]
+    assert isinstance(api_request, gemini.request.Request)
+    request_body = json.loads(api_request.data.decode("utf-8"))
+
+    assert request_body["contents"][0]["parts"][0]["inlineData"] == {
+        "mimeType": "image/png",
+        "data": service.PROFILE_HEALTH_IMAGE_BASE64,
+    }
+    assert captured_request["timeout"] == 45
 
 
 def test_profile_extraction_provider_health_endpoint_returns_status():
