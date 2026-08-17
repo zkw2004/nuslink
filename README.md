@@ -26,8 +26,6 @@ NUSLink is a cross-platform mobile app that helps National University of Singapo
 - In-app and push notifications, configurable smart nudges, and content moderation
 - A versioned FastAPI backend for matching and server-side intelligence
 
-The canonical product direction is documented in [FEATURES.md](./FEATURES.md).
-
 ## Architecture
 
 ```mermaid
