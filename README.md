@@ -192,7 +192,7 @@ Create an internal Android APK with Expo EAS:
 npm run build:android:apk
 ```
 
-See [APP_ACCESS.md](./APP_ACCESS.md) for evaluator access and deployment notes.
+Download the current Android APK from the [Expo EAS build page](https://expo.dev/accounts/joelyrk/projects/nuslink/builds/0b75373a-6b29-486a-b426-f60e0ae7b33c).
 
 ## Domain and privacy guarantees
 
